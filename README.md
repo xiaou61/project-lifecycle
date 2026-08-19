@@ -1,47 +1,87 @@
 # Project Lifecycle Skill
 
-一个面向 Codex 的中文项目开发生命周期 skill。它通过需求、提案、设计、实现和验证五个阶段控制项目漂移，并把项目过程资料统一保存在目标项目的 `.agent/` 目录。
+一个面向 Codex 的中文项目开发生命周期 Skill。它通过需求、提案、设计、实现和验证五个阶段控制项目漂移，并把项目过程资料统一保存在目标项目的 `.agent/` 目录。
 
-## 两个目录不要混淆
+## 先理解三个位置
+
+这个项目涉及三个不同位置。Skill 本体确实需要安装到 Codex 能发现的本地目录；仅仅把源码仓库放在任意文件夹里，并不会完成安装。`.agent/` 只是 Skill 在某个目标项目中创建的项目资料目录。
+
+### 1. GitHub 源码仓库
+
+这是用于版本管理和开源分发的源代码：
 
 ```text
-project-lifecycle/          本开源 skill 仓库
+https://github.com/xiaou61/project-lifecycle
+
+project-lifecycle/
+  SKILL.md                 Skill 指令入口
+  agents/openai.yaml       UI 元数据
+  references/              按需读取的详细规范
+  scripts/                 初始化器和确定性辅助脚本
+```
+
+### 2. Codex 本地安装目录
+
+Codex 实际从这里加载 `$project-lifecycle`。安装后的内容与 GitHub 仓库保持同样的 Skill 结构：
+
+```text
+Windows（本机 bundled skill-installer 的默认位置）
+C:\Users\<用户名>\.codex\skills\project-lifecycle\
   SKILL.md
   agents/
   references/
   scripts/
-
-your-project/               被管理的目标项目
-  .agent/                   skill 初始化的项目资料目录
-  src/                      项目源代码
-  tests/                    项目可执行测试
 ```
 
-`.agents/skills` 是 Codex 查找已安装 skill 的标准位置；`.agent/` 是本 skill 为目标项目定义的工作区。两者用途不同。
+某些 Codex 配置也使用 `~/.agents/skills/` 作为用户级发现目录；关键是使用当前环境声明的 Skill 安装/发现目录，不要把 Skill 放进目标项目的 `.agent/`。
 
-## 安装
+### 3. 被管理的目标项目
 
-把本仓库目录安装或链接到用户级 skill 目录：
+这是你的业务项目。Skill 安装后，在这里运行初始化器：
 
 ```text
-~/.agents/skills/project-lifecycle/
+your-project/
+  .agent/                  本项目的生命周期资料和长期记忆
+  src/                     项目源代码
+  tests/                   项目可执行测试
 ```
 
-也可以发布到 GitHub 后，让 Codex 使用 `$skill-installer` 从仓库地址安装。Codex 没有立即显示新 skill 时，重新启动 Codex。
+这样分开是有意的：同一个 Skill 可以管理多个项目并独立升级；每个项目的需求、决策、记忆和验证结果则跟随各自项目保存。如果把 Skill 本体复制进每个 `.agent/`，会造成重复版本、升级困难，并把通用指令和项目状态混在一起。
 
-## 初始化项目
+## 安装到本地
 
-在目标项目中调用：
+在 Codex 中可以直接调用安装器：
+
+```text
+使用 $skill-installer 从 https://github.com/xiaou61/project-lifecycle 安装 project-lifecycle。
+```
+
+在 Windows PowerShell 中也可以执行 bundled installer：
+
+```powershell
+python "$env:USERPROFILE\.codex\skills\.system\skill-installer\scripts\install-skill-from-github.py" `
+  --repo xiaou61/project-lifecycle `
+  --path . `
+  --name project-lifecycle
+```
+
+安装完成后，Codex 会从本地安装目录加载 `$project-lifecycle`。如果当前会话没有显示新 Skill，重启 Codex。
+
+## 初始化目标项目
+
+先安装 Skill，再在目标项目根目录调用：
 
 ```text
 使用 $project-lifecycle 初始化当前项目，创建 .agent 工作区。
 ```
 
-初始化器实际执行：
+或者直接运行本地安装副本中的初始化器：
 
-```sh
-python <skill目录>/scripts/init_project.py <目标项目目录>
+```powershell
+python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\init_project.py" "F:\我的已有项目"
 ```
+
+初始化器只修改目标项目的 `.agent/`，不会复制整个 Skill，也不会修改源代码、测试、依赖配置或 Git 历史。
 
 生成结构：
 

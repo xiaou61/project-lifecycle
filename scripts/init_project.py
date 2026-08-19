@@ -20,7 +20,7 @@ WORKSPACE_DIRS = (
 
 WORKSPACE_README = """# .agent 项目工作区
 
-本目录保存由 `project-lifecycle` skill 管理的项目过程资料，不保存 skill 本身。
+本目录保存由已安装的 `project-lifecycle` skill 管理的项目过程资料，不保存 Skill 本体。Skill 本体由 Codex 从本地 Skill 安装目录加载。
 
 ```text
 .agent/

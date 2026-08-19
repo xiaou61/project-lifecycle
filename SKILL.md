@@ -13,10 +13,15 @@ Use Simplified Chinese by default for user-facing conversation and every artifac
 
 ## Initialize The Project
 
-The skill package and the managed project workspace are separate:
+The skill is installed as a reusable package in a Codex skill discovery directory. Its root contains `SKILL.md`, `agents/`, `references/`, and `scripts/`. A target project is a separate repository or directory with its own `.agent/` workspace. Never copy the whole skill package into that `.agent/` directory.
 
-- This installed/open-source skill contains `SKILL.md`, `agents/`, `references/`, and `scripts/` at its own root.
-- A target project stores lifecycle artifacts in its own `.agent/` directory. Never copy or install this skill into that `.agent/` directory.
+The source repository being present somewhere on disk does not by itself make the Skill available. Codex must load it from a configured Skill discovery directory, or the user must invoke it by an explicit path while developing it.
+
+There are three locations to keep distinct:
+
+1. the GitHub/source repository for versioning and distribution;
+2. the local installed Skill directory from which Codex loads `$project-lifecycle` (normally `$CODEX_HOME/skills/project-lifecycle` in the bundled installer environment, or another configured skill discovery directory); and
+3. the target project's `.agent/` directory for project-specific requirements, decisions, memory, and verification evidence.
 
 Before the first lifecycle operation in a project, run [scripts/init_project.py](scripts/init_project.py) against the project root. The initializer creates `.agent/`, its working subdirectories, `.agent/memory.md`, a short project-local directory guide, and a copy of the deterministic core-history generator. It preserves existing files and is safe to run again.
 
