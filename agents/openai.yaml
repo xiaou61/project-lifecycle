@@ -1,0 +1,4 @@
+interface:
+  display_name: "项目生命周期"
+  short_description: "从需求澄清、方案设计、编码实现到测试验收的完整项目流程"
+  default_prompt: "使用 $project-lifecycle 用中文澄清这个需求，并从适当的项目阶段开始。"
