@@ -23,7 +23,11 @@ There are three locations to keep distinct:
 2. the local installed Skill directory from which Codex loads `$project-lifecycle` (normally `$CODEX_HOME/skills/project-lifecycle` in the bundled installer environment, or another configured skill discovery directory); and
 3. the target project's `.agent/` directory for project-specific requirements, decisions, memory, and verification evidence.
 
-Before the first lifecycle operation in a project, run [scripts/init_project.py](scripts/init_project.py) against the project root. The initializer creates `.agent/`, its working subdirectories, `.agent/memory.md`, a short project-local directory guide, and a copy of the deterministic core-history generator. It preserves existing files and is safe to run again.
+Before the first lifecycle operation in a project, run [scripts/init_project.py](scripts/init_project.py) against the project root. The initializer creates a root `AGENTS.md` when it is missing, then creates `.agent/`, its working subdirectories, `.agent/memory.md`, a short project-local directory guide, and a copy of the deterministic core-history generator. It preserves existing files and is safe to run again. It never overwrites `AGENTS.md`, `AGENTS.override.md`, or existing `.agent/` files.
+
+The generated root `AGENTS.md` is a small routing layer: it tells Codex when to use `$project-lifecycle` and where project artifacts live. It does not install or discover the Skill; the Skill must already be available in a Codex Skill discovery directory. If a root `AGENTS.override.md` exists, mention that it takes precedence over the generated base rules.
+
+When an `AGENTS.md` already exists, preserve it without appending or rewriting. Report that the lifecycle routing rules were not merged and ask the user to confirm the existing instructions cover them.
 
 ## Locate The Work
 

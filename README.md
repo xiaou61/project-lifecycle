@@ -41,6 +41,7 @@ C:\Users\<用户名>\.codex\skills\project-lifecycle\
 
 ```text
 your-project/
+  AGENTS.md                Codex 项目级入口规则（初始化时缺失才创建）
   .agent/                  本项目的生命周期资料和长期记忆
   src/                     项目源代码
   tests/                   项目可执行测试
@@ -65,7 +66,7 @@ python "$env:USERPROFILE\.codex\skills\.system\skill-installer\scripts\install-s
   --name project-lifecycle
 ```
 
-安装完成后，Codex 会从本地安装目录加载 `$project-lifecycle`。如果当前会话没有显示新 Skill，重启 Codex。
+安装完成后，Codex 会从本地安装目录加载 `$project-lifecycle`。如果当前会话没有显示新 Skill，重启 Codex。`AGENTS.md` 不能替代安装，它只负责告诉 Codex 在目标项目中何时使用已安装的 Skill。
 
 ## 初始化目标项目
 
@@ -81,22 +82,26 @@ python "$env:USERPROFILE\.codex\skills\.system\skill-installer\scripts\install-s
 python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\init_project.py" "F:\我的已有项目"
 ```
 
-初始化器只修改目标项目的 `.agent/`，不会复制整个 Skill，也不会修改源代码、测试、依赖配置或 Git 历史。
+初始化器会在目标项目根目录缺少 `AGENTS.md` 时创建一份最小入口规则，并创建或补充 `.agent/`；不会复制整个 Skill，也不会修改源代码、测试、依赖配置或 Git 历史。已有 `AGENTS.md`、`AGENTS.override.md` 和 `.agent/` 文件都会保留。初始化器不会自动向已有 `AGENTS.md` 合并内容，而是提示你确认其中是否已经包含生命周期规则。
 
 生成结构：
 
 ```text
-.agent/
-  README.md
-  memory.md
-  project/
-  features/
-  references/
-  notes/
-  history/
-  scripts/
-    generate_core_history.py
+your-project/
+  AGENTS.md                缺失时创建；已有文件不覆盖
+  .agent/
+    README.md
+    memory.md
+    project/
+    features/
+    references/
+    notes/
+    history/
+    scripts/
+      generate_core_history.py
 ```
+
+根目录的 `AGENTS.md` 只负责路由：重要功能使用 `$project-lifecycle`，具体资料仍写入 `.agent/`。如果存在 `AGENTS.override.md`，Codex 会优先使用它。
 
 初始化可以重复执行。已有文件会被保留，不会被覆盖。
 
