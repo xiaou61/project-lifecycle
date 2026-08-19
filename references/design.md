@@ -34,4 +34,4 @@ The design must identify boundaries that other modules rely on, state validation
 
 Map design elements and planned tests back to requirements and acceptance criteria. Do not introduce speculative extension points or abstractions with only one foreseeable use.
 
-Keep the design at `status: draft` until the user explicitly approves it. During implementation, a material deviation returns the design to draft and makes prior verification evidence `stale`; a local factual correction may be recorded without reopening approval.
+Keep the design at `status: draft` until the user explicitly approves it. After approval, use `tasks.md` for exact execution order and file-level steps rather than expanding the design into a second checklist. During implementation, a material deviation returns the design to draft and makes the task plan and prior verification evidence `stale`; a local factual correction may be recorded without reopening approval.

@@ -20,7 +20,7 @@ Create `<artifact-root>/testing/plan.md`. Include only relevant test levels and 
 
 The acceptance matrix maps each `AC-*` criterion to an executable test, a manual inspection, or an explicit gap. Name the intended test location or command when known. Test externally observable behavior and meaningful contracts rather than document wording or implementation trivia.
 
-Before running the plan, confirm that its requirements, proposal, and design are approved rather than `draft` or `stale`. If any upstream artifact changes materially after a result is recorded, mark the report `stale` and rerun the affected checks; a previously passing command is not evidence for changed behavior.
+Before running the plan, confirm that its requirements, proposal, design, and task plan are approved rather than `draft` or `stale`. If any upstream artifact changes materially after a result is recorded, mark the report `stale` and rerun the affected checks; a previously passing command is not evidence for changed behavior.
 
 Place executable tests in the repository's established unit, integration, end-to-end, or other test directories. Do not place executable tests under the documentation artifact root unless that is already the repository convention.
 

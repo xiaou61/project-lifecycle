@@ -10,12 +10,17 @@ from pathlib import Path
 
 
 WORKSPACE_DIRS = (
-    "project",
-    "features",
+    "specs",
+    "changes",
     "references",
     "notes",
     "history",
     "scripts",
+)
+
+LEGACY_WORKSPACE_DIRS = (
+    "project",
+    "features",
 )
 
 WORKSPACE_README = """# .agent 项目工作区
@@ -27,15 +32,17 @@ WORKSPACE_README = """# .agent 项目工作区
 ```text
 .agent/
   memory.md                当前有效、可快速检索的项目长期记忆
-  project/                 整体项目的需求、提案、设计和验证资料
-  features/<功能>/         单个功能的需求、提案、设计和验证资料
+  specs/                   项目当前仍有效的共享规格与契约
+  changes/<工作项>/        每个项目或功能变更的完整生命周期资料
   references/              多个工作项共享的项目参考资料
   notes/                   跨功能、长期有效的决策理由
   history/                 根据 Git 生成的核心组件历史
   scripts/                 项目内使用的确定性辅助脚本
 ```
 
-项目源代码和可执行测试仍放在项目原有目录。`testing/` 只保存测试计划和验证报告。
+`specs/` 只保存多个工作项共享的当前事实；项目初始化、功能、重构和迁移都使用 `changes/<工作项>/`，只调整文档详细程度，不再使用不同的目录体系。
+
+每个受管理工作项按需包含 `requirements.md`、`proposal.md`、`design.md`、`tasks.md` 和 `testing/`。项目源代码和可执行测试仍放在项目原有目录；`testing/` 只保存测试计划和验证报告。
 
 生命周期状态使用机器可读的英文值：`draft`、`approved`、`stale`、`passed`、`partial`、`failed`。
 """
@@ -49,9 +56,9 @@ AGENTS_TEMPLATE = """# 项目协作说明
 - 重要功能、跨模块修改或项目级开发，优先使用 `$project-lifecycle`。
 - 首次使用前检查项目根目录的 `.agent/`；不存在时运行该 Skill 的初始化器。
 - 初始化只在缺失时创建项目级 `AGENTS.md`，并创建或补充 `.agent/`；不会覆盖已有资料。
-- 源代码和可执行测试仍放在项目原有目录，`.agent/` 保存需求、提案、设计、验证和长期记忆。
-- 开始重要任务前读取 `.agent/memory.md` 和相关生命周期文档。
-- 需求、提案、设计和验证按审批门槛推进；Agent 不自行批准。
+- 源代码和可执行测试仍放在项目原有目录，`.agent/changes/<工作项>/` 保存需求、提案、设计、任务和验证资料。
+- 开始重要任务前读取 `.agent/memory.md`、相关 `.agent/specs/` 和生命周期文档。
+- 需求、提案、设计、任务和验证按审批门槛推进；Agent 不自行批准。
 - 发现实质性范围、接口、数据、安全或架构变化时，停止并按漂移控制流程更新上游文档。
 - 完成任务后，仅在产生跨任务长期知识时更新 `.agent/memory.md`。
 - 孤立的小改动不强制创建完整生命周期文档。
@@ -92,6 +99,12 @@ def copy_if_missing(source: Path, destination: Path) -> str:
     return "创建"
 
 
+def validate_existing_paths(paths: tuple[Path, ...], expected: str) -> None:
+    for path in paths:
+        if path.exists() and (not path.is_dir() if expected == "目录" else not path.is_file()):
+            raise RuntimeError(f"目标路径已存在但不是{expected}：{path}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", nargs="?", type=Path, default=Path.cwd(), help="目标项目根目录，默认当前目录")
@@ -104,12 +117,19 @@ def main() -> int:
 
     agents_path = target / "AGENTS.md"
     agents_existed = agents_path.exists()
-    if agents_existed and not agents_path.is_file():
-        print(f"初始化失败：目标路径已存在但不是文件：{agents_path}", file=sys.stderr)
-        return 2
-
     workspace = target / ".agent"
     try:
+        validate_existing_paths((agents_path,), "文件")
+        validate_existing_paths((workspace, *(workspace / relative for relative in WORKSPACE_DIRS)), "目录")
+        validate_existing_paths(
+            (
+                workspace / "README.md",
+                workspace / "memory.md",
+                workspace / "scripts" / "generate_core_history.py",
+            ),
+            "文件",
+        )
+
         workspace.mkdir(exist_ok=True)
         for relative in WORKSPACE_DIRS:
             (workspace / relative).mkdir(exist_ok=True)
@@ -134,6 +154,13 @@ def main() -> int:
         print("提示：未修改已有 AGENTS.md；请确认其中包含何时使用 $project-lifecycle 的项目规则。")
     if (target / "AGENTS.override.md").is_file():
         print("提示：检测到 AGENTS.override.md；Codex 会优先采用它，AGENTS.md 作为基础规则暂不生效。")
+    legacy = [workspace / relative for relative in LEGACY_WORKSPACE_DIRS if (workspace / relative).exists()]
+    if legacy:
+        print("提示：检测到旧版工作目录，已原样保留，不会自动移动资料：")
+        for path in legacy:
+            print(f"- {path}")
+        print("迁移建议：.agent/project/ -> .agent/changes/project-foundation/；.agent/features/<名称>/ -> .agent/changes/<名称>/。")
+        print("迁移完成后，请同步更新 AGENTS.md 和 .agent/README.md 中的旧路径；初始化器不会覆盖这两个文件。")
     return 0
 
 

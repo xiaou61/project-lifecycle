@@ -32,4 +32,4 @@ Keep detailed class names, schemas, payloads, and file-by-file changes for the d
 
 Map the proposal to requirement and acceptance identifiers so omissions are visible. Keep the proposal at `status: draft` until the user explicitly approves the selected approach and any material open decisions.
 
-Do not add product scope in the proposal. When the recommended approach requires behavior absent from the requirements, revise and reapprove the requirements first. A materially changed approved proposal makes the current design and verification artifacts `stale`.
+Do not add product scope in the proposal. When the recommended approach requires behavior absent from the requirements, revise and reapprove the requirements first. A materially changed approved proposal makes the current design, task plan, and verification artifacts `stale`.

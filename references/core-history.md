@@ -29,7 +29,7 @@ Recommended locations are:
 .agent/history/core-components.md
 ```
 
-For a feature-specific history, use the same pair below that feature's artifact root instead.
+For a work-item-specific history, use the same pair below that change's artifact root instead.
 
 ## Generated Entry
 
