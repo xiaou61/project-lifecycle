@@ -1,4 +1,4 @@
 interface:
   display_name: "项目生命周期"
-  short_description: "用项目规格和变更资料控制需求、设计、实现与验证"
-  default_prompt: "使用 $project-lifecycle 用中文检查相关 specs 和 changes，并从适当阶段开始。"
+  short_description: "自然衔接项目需求、设计、开发、测试，查询状态和跨需求影响"
+  default_prompt: "使用 $project-lifecycle 用中文重新加载项目常驻规范，查询当前工作项、任务和依赖状态，再根据我的自然语言继续。"

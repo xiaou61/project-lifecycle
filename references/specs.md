@@ -6,7 +6,7 @@ Use this reference when the project needs a durable statement of current behavio
 
 ```text
 .agent/specs/                  What should be true today?
-.agent/changes/<work-slug>/    What are we changing, and how will we prove it?
+.agent/changes/<WORK-id>-<Chinese-name>/  What are we changing, and how will we prove it?
 ```
 
 Use one file per meaningful domain or contract, for example:
@@ -36,11 +36,11 @@ Do not put temporary brainstorming, an unapproved proposal, task checkboxes, cha
 ## Change And Reconciliation
 
 1. Read the affected stable spec before drafting a change.
-2. In `.agent/changes/<work-slug>/requirements.md`, describe the requested outcome and acceptance criteria. State whether a stable spec is expected to change.
+2. In `.agent/changes/<WORK-id>-<Chinese-name>/requirements.md`, describe the requested outcome and acceptance criteria. State whether a stable spec is expected to change.
 3. After approval, record the approach in `proposal.md`, implementation detail in `design.md`, and execution order in `tasks.md`.
 4. Implement and verify against the approved artifacts.
 5. If the delivered behavior changes a stable contract, update the affected spec from the verified result. Preserve the change documents as the rationale and evidence.
-6. Optionally move the completed change directory to `.agent/changes/archive/YYYY-MM-DD-<work-slug>/`. Archive only after verification; keep the files intact so Git can show the complete decision trail.
+6. Optionally move the completed change directory to `.agent/changes/archive/YYYY-MM-DD-<WORK-id>-<Chinese-name>/`. Archive only after verification; keep the files intact so Git can show the complete decision trail.
 
 Do not update a stable spec before implementation just to make a failing or unauthorized change look compliant. If implementation reveals that the spec or approved requirements were wrong, stop, return the earliest affected artifact to `draft`, and obtain approval.
 

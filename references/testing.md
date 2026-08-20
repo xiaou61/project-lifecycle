@@ -4,7 +4,7 @@ Use this reference after implementation to plan and record verification against 
 
 ## Test Plan
 
-Create `<artifact-root>/testing/plan.md`. Include only relevant test levels and checks:
+Create `<artifact-root>/testing/plan.md` with the same `work_id` and Chinese `work` name as the upstream artifacts. Use `artifact: test-plan` and `status: draft | ready | stale` in frontmatter. Include only relevant test levels and checks:
 
 ```markdown
 # <工作项>测试计划
@@ -26,12 +26,10 @@ Place executable tests in the repository's established unit, integration, end-to
 
 ## Verification Report
 
-Run the narrowest checks that provide credible evidence for the affected behavior, then broaden only when the change reaches shared or cross-system behavior. Record the exact commands or manual procedures actually performed and their outcomes in `<artifact-root>/testing/report.md`:
+Run the narrowest checks that provide credible evidence for the affected behavior, then broaden only when the change reaches shared or cross-system behavior. Record the same `work_id` and Chinese `work` name with `artifact: test-report` and `status: passed | partial | failed | stale` in frontmatter. Record the exact commands or manual procedures actually performed and their outcomes in `<artifact-root>/testing/report.md`:
 
 ```markdown
 # <工作项>验证报告
-
-状态：passed | partial | failed | stale
 
 ## 验证环境
 ## 验证结果

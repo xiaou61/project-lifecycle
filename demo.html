@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Project Lifecycle Skill 交互式工作流演示">
+  <link rel="icon" href="data:,">
+  <title>Project Lifecycle · 工作流演示</title>
+  <style>
+    :root {
+      --ink: #17242b;
+      --muted: #607078;
+      --paper: #f5f1e8;
+      --paper-2: #fbfaf6;
+      --line: #d9d8cf;
+      --navy: #173b4b;
+      --navy-2: #28586a;
+      --teal: #1d7c75;
+      --teal-soft: #d8eeea;
+      --amber: #d89136;
+      --amber-soft: #f7e6c6;
+      --rose: #c96c5b;
+      --rose-soft: #f6ddd6;
+      --green: #3e8b61;
+      --shadow: 0 16px 42px rgba(23, 36, 43, .10);
+      --radius: 8px;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      --sans: "Aptos", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(23, 59, 75, .035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(23, 59, 75, .035) 1px, transparent 1px),
+        var(--paper);
+      background-size: 32px 32px;
+      font-family: var(--sans);
+      line-height: 1.55;
+    }
+
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button {
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+    }
+    button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+      outline: 3px solid #e8a854;
+      outline-offset: 3px;
+    }
+
+    .shell { width: min(1180px, calc(100% - 36px)); margin: 0 auto; }
+    .topbar {
+      min-height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      border-bottom: 1px solid rgba(23, 59, 75, .16);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      width: 34px; height: 34px; border-radius: 10px;
+      display: grid; place-items: center;
+      color: var(--paper-2); background: var(--navy);
+      font: 700 13px var(--mono); letter-spacing: 0;
+      box-shadow: 4px 4px 0 var(--amber);
+    }
+    .brand-copy { line-height: 1.1; }
+    .brand-copy strong { display: block; font-size: 14px; letter-spacing: 0; }
+    .brand-copy span { color: var(--muted); font-size: 11px; }
+    .top-note { color: var(--muted); font-size: 12px; text-align: right; }
+
+    .hero { padding: 70px 0 42px; display: grid; grid-template-columns: 1.2fr .8fr; gap: 52px; align-items: end; }
+    .eyebrow {
+      margin: 0 0 14px; color: var(--teal); font: 700 11px var(--mono);
+      letter-spacing: 0; text-transform: uppercase;
+    }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { max-width: 740px; margin-bottom: 18px; font-size: 64px; line-height: 1.02; letter-spacing: 0; font-weight: 750; }
+    .hero-lead { max-width: 650px; margin: 0; color: #415159; font-size: 20px; }
+    .hero-aside {
+      border-left: 2px solid var(--amber); padding: 6px 0 6px 22px;
+      color: var(--muted); font-size: 14px;
+    }
+    .hero-aside strong { display: block; color: var(--ink); font-size: 20px; margin-bottom: 8px; }
+
+    .step-nav {
+      position: sticky; top: 0; z-index: 10;
+      background: rgba(245, 241, 232, .92); backdrop-filter: blur(12px);
+      border-top: 1px solid rgba(23, 59, 75, .12); border-bottom: 1px solid rgba(23, 59, 75, .16);
+    }
+    .step-nav-inner { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 66px; }
+    .step-buttons { display: flex; gap: 8px; }
+    .step-button {
+      border: 1px solid transparent; border-radius: 999px; background: transparent;
+      padding: 10px 15px; color: var(--muted); font-size: 13px; font-weight: 700;
+      transition: background .2s, color .2s, border-color .2s;
+    }
+    .step-button:hover { color: var(--navy); border-color: var(--line); }
+    .step-button[aria-selected="true"] { color: var(--paper-2); background: var(--navy); border-color: var(--navy); }
+    .step-helper { color: var(--muted); font-size: 12px; }
+
+    main { padding: 46px 0 100px; }
+    .scene { display: none; animation: rise .42s ease both; }
+    .scene.active { display: block; }
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .section-head { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 28px; }
+    .section-head h2 { margin-bottom: 7px; font-size: 42px; line-height: 1.08; }
+    .section-head p { max-width: 660px; margin-bottom: 0; color: var(--muted); }
+    .section-index { color: var(--teal); font: 700 12px var(--mono); white-space: nowrap; }
+
+    .flow-card { background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .flow-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+    .live-label { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 0 4px var(--teal-soft); }
+    .toolbar-actions { display: flex; gap: 8px; }
+    .tool-button {
+      border: 1px solid var(--line); border-radius: 8px; background: var(--paper-2);
+      padding: 8px 12px; color: var(--navy); font-size: 12px; font-weight: 700;
+    }
+    .tool-button:hover { border-color: var(--navy-2); background: #f0f5f3; }
+    .flow-body { padding: 28px 24px 32px; }
+    .flow-track { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; padding: 10px 0 26px; }
+    .flow-line, .flow-progress { position: absolute; z-index: 0; pointer-events: none; height: 3px; width: 0; background: var(--line); }
+    .flow-progress { background: var(--teal); transition: width .45s ease, height .45s ease; }
+    .flow-step { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 0; border: 0; background: transparent; text-align: center; }
+    .flow-node {
+      width: 48px; height: 48px; margin-bottom: 12px; border-radius: 50%;
+      display: grid; place-items: center; border: 3px solid var(--line); background: var(--paper-2);
+      color: var(--muted); font: 700 14px var(--mono); transition: .35s ease;
+    }
+    .flow-step.done .flow-node { border-color: var(--teal); background: var(--teal); color: white; }
+    .flow-step.current .flow-node { border-color: var(--amber); background: var(--amber-soft); color: #7a4b0d; box-shadow: 0 0 0 7px rgba(216, 145, 54, .16); }
+    .flow-copy, .flow-label, .flow-summary { display: block; }
+    .flow-label { margin-bottom: 4px; font-size: 14px; font-weight: 800; line-height: 1.25; }
+    .flow-summary { max-width: 125px; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .flow-detail { display: grid; grid-template-columns: 1.1fr .9fr; gap: 22px; align-items: stretch; }
+    .detail-panel { min-height: 170px; padding: 22px; border: 1px solid var(--line); border-radius: 8px; background: #f9f8f2; }
+    .detail-kicker { margin-bottom: 8px; color: var(--teal); font: 700 11px var(--mono); letter-spacing: 0; text-transform: uppercase; }
+    .detail-panel h3 { margin-bottom: 10px; font-size: 23px; }
+    .detail-panel p { margin-bottom: 0; color: #516168; font-size: 14px; }
+    .gate-list { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
+    .gate-list li { display: flex; gap: 9px; align-items: start; color: #465960; font-size: 13px; }
+    .gate-list li::before { content: "→"; color: var(--amber); font: 700 14px var(--mono); }
+    .flow-caption { margin: 22px 0 0; padding-top: 17px; border-top: 1px dashed var(--line); color: var(--muted); font-size: 12px; }
+
+    .example-grid { display: grid; grid-template-columns: .88fr 1.12fr; gap: 22px; align-items: start; }
+    .conversation, .workbench { background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 17px 19px; border-bottom: 1px solid var(--line); }
+    .panel-head h3 { margin: 0; font-size: 15px; }
+    .panel-head span { color: var(--muted); font: 11px var(--mono); }
+    .chat-body { padding: 20px; min-height: 522px; display: flex; flex-direction: column; gap: 15px; }
+    .chat-line { display: flex; gap: 10px; align-items: flex-start; }
+    .avatar { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--navy); color: white; font-size: 11px; font-weight: 800; }
+    .avatar.user { background: var(--amber); color: #51300a; }
+    .bubble { max-width: 86%; padding: 11px 13px; border-radius: 8px; background: #eef2ef; color: #425159; font-size: 13px; line-height: 1.5; }
+    .bubble.user { background: var(--amber-soft); color: #604319; }
+    .bubble strong { color: var(--ink); }
+    .chat-divider { display: flex; align-items: center; gap: 10px; margin: 1px 0; color: var(--muted); font: 10px var(--mono); letter-spacing: 0; text-transform: uppercase; }
+    .chat-divider::before, .chat-divider::after { content: ""; height: 1px; flex: 1; background: var(--line); }
+    .chat-controls { margin-top: auto; display: flex; flex-wrap: wrap; gap: 8px; padding-top: 15px; border-top: 1px solid var(--line); }
+    .chat-action { border: 1px solid var(--navy-2); border-radius: 8px; background: transparent; color: var(--navy); padding: 8px 10px; font-size: 12px; font-weight: 700; }
+    .chat-action:hover { background: var(--navy); color: white; }
+    .chat-action[aria-pressed="true"] { background: var(--teal); border-color: var(--teal); color: white; }
+
+    .workbench-body { padding: 19px; display: grid; gap: 16px; }
+    .identity-strip { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 15px; border: 1px solid #c9dfdb; border-radius: 8px; background: var(--teal-soft); }
+    .identity-name { display: flex; gap: 10px; align-items: center; min-width: 0; }
+    .identity-icon { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: var(--teal); color: white; font: 700 12px var(--mono); }
+    .identity-name strong { display: block; font-size: 15px; }
+    .identity-name span { color: #4d716d; font: 11px var(--mono); }
+    .status-pill { flex: 0 0 auto; padding: 5px 9px; border-radius: 999px; color: #226147; background: #e8f5e9; font-size: 11px; font-weight: 800; }
+    .work-stage { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+    .stage-cell { position: relative; min-height: 67px; padding: 10px 8px; border: 1px solid var(--line); border-radius: 8px; background: #faf9f4; }
+    .stage-cell.active { border-color: var(--amber); background: var(--amber-soft); box-shadow: inset 0 -3px 0 var(--amber); }
+    .stage-cell.done { border-color: #b9d7c2; background: #edf6ee; }
+    .stage-cell .stage-num { color: var(--muted); font: 10px var(--mono); }
+    .stage-cell strong { display: block; margin-top: 3px; font-size: 11px; line-height: 1.25; }
+    .stage-cell small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; }
+    .task-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .metric { padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: #faf9f4; }
+    .metric-label { color: var(--muted); font-size: 11px; }
+    .metric-value { display: block; margin: 5px 0 7px; color: var(--navy); font: 700 24px var(--mono); }
+    .progress { height: 6px; overflow: hidden; border-radius: 999px; background: #e5e6df; }
+    .progress span { display: block; height: 100%; width: 42%; border-radius: inherit; background: var(--teal); transition: width .4s ease; }
+    .relation-map { position: relative; min-height: 150px; padding: 17px; border: 1px solid var(--line); border-radius: 8px; background: #f9f8f2; overflow: hidden; }
+    .relation-map::before { content: ""; position: absolute; left: 16%; right: 16%; top: 74px; height: 2px; background: var(--line); }
+    .relation-map::after { content: ""; position: absolute; left: 50%; top: 74px; width: 44%; height: 2px; background: var(--amber); transform-origin: left center; transform: rotate(-26deg); opacity: .65; }
+    .relation-title { position: relative; z-index: 1; margin-bottom: 16px; color: var(--muted); font: 11px var(--mono); }
+    .relation-node { position: absolute; z-index: 2; display: grid; gap: 2px; min-width: 116px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper-2); box-shadow: 0 6px 14px rgba(23, 36, 43, .07); }
+    .relation-node strong { font-size: 12px; }
+    .relation-node span { color: var(--muted); font: 10px var(--mono); }
+    .relation-node.primary { left: 4%; top: 58px; border-color: #9ecbc2; background: #edf8f5; }
+    .relation-node.secondary { right: 4%; top: 58px; border-color: #e4c18e; background: #fff7e9; }
+    .relation-node.prereq { left: 50%; top: 103px; transform: translateX(-50%); border-color: #bdd0df; background: #eef5f8; }
+    .relation-tag { position: absolute; z-index: 3; left: 50%; top: 56px; transform: translateX(-50%); padding: 3px 7px; border-radius: 999px; color: #825014; background: var(--amber-soft); font: 10px var(--mono); }
+    .event-log { display: grid; gap: 8px; }
+    .event { display: grid; grid-template-columns: 10px 1fr auto; gap: 9px; align-items: start; padding: 10px 11px; border-left: 3px solid var(--teal); background: #f7f7f1; font-size: 12px; }
+    .event.warning { border-left-color: var(--rose); background: var(--rose-soft); }
+    .event-dot { width: 7px; height: 7px; margin-top: 5px; border-radius: 50%; background: currentColor; }
+    .event time { color: var(--muted); font: 10px var(--mono); white-space: nowrap; }
+    .example-footer { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-top: 22px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--navy); color: #e7f0ef; }
+    .example-footer p { margin: 0; font-size: 13px; }
+    .example-footer strong { color: white; }
+    .reset-button { flex: 0 0 auto; border: 1px solid rgba(255,255,255,.32); border-radius: 8px; background: transparent; color: white; padding: 8px 11px; font-size: 12px; font-weight: 700; }
+    .reset-button:hover { background: rgba(255,255,255,.12); }
+
+    .footer { padding: 24px 0 40px; border-top: 1px solid rgba(23, 59, 75, .14); color: var(--muted); font-size: 12px; }
+    .footer-inner { display: flex; justify-content: space-between; gap: 20px; }
+    .mono { font-family: var(--mono); }
+
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; gap: 25px; padding-top: 50px; }
+      h1 { font-size: 52px; }
+      .hero-aside { max-width: 580px; }
+      .example-grid { grid-template-columns: 1fr; }
+      .chat-body { min-height: 0; }
+    }
+    @media (max-width: 680px) {
+      .shell { width: min(100% - 26px, 1180px); }
+      .topbar { min-height: 62px; }
+      .top-note { display: none; }
+      .step-nav-inner { align-items: stretch; flex-direction: column; gap: 4px; padding: 10px 0; }
+      .step-buttons { width: 100%; }
+      .step-button { flex: 1; padding: 9px 8px; font-size: 12px; }
+      .step-helper { padding: 0 3px 2px; }
+      main { padding-top: 34px; }
+      .section-head { align-items: start; flex-direction: column; gap: 8px; }
+      h1 { font-size: 42px; }
+      .hero-lead { font-size: 17px; }
+      .section-head h2 { font-size: 34px; }
+      .flow-toolbar { align-items: start; flex-direction: column; }
+      .flow-body { padding: 21px 14px 24px; }
+      .flow-track { display: block; padding: 0 0 0 13px; }
+      .flow-line, .flow-progress { width: 3px; height: 0; }
+      .flow-step { min-height: 79px; flex-direction: row; align-items: flex-start; gap: 14px; text-align: left; }
+      .flow-node { width: 48px; height: 48px; margin: 0; flex: 0 0 auto; }
+      .flow-label { margin-top: 4px; }
+      .flow-summary { max-width: none; }
+      .flow-detail { grid-template-columns: 1fr; gap: 12px; }
+      .detail-panel { min-height: 0; padding: 17px; }
+      .workbench-body { padding: 13px; }
+      .identity-strip { align-items: start; flex-direction: column; }
+      .work-stage { grid-template-columns: repeat(3, 1fr); }
+      .stage-cell { min-height: 62px; }
+      .relation-map { min-height: 210px; }
+      .relation-map::before { left: 50%; top: 78px; width: 2px; height: 88px; }
+      .relation-map::after { left: 50%; top: 78px; width: 1px; height: 84px; transform: rotate(34deg); }
+      .relation-tag { top: 89px; left: 55%; }
+      .relation-node.primary { left: 4%; top: 52px; }
+      .relation-node.secondary { right: 4%; top: 143px; }
+      .relation-node.prereq { left: 50%; top: 162px; transform: translateX(-50%); }
+      .example-footer { align-items: start; flex-direction: column; }
+      .footer-inner { flex-direction: column; gap: 5px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="shell topbar">
+    <div class="brand" aria-label="Project Lifecycle Skill">
+      <div class="brand-mark" aria-hidden="true">PL</div>
+      <div class="brand-copy"><strong>PROJECT LIFECYCLE</strong><span>自然语言驱动的项目状态</span></div>
+    </div>
+    <div class="top-note">一个需求，从出现到沉淀</div>
+  </header>
+
+  <div class="shell hero">
+    <div>
+      <p class="eyebrow">Interactive field guide / 01—02</p>
+      <h1>让项目知道，<br>下一步该做什么。</h1>
+      <p class="hero-lead">先看一条需求如何穿过生命周期，再看它如何在真实的工作项、依赖和验证证据中落地。</p>
+    </div>
+    <aside class="hero-aside">
+      <strong>不是文档仪式，是方向感。</strong>
+      你只需说“继续”“这版确认”“测试一下”。Skill 负责保留上下文，并在每次动作后说清楚当前状态和下一步。
+    </aside>
+  </div>
+
+  <nav class="step-nav" aria-label="演示步骤">
+    <div class="shell step-nav-inner">
+      <div class="step-buttons" role="tablist" aria-label="演示场景">
+        <button class="step-button" id="tab-flow" role="tab" aria-selected="true" aria-controls="scene-flow" data-scene="flow">01 · 看完整流程</button>
+        <button class="step-button" id="tab-case" role="tab" aria-selected="false" aria-controls="scene-case" data-scene="case">02 · 看一个例子</button>
+      </div>
+      <div class="step-helper" id="step-helper" aria-live="polite">点击阶段，或播放一遍完整生命周期</div>
+    </div>
+  </nav>
+
+  <main class="shell">
+    <section class="scene active" id="scene-flow" role="tabpanel" aria-labelledby="tab-flow">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Scene 01 / lifecycle</p>
+          <h2>一条需求的完整旅程</h2>
+          <p>每一步都回答一个问题：我们要做什么、为什么这样做、如何实现，以及怎样证明它真的完成了。</p>
+        </div>
+        <div class="section-index">6 个阶段 · 4 个决策闸门</div>
+      </div>
+
+      <div class="flow-card">
+        <div class="flow-toolbar">
+          <div class="live-label"><span class="live-dot" aria-hidden="true"></span><span id="flow-live-label">当前停在：需求出现</span></div>
+          <div class="toolbar-actions">
+            <button class="tool-button" id="flow-play" type="button">▶ 播放流程</button>
+            <button class="tool-button" id="flow-reset" type="button">↺ 重置</button>
+          </div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-track" id="flow-track" aria-label="项目生命周期阶段">
+            <div class="flow-line" id="flow-line" aria-hidden="true"></div>
+            <div class="flow-progress" id="flow-progress" aria-hidden="true"></div>
+            <button class="flow-step current" type="button" data-flow-index="0" aria-label="第 1 阶段：需求出现">
+              <span class="flow-node">01</span><span class="flow-copy"><span class="flow-label">需求出现</span><span class="flow-summary">把想法说出来</span></span>
+            </button>
+            <button class="flow-step" type="button" data-flow-index="1" aria-label="第 2 阶段：讨论收敛">
+              <span class="flow-node">02</span><span class="flow-copy"><span class="flow-label">讨论收敛</span><span class="flow-summary">确认目标与边界</span></span>
+            </button>
+            <button class="flow-step" type="button" data-flow-index="2" aria-label="第 3 阶段：设计决策">
+              <span class="flow-node">03</span><span class="flow-copy"><span class="flow-label">设计决策</span><span class="flow-summary">方案 → 设计 → 任务</span></span>
+            </button>
+            <button class="flow-step" type="button" data-flow-index="3" aria-label="第 4 阶段：开发实现">
+              <span class="flow-node">04</span><span class="flow-copy"><span class="flow-label">开发实现</span><span class="flow-summary">按已确认的计划做</span></span>
+            </button>
+            <button class="flow-step" type="button" data-flow-index="4" aria-label="第 5 阶段：测试验收">
+              <span class="flow-node">05</span><span class="flow-copy"><span class="flow-label">测试验收</span><span class="flow-summary">用证据回答是否完成</span></span>
+            </button>
+            <button class="flow-step" type="button" data-flow-index="5" aria-label="第 6 阶段：完成沉淀">
+              <span class="flow-node">06</span><span class="flow-copy"><span class="flow-label">完成沉淀</span><span class="flow-summary">更新规格与长期记忆</span></span>
+            </button>
+          </div>
+
+          <div class="flow-detail" aria-live="polite">
+            <article class="detail-panel">
+              <div class="detail-kicker" id="flow-kicker">START / 01</div>
+              <h3 id="flow-title">需求出现</h3>
+              <p id="flow-description">一句自然语言的想法，先被保留下来。此时不急着选技术，也不急着改代码。</p>
+            </article>
+            <article class="detail-panel">
+              <div class="detail-kicker">GATE / NEXT</div>
+              <ul class="gate-list" id="flow-gates">
+                <li>说清楚想解决的结果</li>
+                <li>给它一个中文工作项名称</li>
+                <li>分配稳定的 WORK 编号</li>
+              </ul>
+            </article>
+          </div>
+          <p class="flow-caption" id="flow-caption">自然语言入口： “我想增加用户登录，先聊聊这个需求。”</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="scene" id="scene-case" role="tabpanel" aria-labelledby="tab-case" hidden>
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Scene 02 / field example</p>
+          <h2>一个需求，如何真的被推进</h2>
+          <p>下面的例子里，<span class="mono">WORK-003</span> 先被命名为“用户登录”，随后发现它依赖“账户基础”，并与“权限管理”共享契约。</p>
+        </div>
+        <div class="section-index">WORK-003 · 用户登录</div>
+      </div>
+
+      <div class="example-grid">
+        <section class="conversation" aria-labelledby="conversation-title">
+          <div class="panel-head"><h3 id="conversation-title">自然语言对话</h3><span>CONTEXT / LIVE</span></div>
+          <div class="chat-body" id="chat-body" aria-live="polite">
+            <div class="chat-line"><div class="avatar user" aria-hidden="true">你</div><div class="bubble user">我想增加用户登录，先聊聊这个需求。</div></div>
+            <div class="chat-line"><div class="avatar" aria-hidden="true">AI</div><div class="bubble"><strong>我先把它命名为“用户登录”，编号 WORK-003。</strong><br>当前进入需求讨论：我会先确认登录方式、会话边界和验收标准，不会直接写代码。</div></div>
+            <div class="chat-divider">需求收敛</div>
+            <div class="chat-line"><div class="avatar user" aria-hidden="true">你</div><div class="bubble user">这版需求确认，继续给方案。</div></div>
+            <div class="chat-line"><div class="avatar" aria-hidden="true">AI</div><div class="bubble">方案已形成。继续之前，我检查到它依赖 <strong>WORK-001 · 账户基础</strong>，并与 <strong>WORK-002 · 权限管理</strong>相关。</div></div>
+            <div class="chat-controls" aria-label="演示动作">
+              <button class="chat-action" type="button" data-demo-action="approve">确认方案</button>
+              <button class="chat-action" type="button" data-demo-action="dependency">模拟依赖阻塞</button>
+              <button class="chat-action" type="button" data-demo-action="resolve">完成依赖并继续</button>
+              <button class="chat-action" type="button" data-demo-action="verify">进入测试验收</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="workbench" aria-labelledby="workbench-title">
+          <div class="panel-head"><h3 id="workbench-title">当前工作项状态</h3><span id="status-clock">READ / NOW</span></div>
+          <div class="workbench-body">
+            <div class="identity-strip">
+              <div class="identity-name"><div class="identity-icon" aria-hidden="true">03</div><div><strong>用户登录</strong><span>WORK-003 · .agent/changes/WORK-003-用户登录/</span></div></div>
+              <span class="status-pill" id="status-pill">方案已确认</span>
+            </div>
+            <div class="work-stage" id="work-stage" aria-label="用户登录工作项阶段">
+              <div class="stage-cell done"><span class="stage-num">01</span><strong>需求</strong><small>已确认</small></div>
+              <div class="stage-cell active"><span class="stage-num">02</span><strong>设计决策</strong><small>方案确认</small></div>
+              <div class="stage-cell"><span class="stage-num">03</span><strong>开发</strong><small>等待计划</small></div>
+              <div class="stage-cell"><span class="stage-num">04</span><strong>测试</strong><small>尚未开始</small></div>
+              <div class="stage-cell"><span class="stage-num">05</span><strong>沉淀</strong><small>尚未开始</small></div>
+              <div class="stage-cell"><span class="stage-num">06</span><strong>归档</strong><small>可选</small></div>
+            </div>
+            <div class="task-summary">
+              <div class="metric"><span class="metric-label">实施任务</span><strong class="metric-value" id="task-value">0 / 4</strong><div class="progress"><span id="task-progress" style="width: 0%"></span></div></div>
+              <div class="metric"><span class="metric-label">当前下一步</span><strong class="metric-value" id="next-value" style="font-size: 16px; margin-top: 12px;">确认设计</strong><span class="metric-label" id="next-detail">方案已确认，等待详细设计。</span></div>
+            </div>
+            <div class="relation-map" aria-label="用户登录与其他工作项的关系图">
+              <div class="relation-title">RELATION MAP / 影响不是猜出来的</div>
+              <div class="relation-node primary"><strong>账户基础</strong><span>WORK-001 · depends_on</span></div>
+              <div class="relation-node secondary"><strong>权限管理</strong><span>WORK-002 · related_to</span></div>
+              <div class="relation-tag">硬依赖</div>
+              <div class="relation-node prereq"><strong>用户登录</strong><span>WORK-003 · 当前</span></div>
+            </div>
+            <div class="event-log" id="event-log">
+              <div class="event"><span class="event-dot" aria-hidden="true"></span><span><strong>关系检查：</strong>发现账户基础尚未完成，开发暂不放行。</span><time>NOW</time></div>
+              <div class="event"><span class="event-dot" aria-hidden="true"></span><span><strong>软关联：</strong>权限管理不阻塞，但跨阶段前需要影响检查。</span><time>NOW</time></div>
+            </div>
+          </div>
+        </section>
+      </div>
+      <div class="example-footer"><p id="example-footer-copy"><strong>现在发生了什么？</strong> 需求不是停在聊天里，而是变成了一个有身份、有关系、可查询的工作项。</p><button class="reset-button" id="demo-reset" type="button">↺ 重置例子</button></div>
+    </section>
+  </main>
+
+  <footer class="shell footer"><div class="footer-inner"><span>Project Lifecycle Skill · 中文项目开发工作流</span><span class="mono">offline / single file / no dependencies</span></div></footer>
+
+  <script>
+    (() => {
+      const flowData = [
+        { title: '需求出现', kicker: 'START / 01', description: '一句自然语言的想法，先被保留下来。此时不急着选技术，也不急着改代码。', gates: ['说清楚想解决的结果', '给它一个中文工作项名称', '分配稳定的 WORK 编号'], caption: '自然语言入口： “我想增加用户登录，先聊聊这个需求。”' },
+        { title: '讨论收敛', kicker: 'CLARIFY / 02', description: '把背景、目标、非目标、约束和可观察的验收标准说清楚。只问会改变范围的问题。', gates: ['确认目标与非目标', '识别相关工作项和依赖', '保持 requirements.md 为草稿'], caption: '确认之后： “这版需求确认，继续给方案。”' },
+        { title: '设计决策', kicker: 'DECIDE / 03', description: '方案、详细设计、实施任务依次收敛。它们是设计准备的检查点，不是三套割裂的流程。', gates: ['提案说明取舍', '设计落到真实代码边界', '任务计划写清路径和验证'], caption: '决策闸门：用户明确确认，Agent 才能进入下一步。' },
+        { title: '开发实现', kicker: 'BUILD / 04', description: '只按已批准的范围和任务实现。出现目标、接口、数据或架构变化时，先停下来控制漂移。', gates: ['按依赖顺序执行任务', '同步可执行测试', '更新真实任务状态'], caption: '自然语言入口： “按这个计划开始做。”' },
+        { title: '测试验收', kicker: 'PROVE / 05', description: '用真实命令、人工检查和验收矩阵回答“完成了吗”，而不是用打勾代替证据。', gates: ['每条 AC 对应证据', '记录失败与未验证项', '生成 testing/report.md'], caption: '自然语言入口： “测试一下，告诉我哪些验收项过了。”' },
+        { title: '完成沉淀', kicker: 'KEEP / 06', description: '把验证后的公共行为更新到 specs，把真正会影响未来工作的知识写入 memory，保留变更轨迹。', gates: ['核对稳定规格', '沉淀跨任务知识', '按需归档完整工作项'], caption: '完成不是删除资料，而是让下一次更快找到正确上下文。' }
+      ];
+      const flowSteps = [...document.querySelectorAll('.flow-step')];
+      const flowTrack = document.getElementById('flow-track');
+      const flowLine = document.getElementById('flow-line');
+      const progress = document.getElementById('flow-progress');
+      const flowTitle = document.getElementById('flow-title');
+      const flowKicker = document.getElementById('flow-kicker');
+      const flowDescription = document.getElementById('flow-description');
+      const flowGates = document.getElementById('flow-gates');
+      const flowCaption = document.getElementById('flow-caption');
+      const flowLiveLabel = document.getElementById('flow-live-label');
+      const flowPlay = document.getElementById('flow-play');
+      let flowIndex = 0;
+      let flowTimer = null;
+
+      function renderFlowProgress() {
+        const ratio = flowIndex / (flowData.length - 1);
+        const firstNode = flowSteps[0].querySelector('.flow-node');
+        const lastNode = flowSteps.at(-1).querySelector('.flow-node');
+        const trackRect = flowTrack.getBoundingClientRect();
+        const firstRect = firstNode.getBoundingClientRect();
+        const lastRect = lastNode.getBoundingClientRect();
+        const vertical = window.matchMedia('(max-width: 680px)').matches;
+        const startX = firstRect.left + firstRect.width / 2 - trackRect.left;
+        const startY = firstRect.top + firstRect.height / 2 - trackRect.top;
+        const endX = lastRect.left + lastRect.width / 2 - trackRect.left;
+        const endY = lastRect.top + lastRect.height / 2 - trackRect.top;
+        const distance = vertical ? endY - startY : endX - startX;
+        const lineStyle = {
+          left: `${(vertical ? startX : startX)}px`,
+          top: `${(vertical ? startY : startY)}px`,
+          width: vertical ? '3px' : `${distance}px`,
+          height: vertical ? `${distance}px` : '3px'
+        };
+        Object.assign(flowLine.style, lineStyle);
+        Object.assign(progress.style, {
+          ...lineStyle,
+          width: vertical ? '3px' : `${distance * ratio}px`,
+          height: vertical ? `${distance * ratio}px` : '3px'
+        });
+      }
+
+      function setFlow(index) {
+        flowIndex = Math.max(0, Math.min(flowData.length - 1, index));
+        const data = flowData[flowIndex];
+        flowSteps.forEach((step, i) => {
+          step.classList.toggle('done', i < flowIndex);
+          step.classList.toggle('current', i === flowIndex);
+          step.setAttribute('aria-current', i === flowIndex ? 'step' : 'false');
+        });
+        renderFlowProgress();
+        flowTitle.textContent = data.title;
+        flowKicker.textContent = data.kicker;
+        flowDescription.textContent = data.description;
+        flowGates.innerHTML = data.gates.map(gate => `<li>${gate}</li>`).join('');
+        flowCaption.textContent = data.caption;
+        flowLiveLabel.textContent = `当前停在：${data.title}`;
+      }
+      function stopFlow() {
+        if (flowTimer) { clearInterval(flowTimer); flowTimer = null; }
+        flowPlay.textContent = '▶ 播放流程';
+        flowPlay.setAttribute('aria-pressed', 'false');
+      }
+      flowSteps.forEach(step => step.addEventListener('click', () => { stopFlow(); setFlow(Number(step.dataset.flowIndex)); }));
+      document.getElementById('flow-reset').addEventListener('click', () => { stopFlow(); setFlow(0); });
+      flowPlay.addEventListener('click', () => {
+        if (flowTimer) { stopFlow(); return; }
+        if (flowIndex >= flowData.length - 1) setFlow(0);
+        flowPlay.textContent = 'Ⅱ 暂停播放';
+        flowPlay.setAttribute('aria-pressed', 'true');
+        flowTimer = setInterval(() => {
+          if (flowIndex >= flowData.length - 1) { stopFlow(); return; }
+          setFlow(flowIndex + 1);
+        }, 1550);
+      });
+      window.addEventListener('resize', renderFlowProgress);
+      setFlow(0);
+
+      const tabs = [...document.querySelectorAll('.step-button')];
+      const scenes = [...document.querySelectorAll('.scene')];
+      const stepHelper = document.getElementById('step-helper');
+      function setScene(sceneName) {
+        tabs.forEach(tab => {
+          const selected = tab.dataset.scene === sceneName;
+          tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+          tab.tabIndex = selected ? 0 : -1;
+        });
+        scenes.forEach(scene => {
+          const active = scene.id === `scene-${sceneName}`;
+          scene.classList.toggle('active', active);
+          scene.hidden = !active;
+        });
+        if (sceneName === 'flow') requestAnimationFrame(renderFlowProgress);
+        stepHelper.textContent = sceneName === 'flow' ? '点击阶段，或播放一遍完整生命周期' : '点击对话动作，观察状态、关系和下一步变化';
+      }
+      tabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => setScene(tab.dataset.scene));
+        tab.addEventListener('keydown', event => {
+          if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+            event.preventDefault();
+            const next = (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+            tabs[next].focus();
+            setScene(tabs[next].dataset.scene);
+          }
+        });
+      });
+
+      const demoInitial = {
+        stage: 1,
+        pill: '方案已确认',
+        taskDone: 0,
+        next: '确认设计',
+        nextDetail: '方案已确认，等待详细设计。',
+        footer: '<strong>现在发生了什么？</strong> 需求不是停在聊天里，而是变成了一个有身份、有关系、可查询的工作项。',
+        events: [
+          ['normal', '<strong>关系检查：</strong>发现账户基础尚未完成，开发暂不放行。', 'NOW'],
+          ['normal', '<strong>软关联：</strong>权限管理不阻塞，但跨阶段前需要影响检查。', 'NOW']
+        ]
+      };
+      let demoState = structuredClone(demoInitial);
+      const chatBody = document.getElementById('chat-body');
+      const workStage = document.getElementById('work-stage');
+      const statusPill = document.getElementById('status-pill');
+      const taskValue = document.getElementById('task-value');
+      const taskProgress = document.getElementById('task-progress');
+      const nextValue = document.getElementById('next-value');
+      const nextDetail = document.getElementById('next-detail');
+      const eventLog = document.getElementById('event-log');
+      const footerCopy = document.getElementById('example-footer-copy');
+      const statusClock = document.getElementById('status-clock');
+      const actionButtons = [...document.querySelectorAll('[data-demo-action]')];
+
+      function stageNames() { return ['需求', '设计决策', '开发', '测试', '沉淀', '归档']; }
+      function renderDemo() {
+        const names = stageNames();
+        [...workStage.children].forEach((cell, i) => {
+          cell.classList.toggle('done', i < demoState.stage);
+          cell.classList.toggle('active', i === demoState.stage);
+          cell.querySelector('small').textContent = i < demoState.stage ? '已完成' : i === demoState.stage ? (demoState.stage === 2 ? '进行中' : '当前') : '尚未开始';
+        });
+        statusPill.textContent = demoState.pill;
+        taskValue.textContent = `${demoState.taskDone} / 4`;
+        taskProgress.style.width = `${(demoState.taskDone / 4) * 100}%`;
+        nextValue.textContent = demoState.next;
+        nextDetail.textContent = demoState.nextDetail;
+        footerCopy.innerHTML = demoState.footer;
+        eventLog.innerHTML = demoState.events.map(event => `<div class="event ${event[0] === 'warning' ? 'warning' : ''}"><span class="event-dot" aria-hidden="true"></span><span>${event[1]}</span><time>${event[2]}</time></div>`).join('');
+        statusClock.textContent = `READ / ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`;
+        actionButtons.forEach(button => button.setAttribute('aria-pressed', 'false'));
+      }
+      function addChat(role, html) {
+        const line = document.createElement('div');
+        line.className = 'chat-line';
+        line.innerHTML = `<div class="avatar ${role === 'user' ? 'user' : ''}" aria-hidden="true">${role === 'user' ? '你' : 'AI'}</div><div class="bubble ${role === 'user' ? 'user' : ''}">${html}</div>`;
+        chatBody.insertBefore(line, document.querySelector('.chat-controls'));
+      }
+      function addDivider(text) {
+        const divider = document.createElement('div'); divider.className = 'chat-divider'; divider.textContent = text; chatBody.insertBefore(divider, document.querySelector('.chat-controls'));
+      }
+      function applyAction(action) {
+        if (action === 'approve') {
+          addChat('user', '方案可以，结合现在的代码做设计。');
+          addChat('ai', '<strong>进入详细设计。</strong> 我会确认组件边界、接口、数据流和失败处理，再拆实施任务。');
+          addDivider('设计准备');
+          demoState = { ...demoState, stage: 1, pill: '设计进行中', next: '完成详细设计', nextDetail: '设计完成后，才能拆出可验证的任务。', taskDone: 0, events: [['normal', '<strong>状态变化：</strong>方案已批准，当前进入详细设计。', 'NOW'], ['normal', '<strong>关系检查：</strong>账户基础仍是 WORK-003 的硬依赖。', 'NOW']] };
+        }
+        if (action === 'dependency') {
+          addChat('user', '按计划开始做。');
+          addChat('ai', '<strong>先停一下。</strong> WORK-001 · 账户基础尚未完成，WORK-003 不能进入开发；这不是失败，而是一个可见的阻塞。');
+          demoState = { ...demoState, stage: 2, pill: '被依赖阻塞', next: '完成账户基础', nextDetail: '解除 WORK-001 后，才能继续用户登录。', taskDone: 0, footer: '<strong>阻塞被显式化。</strong> Skill 不会绕过硬依赖偷偷改代码，而是告诉你要先完成哪个工作项。', events: [['warning', '<strong>硬依赖：</strong> WORK-001 · 账户基础未完成，开发入口被阻断。', 'NOW'], ['normal', '<strong>软关联：</strong> WORK-002 · 权限管理仍可独立推进。', 'NOW']] };
+        }
+        if (action === 'resolve') {
+          addChat('user', '账户基础已经完成，继续用户登录。');
+          addChat('ai', '<strong>依赖已解除。</strong> 现在按批准的任务计划继续实现，并同步任务状态。');
+          demoState = { ...demoState, stage: 2, pill: '开发进行中', next: '完成 TASK-004', nextDetail: '4 个实施任务中已有 2 个完成。', taskDone: 2, footer: '<strong>上下文恢复。</strong> 依赖完成后，原工作项从阻塞处继续，不需要重新解释整条需求。', events: [['normal', '<strong>依赖解除：</strong> WORK-001 已完成，WORK-003 恢复进行中。', 'NOW'], ['normal', '<strong>任务同步：</strong> 2 / 4 个实施任务已完成。', 'NOW']] };
+        }
+        if (action === 'verify') {
+          addChat('user', '测试一下，告诉我哪些验收项过了。');
+          addChat('ai', '<strong>进入测试验收。</strong> 我会把每条 AC 映射到真实命令或人工检查，并记录未验证项。');
+          addDivider('证据回写');
+          demoState = { ...demoState, stage: 3, pill: '测试验收中', next: '记录验证报告', nextDetail: '验收矩阵：3 项通过，1 项待补充。', taskDone: 4, footer: '<strong>完成不是“代码写完”。</strong> 只有验收证据写入 testing/report.md，工作项才会进入完成沉淀。', events: [['normal', '<strong>测试计划：</strong> 已建立 testing/plan.md。', 'NOW'], ['warning', '<strong>验收缺口：</strong> 会话过期场景仍未验证。', 'NOW']] };
+        }
+        renderDemo();
+        const button = actionButtons.find(item => item.dataset.demoAction === action);
+        if (button) button.setAttribute('aria-pressed', 'true');
+      }
+      actionButtons.forEach(button => button.addEventListener('click', () => applyAction(button.dataset.demoAction)));
+      document.getElementById('demo-reset').addEventListener('click', () => {
+        demoState = structuredClone(demoInitial);
+        [...chatBody.querySelectorAll('.chat-line, .chat-divider')].forEach((node, index) => { if (index > 4) node.remove(); });
+        renderDemo();
+      });
+      renderDemo();
+    })();
+  </script>
+</body>
+</html>

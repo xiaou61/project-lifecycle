@@ -1,166 +1,210 @@
 ---
 name: project-lifecycle
-description: 通过稳定项目规格、按工作项的需求/提案/设计/任务/验证资料和可检索长期记忆，引导重要软件工作从澄清到交付并控制项目漂移；不用于无需生命周期文档的孤立小改动。
+description: 用自然语言驱动重要软件工作从需求讨论、方案和设计到开发、测试与沉淀，查询中文工作项的阶段、任务、依赖和下一步，并控制跨需求漂移；不用于无需持久流程资料的孤立小改动。
 ---
 
 # Project Lifecycle
 
-Treat repository artifacts, not chat history, as the durable source of project state. Keep the workflow proportional to the work: a small change may need short artifacts, while a broad project may need more detail. Do not invent sections, infrastructure, or future flexibility that the work does not require.
+把仓库工件而不是聊天记录作为长期事实源，同时让用户只需自然地描述需求、确认决定或说“继续”。不要要求用户记忆阶段命令、目录结构或文档模板。
 
-## Output Language
+默认使用简体中文进行对话并创建所有项目工件。保留代码标识符、路径、命令、稳定 ID、机器可读状态值和原始 Git 提交主题。只有用户明确要求或目标仓库存在强制语言规则时才切换语言，并说明该约束。
 
-Use Simplified Chinese by default for user-facing conversation and every artifact created by this skill, including headings, explanations, decisions, test plans, verification reports, and generated history labels. Preserve source-code identifiers, file paths, commands, requirement and acceptance IDs, machine-readable status values, and verbatim Git commit subjects. Switch languages only when the user explicitly requests it or the target repository has a mandatory language rule; surface that repository constraint when it conflicts with the default.
+## 分层规范：先加载，再行动
 
-## Operating Model And Initialization
+本 Skill 的规范分成三个范围，避免把一次需求的特殊要求误当成所有项目的永久规则：
 
-Use a two-part operating model:
+1. **Skill 全局底线**：所有项目和所有受管理任务都必须遵守。本文件中的中文输出、先查状态、明确批准、控制漂移、不覆盖已有资料、不虚报测试和按风险选择流程，属于这一层。
+2. **项目常驻规范**：目标项目 `.agent/rules/always.md` 中的规则适用于该项目每一个任务，例如技术栈、目录、测试命令、生成文件和安全边界。
+3. **工作项约束**：当前 `.agent/changes/<WORK编号>-<中文名称>/requirements.md` 中的目标、非目标、验收标准和特殊约束，只适用于本次工作。
 
-1. The reusable Skill package contains workflow instructions, phase references, and deterministic helpers.
-2. The target project's `.agent/` workspace contains that project's durable lifecycle state: current specs, active changes, memory, references, decisions, and evidence.
+工作项约束可以收紧项目规范，不能静默放宽项目规范；提案、设计和任务只负责授权本次实现的方案与步骤。项目规范缺失、冲突或需要例外时，先停下并说明，不靠上下文记忆猜测。初始化模板中的“待项目确认”不阻塞需求讨论和设计，但进入实现前必须补全本次工作会依赖的项目事实。详细优先级和恢复顺序见 [references/rules.md](references/rules.md)。
 
-GitHub, a local checkout, a plugin, and a Codex discovery directory are distribution or installation mechanisms for the same Skill package; they are not separate runtime layers. Never copy the whole Skill package into `.agent/`. The source repository being present somewhere on disk does not by itself make the Skill available: Codex must discover or explicitly load it.
+项目规则采用 `MUST / SHOULD / MAY`：`MUST` 是不可跳过的硬约束，`SHOULD` 是有理由才可偏离的默认做法，`MAY` 是可选建议。规则文件只保存跨多个任务仍然成立的项目事实；单次取舍放回工作项，不要污染常驻规范。
 
-Before the first managed work item in a project, run [scripts/init_project.py](scripts/init_project.py) against the project root. The initializer creates a root `AGENTS.md` when missing, then creates `.agent/`, `.agent/specs/`, `.agent/changes/`, the shared knowledge directories, `.agent/memory.md`, a short workspace guide, and a copy of the deterministic core-history generator. It preserves existing files and is safe to run again. It never overwrites `AGENTS.md`, `AGENTS.override.md`, or existing `.agent/` files.
+## 每次先回答“现在在哪”
 
-The generated root `AGENTS.md` is an optional project adapter: it tells Codex when to use `$project-lifecycle` and where project artifacts live. It does not install or discover the Skill. If a root `AGENTS.override.md` exists, mention that it takes precedence over the generated base rules.
+开始或恢复重要工作时：
 
-When an `AGENTS.md` already exists, preserve it without appending or rewriting. Report that the lifecycle routing rules were not merged and ask the user to confirm the existing instructions cover them. When legacy `.agent/project/` or `.agent/features/` directories exist, preserve them and report the manual migration mapping; never move project records automatically.
-
-## Locate The Work
-
-1. Read the applicable repository instructions and inspect existing documentation before creating anything.
-2. Identify the current work item and phase from the user's request and existing artifacts. Resume existing artifacts instead of replacing them.
-3. Decide whether the work needs persisted lifecycle artifacts. An isolated, low-risk fix may proceed without a `.agent/changes/` entry; a new project, important feature, cross-module change, public behavior change, migration, or work likely to span sessions should use one.
-4. Follow an established repository location when one exists. Otherwise use `.agent/changes/<work-slug>/` for every managed work item, including whole-project inception. Scale document depth to the work; do not create separate directory systems for projects and features.
-5. Create only the artifact needed for the current phase. Do not scaffold empty later-phase files.
-
-Use `.agent/specs/` only for stable, reusable statements about how the project should behave today: cross-feature contracts, domain rules, architecture boundaries, or operational invariants. Do not copy every feature's temporary proposal there. Read [references/specs.md](references/specs.md) when creating, updating, reconciling, or archiving stable specs.
-
-Use this default artifact set:
+1. 读取目标仓库适用的 `AGENTS.md`、`AGENTS.override.md` 和已有项目文档。
+2. 确认项目根目录。若工作需要持久管理但 `.agent/` 不存在，按“初始化”规则处理。
+3. 读取 `.agent/rules/always.md`；缺失、空白或存在冲突时先补齐或报告，不能直接进入实现；有“待项目确认”时在实现前补全受影响的项目事实。
+4. 从本 Skill 目录运行 `scripts/project_status.py <project-root> --json`，不要从时间戳猜阶段。
+5. 根据用户明确提到的工作项、内容匹配或唯一活动工作项确定上下文；多个工作项仍有歧义时，只问一次选择问题。
+6. 读取当前工作项的 `requirements.md` 和当前阶段所需的批准工件；只读取匹配的 `.agent/memory.md` 条目、稳定规格和参考资料，不默认加载所有资料。
+7. 用下面的短格式让用户保持方向感，然后直接处理当前动作：
 
 ```text
-<artifact-root>/
-  requirements.md
-  proposal.md
-  design.md
-  tasks.md
-  testing/
-    plan.md
-    report.md
+当前：<中文工作项名称>（<WORK 编号>）· <阶段> · <状态>
+本次：<刚完成或正在处理的事情>
+下一步：<Agent 将做什么，或等待用户确认什么>
 ```
 
-Executable tests remain in the repository's normal test directories. The `testing/` folder contains the test plan and recorded verification evidence, not duplicate test source.
+不要每次复述完整流程。用户问“当前任务状态”“所有需求到哪了”“某需求还差什么”“下一步是什么”或“继续”时，必须先按工件重新判断状态。状态回答同时包含相关实施任务计数和阻塞关系；用户点名 `TASK-*` 时再读取 `tasks.md` 回答具体实施任务。进入、恢复、汇报工作或用户点名 `WORK-*` 时，读取并执行 [references/workflow.md](references/workflow.md) 中的标准协议。
 
-## Stable Project Specs
+上下文压缩或换会话后，不能沿用上一轮记忆中的规则和批准；按“适用入口规则 -> `.agent/rules/always.md` -> `project_status.py --json` -> 工作项 requirements -> 当前阶段工件”的顺序恢复，并在汇报中说明规范已重新加载。`WORK-*` 是跨对话定位键，不是实施命令或阶段批准；用户说“实施 WORK-003”时，满足现有门槛就直接实施，否则停在最早缺失阶段并说明原因。
 
-`.agent/specs/` is the current-project view: concise statements of behavior and constraints that remain useful after an individual change is finished. It is optional for a tiny project and should grow only when a fact is shared or repeatedly needed. It is not a dump of all source code and it is not a replacement for executable tests.
+已有稳定 `WORK-*` 时，每次实质性推进、状态查询或准备结束当前对话，都在状态块末尾给出可直接用于新对话的接力句：
 
-An active change in `.agent/changes/<work-slug>/` explains what is being proposed. After implementation and verification, reconcile affected stable specs, then move the completed change to `.agent/changes/archive/<date>-<work-slug>/` when the repository wants an audit trail. Preserve the change in Git; do not delete it or rewrite it into an opaque summary. If no stable project fact changed, leave `specs/` untouched.
+```text
+接力：新对话可说“$project-lifecycle 继续 <WORK编号>，先恢复规范和状态，再按当前阶段执行。”
+```
 
-## Project Memory
+接力句必须填入真实编号；尚未持久化工作项时不输出。
 
-Use `.agent/memory.md` as a compact index of durable knowledge that should influence future work across tasks. Before a substantial task, list its entry headings and search for terms related to the affected feature, module, paths, constraints, and technologies. Read only the matching entries and enough surrounding context to interpret them; read the entire file only when it is small or the task is repository-wide.
+## 自然语言就是工作流入口
 
-Read [references/memory.md](references/memory.md) before adding, changing, invalidating, or compacting memory entries. Store only evidence-backed knowledge that is likely to matter beyond the current task. Memory is a discovery aid, not authority over approved lifecycle artifacts, current code, tests, or Git. When they conflict, verify the authoritative source and mark or replace the memory entry instead of silently following it.
+识别意图而不是匹配固定口令：
 
-## Approval Gates
+- “我有个想法”“想做一个功能”进入需求讨论。
+- “整理成需求”“这版需求确认”创建、修订或批准需求。
+- “给个方案”“需求确认了，继续”进入方案阶段。
+- “方案可以，做设计”批准方案并进入详细设计。
+- “设计没问题，拆任务”批准设计并形成任务计划。
+- “按计划开始做”在任务计划已批准时进入实现。
+- “实施 WORK-003”先按编号恢复上下文；满足实施门槛时直接开发，否则说明当前缺少的批准或阻塞。
+- “测试一下”“开始验收”进入验证。
+- “继续”只推进当前阶段已获授权的动作；它本身不代表批准。
 
-- Never mark an artifact approved on the agent's own authority. Approval must be explicit in a user message.
-- Requirements precede the proposal, an approved proposal precedes design, an approved design precedes task planning, and an approved task plan precedes implementation. The user may explicitly waive or combine a gate.
-- A request to draft the next artifact is not approval of the current one unless the user clearly says both.
-- Keep unresolved decisions visible. Do not silently convert assumptions into requirements.
-- If implementation reveals a material change to scope, architecture, public behavior, data, security, or migration, revise the affected artifact and obtain approval before continuing. Record minor implementation detail without reopening the gate.
+自然语言批准是有效批准，但必须明确指向当前工件或由紧邻上下文唯一确定。用户可以在一句话中“批准并继续”，此时更新状态并在同一轮完成下一项已授权工作。Agent 永远不能自行批准。
 
-For `requirements.md`, `proposal.md`, `design.md`, and `tasks.md`, use concise YAML frontmatter:
+## 默认主线
+
+```text
+需求出现
+  -> 讨论收敛
+  -> 设计决策（方案选择 -> 详细设计 -> 实施计划）
+  -> 开发实现
+  -> 测试验收
+  -> 规格与记忆沉淀
+  -> 完成或归档
+```
+
+这是用户看到的标准工作流。方案、详细设计和实施计划不是三套独立流程，而是把“准备怎么做”逐步收敛成“可以开始做”的内部检查点。状态提示可以显示这些精确子阶段，让用户知道当前具体在等待什么。
+
+阶段工件位于 `.agent/changes/<WORK编号>-<中文名称>/`：
+
+```text
+requirements.md
+proposal.md
+design.md
+tasks.md
+testing/
+  plan.md
+  report.md
+```
+
+可执行测试仍放在项目原有测试目录，`testing/` 只保存计划和实际证据。一次只创建当前阶段需要的工件，不预建空白文件。
+
+阶段顺序和默认门槛是：批准需求后写提案，批准提案后写设计，批准设计后写任务计划，批准任务计划后实现，实现完成后测试。用户可以明确合并或免除某个门槛；把该决定写入受影响工件，不从“赶时间”或“继续”推断豁免。
+
+## 工作项名称、状态和关系
+
+每个受管理的新需求都使用稳定 `WORK-*` 编号和简短中文名称。第一次识别到需求时主动命名，例如“用户登录”；持久化后让同一编号和名称贯穿需求、提案、设计、任务、测试和状态提示。不要让用户替 Agent 维护名称，也不要在不同阶段擅自换称呼。
+
+创建工作项、查询状态或发现两个需求可能互相影响时，读取 [references/relationships.md](references/relationships.md)。新工作项目录使用 `WORK-003-用户登录`；编号永不复用，关系永远引用编号而不是可变名称。
+
+只使用两种跨需求关系：
+
+- `depends_on`：硬依赖；被依赖工作项未完成时，可以继续澄清和设计，但不能进入开发实现或测试验收。
+- `related_to`：软关联；不阻塞，但跨阶段前必须检查共享契约、数据、接口、模块和验收标准是否受到实质影响。
+
+两个需求如果不能独立批准和验收，就应在需求阶段合并，而不是建立循环依赖。硬依赖形成循环时停止推进，合并工作项或抽出双方共同依赖的前置工作项。
+
+## 按工作风险控制重量
+
+以下工作通常使用完整变更目录：新项目、重要功能、跨模块修改、公共行为或接口变化、数据迁移、安全与权限变化、架构调整、容易跨会话的工作。
+
+孤立、低风险、行为边界清晰的小修复可走短路径：在对话中确认目标，给出最小实现思路，修改代码并验证，不创建整套生命周期文档。用户明确要求记录时仍应持久化。不要因为 Skill 被自动发现就给每个小改动初始化 `.agent/`。
+
+## 初始化
+
+当用户明确使用本 Skill 管理重要工作且项目没有 `.agent/` 时，先用一句话说明会增加项目资料但不会修改源码，然后运行：
+
+```sh
+python -X utf8 scripts/init_project.py <project-root>
+```
+
+解析脚本路径时以本 Skill 目录为基准。初始化器可用于空项目和正在开发的项目，可重复执行；它只补充缺失的 `AGENTS.md`、`.agent/` 目录、工作区说明、长期记忆文件和核心历史脚本，不覆盖已有项目资料。
+
+若已有 `AGENTS.md`，保持原样并说明生命周期路由规则没有自动合并；若存在 `AGENTS.override.md`，说明它优先。旧版 `.agent/project/` 或 `.agent/features/` 只报告迁移映射，不自动移动。
+
+## 工件职责
+
+- `.agent/specs/`：项目今天仍应满足的共享行为、契约和边界。仅在验证完成后按真实交付结果核对更新。创建或调整时读取 [references/specs.md](references/specs.md)。
+- `.agent/rules/always.md`：该项目所有任务都适用的常驻规范；只记录长期有效的技术、目录、命令、安全和兼容性约束。创建或调整时读取 [references/rules.md](references/rules.md)。
+- `.agent/changes/<WORK编号>-<中文名称>/`：一次变更从需求到验证的完整依据。整个项目启动也使用一个工作项，不另建目录体系。
+- `.agent/memory.md`：跨任务仍有价值、证据充分的检索索引。维护时读取 [references/memory.md](references/memory.md)。
+- `.agent/notes/`：跨变更决策的长期理由，不复制普通提案或设计。
+- `.agent/references/`：多个工作项共享的业务规则、协议或外部资料，不存任务进度。
+- `.agent/history/`：从 Git 可重建的核心组件历史视图，不是手工事实源。
+
+不要创建 `.agent/current.md`、`state.json` 或手工工作项索引来重复状态。规范来自入口规则和 `.agent/rules/always.md`，工作项身份和关系来自 `requirements.md`，阶段来自工件的 `status`、任务状态和验证报告；`project_status.py` 动态汇总它们。
+
+## 按阶段工作
+
+### 需求讨论
+
+读取 [references/requirements.md](references/requirements.md)。先理解用户结果和现有仓库，只问会改变范围、行为、约束或验收的问题。对话收敛后创建或更新 `requirements.md`，保持 `draft`，直到用户明确确认。
+
+### 方案选择
+
+读取 [references/proposal.md](references/proposal.md)。基于已批准需求推荐一个方案，只保留真实备选和取舍，不把尚未确认的新范围藏进方案。保持 `draft` 直到用户确认。
+
+### 详细设计
+
+读取 [references/design.md](references/design.md)。检查实际代码，把批准的方案落到组件、接口、数据流、失败行为、迁移和验证策略。避免为假设中的未来创建扩展点。保持 `draft` 直到用户确认。
+
+### 实施计划
+
+读取 [references/tasks.md](references/tasks.md)。把批准的设计拆成依赖有序、路径真实、每项可验证的 `tasks.md`。不在任务计划中重新选择产品范围或架构。保持 `draft` 直到用户确认。
+
+### 开发实现
+
+开始编辑前读取所有已批准上游工件和任务计划。按依赖顺序实现最小完整改动，在项目正常位置添加或更新测试，并根据实际执行结果更新任务状态。任务完成不等于验收通过。
+
+### 测试验收
+
+读取 [references/testing.md](references/testing.md)。建立 `testing/plan.md`，把每条验收标准映射到自动化测试、人工检查或明确缺口；执行真实命令后据实写 `testing/report.md`。不可用环境、失败、未运行和剩余风险必须可见。
+
+## 漂移控制
+
+批准的需求定义范围，提案定义选定方案，设计定义实现边界，任务计划定义执行顺序，验证报告提供证据。下游工件不能悄悄增加上游没有的要求。
+
+当目标、非目标、验收标准、公共行为、接口、数据、安全、迁移或架构发生实质变化时：
+
+1. 停在当前阶段，指出变化和影响。
+2. 将最早受影响工件退回 `draft`。
+3. 把受影响的下游工件标为 `stale`。
+4. 从最早受影响阶段重新修订并取得明确确认。
+5. 重新实现和验证后再更新稳定规格。
+
+局部变量改名、等价调用或批准设计内新增的本地实施步骤通常不是实质变化。不要为了让现有代码显得合规而事后改写已批准意图。
+
+每次跨阶段前比较实际内容，而不只检查 `status`：需求是否被方案覆盖、方案职责是否落实到设计、设计是否都有实施任务、代码是否由批准的设计和任务授权、每条验收标准是否有验证证据。发现缺口、矛盾、未授权行为或失效测试时，先报告并回到最早受影响阶段。`project_status.py` 只负责定位阶段，不证明内容已经对齐。
+
+## 状态和完成
+
+`requirements.md` 使用 `draft | approved`；`proposal.md`、`design.md`、`tasks.md` 使用 `draft | approved | stale`；任务使用 `pending | in_progress | done | blocked`；验证报告使用 `passed | partial | failed | stale`。需求、提案、设计和任务的 YAML frontmatter 采用：
 
 ```yaml
 ---
-work: <slug>
+work_id: WORK-003
+work: <中文名称>
 artifact: requirements | proposal | design | tasks
 status: draft | approved | stale
 updated: YYYY-MM-DD
 ---
 ```
 
-Keep approval evidence in prose near the status or in version control; do not create a separate workflow database.
+仅 `requirements.md` 可增加 `depends_on: [WORK-001]` 和 `related_to: [WORK-002]`。下游工件复制 `work_id` 和 `work`，不复制关系字段。已有旧工作项缺少 `work_id` 时保持兼容，不为了格式统一进行无意义迁移。
 
-Use `draft | approved` for requirements, `draft | approved | stale` for proposals, designs, and task plans, and `passed | partial | failed | stale` for verification reports. `stale` means an upstream material change invalidated the artifact; it is never an approval state. Preserve an existing `feature:` field when resuming an older artifact; use `work:` for new artifacts and do not perform metadata-only migrations.
+状态改为 `approved` 时，在工件正文中简短记录确认日期和确认内容；不要另建审批数据库。只在用户明确确认或明确豁免门槛时记录，不能把 Agent 的建议写成用户批准。
 
-## Control Drift
+只有上游工件与交付行为一致、任务反映真实执行、验收标准都有证据或明确缺口、报告没有冒充通过、限制和后续事项清楚时，工作项才算完成。完成后：
 
-Treat approved requirements as the source of scope. Stable specs describe the current intended project behavior; a proposal chooses an approach for one change, a design explains how to build it, a task plan sequences the work, implementation realizes the plan, and verification proves the acceptance criteria. A downstream artifact must not quietly introduce a new requirement, and a stable spec must not be edited merely to make an unauthorized implementation appear correct.
+1. 按验证结果核对受影响的 `.agent/specs/`。
+2. 仅在产生跨任务知识时更新 `.agent/memory.md`。
+3. 仅在形成跨变更决策理由时写 `.agent/notes/`。
+4. 需要审计轨迹时，把完整目录移动到 `.agent/changes/archive/YYYY-MM-DD-<WORK编号>-<中文名称>/`；不要删除或压缩成不可追溯摘要。
 
-When a material change appears:
-
-1. Stop at the current phase and identify whether the change affects scope, approach, design, or only local implementation detail.
-2. Update the earliest affected artifact. Return it to `draft` and obtain explicit approval.
-3. Mark every affected downstream artifact `stale`; do not treat its previous approval or test result as current evidence.
-4. Revise downstream artifacts in order, preserving unaffected content, and repeat the required approvals and verification.
-5. Reconcile `.agent/specs/` only after implementation and verification support the new behavior.
-
-A material change alters a goal, non-goal, acceptance criterion, chosen approach, public behavior, interface, owned data, security rule, migration, or operational requirement. Renaming a local variable or choosing an equivalent library call is normally not material.
-
-Before advancing phases, perform a short alignment check:
-
-- every requirement and goal is addressed by the proposal;
-- every proposed responsibility is realized by the design;
-- every design responsibility is covered by an executable task;
-- every material code change is authorized by the approved design and task plan;
-- every acceptance criterion maps to verification evidence; and
-- no deliverable introduces unapproved scope or contradicts a non-goal.
-
-If an item has no stable identifier, cite its heading or exact wording. Report mismatches before continuing. Do not declare alignment from document statuses alone; compare their content and the code.
-
-## Route By Phase
-
-### Requirements Discovery
-
-Read [references/requirements.md](references/requirements.md). Discuss the need before proposing implementation. Ask only questions whose answers change scope, behavior, constraints, or acceptance. Produce or revise `requirements.md` when the user asks to capture the result or when a stable draft is useful.
-
-### Proposal
-
-Read [references/proposal.md](references/proposal.md). Base the proposal on the approved requirements, or on requirements the user approves in the same message. Recommend one approach, record real alternatives and tradeoffs, and keep implementation detail out unless it affects feasibility or the decision.
-
-### Design
-
-Read [references/design.md](references/design.md). Translate the approved proposal into an implementable design grounded in the current repository. Resolve component ownership, interfaces, data flow, failure behavior, migration, and verification only where relevant.
-
-### Task Planning
-
-Read [references/tasks.md](references/tasks.md). Translate the approved design into a dependency-ordered implementation checklist with exact affected paths and a verification step for each task. Keep product scope and architecture out of the task plan; if they need to change, return to the earliest affected artifact.
-
-### Implementation
-
-Read the approved requirements, proposal, design, and task plan before editing code. Inspect the current implementation and reuse repository conventions. Execute tasks in dependency order, update their execution state from actual work, and implement the smallest complete change that satisfies the acceptance criteria. Add or update executable tests in the repository's normal locations and keep documentation synchronized with material discoveries.
-
-Do not mark delivery verified merely because tasks are checked off. If implementation requires a material deviation, follow the drift-control procedure before continuing. A newly discovered local step that remains inside the approved design may be added to `tasks.md` with its reason; a scope, interface, data, security, migration, or architecture change requires upstream revision and approval.
-
-### Testing And Verification
-
-Read [references/testing.md](references/testing.md). Create `testing/plan.md` when verification begins, run the relevant checks, and write `testing/report.md` from actual evidence. Map every acceptance criterion to a test, inspection, or explicitly unverified item.
-
-### Alignment Audit
-
-At any phase, the user may ask for an alignment or drift check. Compare stable specs, approved requirements, proposal, design, task plan, current implementation, executable tests, and verification report in that order. Report missing coverage, unauthorized behavior, contradictions, stale artifacts, and tests that no longer prove an acceptance criterion. Do not explain away a mismatch by editing the upstream intent after the fact; apply the change-control procedure if the user chooses to accept it.
-
-### Core Change History
-
-Read [references/core-history.md](references/core-history.md) when the user asks to track important classes or components across Git commits. After initialization, use the target project's `.agent/scripts/generate_core_history.py` to regenerate the Markdown projection from Git; the copy in this skill package is only the initializer's source. Git remains the authority, and the Markdown is derived and may be regenerated after amend, rebase, merge, or rollback. Do not auto-commit generated output from a Git hook.
-
-## Completion
-
-A work item is complete only when:
-
-- the approved requirements, proposal, and design reflect the delivered behavior;
-- the approved task plan covers the delivered work and records its actual execution state;
-- implementation and executable tests are present in their normal repository locations;
-- `testing/report.md` records the commands and checks actually performed;
-- every acceptance criterion is passed or clearly reported as failed or unverified; and
-- remaining limitations and follow-up work are explicit; and
-- no artifact used as evidence is marked `draft` or `stale`.
-
-After these checks, reconcile affected stable specs and optionally archive the completed change under `.agent/changes/archive/`. Do not mark a change complete solely because its task checkboxes are checked.
-
-At completion, check whether the work established or invalidated durable cross-task knowledge. Update `.agent/memory.md` only when it did; do not create a memory entry merely to summarize the completed task.
-
-Create or update a note under `.agent/notes/` only when the work establishes a cross-feature decision whose rationale should guide future changes. Do not duplicate an ordinary proposal or design there.
+用户要求跟踪核心类或组件的 Git 修改历史时，读取 [references/core-history.md](references/core-history.md)，使用目标项目中的 `.agent/scripts/generate_core_history.py`。Git 始终是提交身份、作者、时间和路径的事实源。
