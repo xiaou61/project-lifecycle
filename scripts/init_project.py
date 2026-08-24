@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import shutil
 import sys
-from datetime import date
 from pathlib import Path
 
 
@@ -34,7 +33,7 @@ WORKSPACE_README = """# .agent 项目工作区
 ```text
 .agent/
   memory.md                当前有效、可快速检索的项目长期记忆
-  rules/always.md          当前项目所有任务都适用的常驻规范
+  rules/always.md          用户确认后生效的项目常驻规范（初始化时不自动创建）
   specs/                   项目当前仍有效的共享规格与契约
   changes/WORK-001-中文名/ 每个需求或变更的完整生命周期资料
   references/              多个工作项共享的项目参考资料
@@ -45,7 +44,7 @@ WORKSPACE_README = """# .agent 项目工作区
 
 `specs/` 只保存多个工作项共享的当前事实；项目初始化、功能、重构和迁移都使用 `changes/WORK-编号-中文名/`，只调整文档详细程度，不再使用不同的目录体系。
 
-`rules/always.md` 只保存这个项目每个任务都适用的长期规范。初始化器提供最小安全模板，不猜测项目的测试命令、目录或技术栈；维护者应在开始重要开发前补全“待项目确认”的项目事实。单次需求的特殊约束写在对应 `requirements.md`，不要把临时取舍提升为常驻规范。
+`rules/always.md` 只保存这个项目每个任务都适用、并经过用户确认的长期规范。初始化器只创建 `rules/` 目录，不会替项目写入固定规则；首次使用时先检查仓库并向用户提出规则草案，得到确认后再创建或填写 `always.md`。单次需求的特殊约束写在对应 `requirements.md`，不要把临时取舍提升为常驻规范。
 
 每个受管理工作项按需包含 `requirements.md`、`proposal.md`、`design.md`、`tasks.md` 和 `testing/`。项目源代码和可执行测试仍放在项目原有目录；`testing/` 只保存测试计划和验证报告。
 
@@ -85,6 +84,7 @@ AGENTS_TEMPLATE = """# 项目协作说明
 - 重要功能、跨模块修改或项目级开发，优先使用 `$project-lifecycle`。
 - 首次使用前检查项目根目录的 `.agent/`；不存在时运行该 Skill 的初始化器。
 - 初始化只在缺失时创建项目级 `AGENTS.md`，并创建或补充 `.agent/`；不会覆盖已有资料。
+- 首次初始化或 `.agent/rules/always.md` 缺失时，先检查项目并向用户确认项目常驻规范；用户确认前不得把推测写成规则或进入代码实现。
 - 源代码和可执行测试仍放在项目原有目录，`.agent/changes/WORK-编号-中文名/` 保存需求、提案、设计、任务和验证资料。
 - 开始重要任务前读取 `.agent/memory.md`、相关 `.agent/specs/` 和生命周期文档。
 - 开始或恢复任何受管理任务前读取 `.agent/rules/always.md`；上下文压缩后按入口规则、项目规范、状态查询、工作项需求和当前阶段工件重新加载。
@@ -106,59 +106,6 @@ AGENTS_TEMPLATE = """# 项目协作说明
 - 项目规范使用 `MUST / SHOULD / MAY`；工作项可以收紧项目规范，不能静默放宽；例外必须记录范围、理由、批准人和验证方式。
 
 如果当前环境没有发现 `$project-lifecycle`，请先说明 Skill 未安装，不要假装已经加载它。
-"""
-
-RULES_TEMPLATE = """---
-artifact: project_rules
-scope: project
-status: active
-configured: false
-version: 1
-updated: {{UPDATED_DATE}}
----
-
-# 项目常驻规范
-
-本文件适用于当前项目的每一个受管理任务。它不是某个功能的需求、方案或任务清单；只记录多个未来任务仍然成立的项目事实。上下文压缩、换会话或用户说“继续”时，Agent 必须重新读取本文件。
-
-## 规范级别（MUST / SHOULD / MAY）
-
-- `MUST`：硬约束，不得跳过。需要例外时先记录并取得明确批准。
-- `SHOULD`：默认做法，有充分理由才偏离，并在当前工作项中说明。
-- `MAY`：可选建议，不构成完成门槛。
-
-## MUST：所有任务都要遵守
-
-- 使用项目已经确认的技术栈、包管理器和源码/测试目录；未知内容先检查，不凭空假设。
-- 不把密钥、个人数据或生产数据写入代码、日志、测试样例和 `.agent/`。
-- 任何行为、接口、数据、安全或迁移变化，都必须在当前工作项的需求和验收标准中有依据。
-- 代码变更后运行与影响范围匹配的真实检查；没有运行或失败的检查必须如实记录。
-- 不手工编辑工具生成文件；需要改变生成结果时修改源文件或生成配置。
-
-## SHOULD：默认做法
-
-- 保持已有目录、命名、错误处理、日志和测试风格；先复用项目已有模式。
-- 优先增加可重复执行的测试和最小实现；不为假设中的未来需求增加扩展点。
-- 提交前检查差异、未跟踪文件和敏感信息。
-
-## MAY：可选做法
-
-- 在不改变项目行为的前提下，使用更清晰的局部重构或辅助工具。
-
-## 项目事实（初始化后补全）
-
-补全本节后，将 frontmatter 的 `configured` 改为 `true`。如果仍有“待项目确认”项，状态查询会继续报告未配置完成。
-
-- 主源码目录：待项目确认
-- 可执行测试目录：待项目确认
-- 必须通过的格式化/静态检查命令：待项目确认
-- 必须通过的测试命令：待项目确认
-- 生成文件和禁止手工编辑的目录：待项目确认
-- 兼容性、安全和部署约束：待项目确认
-
-## 例外记录
-
-当前没有项目级例外。一次需求的特殊约束写入对应 `.agent/changes/<WORK编号>-<中文名称>/requirements.md`；若需要暂时放宽本文件的 `MUST`，先在这里记录：范围、理由、批准人、开始/结束日期、验证方式和回滚方案。
 """
 
 MEMORY_TEMPLATE = """# 项目长期记忆
@@ -233,10 +180,6 @@ def main() -> int:
         agents_status = create_text_if_missing(agents_path, AGENTS_TEMPLATE)
         readme_status = create_text_if_missing(workspace / "README.md", WORKSPACE_README)
         memory_status = create_text_if_missing(workspace / "memory.md", MEMORY_TEMPLATE)
-        rules_status = create_text_if_missing(
-            workspace / "rules" / "always.md",
-            RULES_TEMPLATE.replace("{{UPDATED_DATE}}", date.today().isoformat()),
-        )
         generator_status = copy_if_missing(
             Path(__file__).with_name("generate_core_history.py"),
             workspace / "scripts" / "generate_core_history.py",
@@ -249,7 +192,12 @@ def main() -> int:
     print(f"{agents_status}：{agents_path}")
     print(f"{readme_status}：{workspace / 'README.md'}")
     print(f"{memory_status}：{workspace / 'memory.md'}")
-    print(f"{rules_status}：{workspace / 'rules' / 'always.md'}")
+    rules_path = workspace / "rules" / "always.md"
+    if rules_path.is_file():
+        print(f"保留：{rules_path}")
+    else:
+        print(f"待用户确认后创建：{rules_path}")
+        print("提示：初始化不会写入固定项目规则；请先检查项目并向用户提出规则草案，确认后再创建 always.md。")
     print(f"{generator_status}：{workspace / 'scripts' / 'generate_core_history.py'}")
     if agents_existed:
         print("提示：未修改已有 AGENTS.md；请确认其中包含何时使用 $project-lifecycle 的项目规则。")

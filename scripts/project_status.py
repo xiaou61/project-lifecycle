@@ -438,6 +438,20 @@ def resolve_relations(items: list[dict[str, object]]) -> None:
                     relation.update(relation_summary(targets[0]))
 
 
+def apply_rules_gate(items: list[dict[str, object]], rules: dict[str, object]) -> None:
+    """Prevent implementation or verification before project rules are confirmed."""
+    if rules.get("ready") and rules.get("configured"):
+        return
+    message = "项目常驻规范尚未确认或无效；修复并取得用户确认后才能进入开发实现或测试验收。"
+    for item in items:
+        if item["archived"] or item["phase"] not in {"implementation", "verification"}:
+            continue
+        if message not in item["warnings"]:
+            item["warnings"].append(message)
+        item["state"] = "blocked"
+        item["next_action"] = "先检查项目并向用户确认项目常驻规范，再继续当前工作项。"
+
+
 def locate_project(start: Path) -> Path:
     resolved = start.resolve()
     if resolved.name == ".agent" and resolved.is_dir():
@@ -478,11 +492,15 @@ def project_rules_status(workspace: Path) -> dict[str, object]:
         "status": "missing",
         "ready": False,
         "configured": False,
+        "confirmation_required": True,
         "warnings": [],
         "notices": [],
     }
     if not path.exists():
-        result["warnings"].append("缺少项目常驻规范 .agent/rules/always.md。")
+        result["warnings"].append(
+            "项目常驻规范尚未确认（缺少 .agent/rules/always.md）；请先向用户确认规则。"
+        )
+        result["notices"].append("首次初始化需要用户确认项目规则；确认后再创建 always.md。")
         return result
     if not path.is_file():
         result["warnings"].append(".agent/rules/always.md 存在但不是文件。")
@@ -496,8 +514,10 @@ def project_rules_status(workspace: Path) -> dict[str, object]:
     result["status"] = status
     if not text.split("---", 2)[-1].strip():
         result["warnings"].append("项目常驻规范文件为空。")
-    if status != "active":
-        result["warnings"].append("项目常驻规范的 status 必须为 active。")
+    if status not in {"active", "draft"}:
+        result["warnings"].append("项目常驻规范的 status 必须为 active 或 draft。")
+    elif status == "draft":
+        result["warnings"].append("项目常驻规范仍是草案；请先向用户确认后再进入实现。")
     if not re.search(r"^##\s+.*MUST", text, re.IGNORECASE | re.MULTILINE):
         result["warnings"].append("项目常驻规范缺少 MUST 章节。")
     placeholders = "待项目确认" in text
@@ -515,8 +535,11 @@ def project_rules_status(workspace: Path) -> dict[str, object]:
         result["warnings"].append("项目常驻规范的 configured 必须为 true 或 false。")
     result["ready"] = not result["warnings"]
     result["configured"] = configured
+    result["confirmation_required"] = not configured
     if result["ready"] and not result["configured"]:
-        result["notices"].append("项目常驻规范仍有“待项目确认”项；进入开发实现前补全受影响的项目事实。")
+        result["notices"].append("项目常驻规范仍有“待项目确认”项；进入开发实现前必须取得用户确认。")
+    elif result["confirmation_required"] and not result["notices"]:
+        result["notices"].append("项目常驻规范尚未得到用户确认；当前只能讨论和设计。")
     return result
 
 
@@ -571,6 +594,7 @@ def inspect_project(
             "status": "missing",
             "ready": False,
             "configured": False,
+            "confirmation_required": True,
             "warnings": ["项目尚未初始化，尚无项目常驻规范。"],
             "notices": [],
         },
@@ -587,6 +611,7 @@ def inspect_project(
     archived_items = [inspect_work(path, archived=True) for path in archived_dirs]
     all_items = active_items + archived_items
     resolve_relations(all_items)
+    apply_rules_gate(all_items, result["rules"])
     result["next_work_id"] = next_work_id(all_items)
 
     if work:
@@ -597,9 +622,14 @@ def inspect_project(
     active = [item for item in active_items if item["phase"] != "completed"]
     result["work_items"] = visible_items
     if not visible_items and not all_items:
+        next_action = (
+            "先检查项目并向用户确认项目常驻规范，再描述一个新需求。"
+            if not (result["rules"]["ready"] and result["rules"]["configured"])
+            else "描述一个新需求；需要跨会话管理时创建带中文名称的工作项。"
+        )
         result.update(
             state="idle",
-            next_action="描述一个新需求；需要跨会话管理时创建带中文名称的工作项。",
+            next_action=next_action,
         )
     elif work:
         selected = visible_items[0]
@@ -632,9 +662,9 @@ def render_text(status: dict[str, object]) -> str:
     rules_label = (
         "已加载"
         if rules["ready"] and rules["configured"]
-        else "已加载，待补全"
-        if rules["ready"]
-        else "需要处理"
+        else "已加载，等待用户确认"
+        if rules["present"]
+        else "等待用户确认"
     )
     lines.append(f"项目规范：{rules_label}（{rules['path']}）")
     lines.extend(f"规范注意：{warning}" for warning in rules["warnings"])

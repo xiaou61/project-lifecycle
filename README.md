@@ -84,7 +84,7 @@ your-project/
   .agent/
     README.md                       工作区说明
     rules/
-      always.md                     当前项目所有任务都适用的常驻规范
+      always.md                     用户确认后生效的项目常驻规范（初始化时不自动创建）
     memory.md                       可检索的跨任务长期记忆
     specs/                          当前仍有效的共享规格、契约和边界
       auth.md
@@ -118,7 +118,7 @@ your-project/
 
 其他目录保持单一职责：
 
-- `rules/always.md`：这个项目每个任务都必须重新加载的长期规范；技术栈、目录、命令和安全边界放这里。
+- `rules/always.md`：用户确认后，这个项目每个任务都必须重新加载的长期规范；技术栈、目录、命令和安全边界放这里。初始化器不会自动生成固定规则。
 - `memory.md`：下一次 Agent 需要快速想起什么。
 - `notes/`：为什么做出某个跨变更决策。
 - `references/`：项目依赖的共享事实、协议、业务规则或外部资料。
@@ -163,7 +163,8 @@ python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\init_project.py
 它会：
 
 - 缺少时创建根 `AGENTS.md`；
-- 创建 `.agent/specs/`、`.agent/changes/`、`.agent/rules/`、`notes/`、`references/`、`history/`、`scripts/`、`rules/always.md` 和 `memory.md`；
+- 创建 `.agent/specs/`、`.agent/changes/`、`.agent/rules/`、`notes/`、`references/`、`history/`、`scripts/` 和 `memory.md`；
+- 首次初始化后先检查项目并向用户提出项目常驻规则草案；用户确认后才创建 `.agent/rules/always.md`；
 - 把核心历史脚本复制到目标项目；
 - 允许对空项目、已有项目和重复执行；
 - 保留已有 `AGENTS.md`、`AGENTS.override.md`、`.agent/` 文件、源代码和 Git 历史。
@@ -348,7 +349,7 @@ related_to: [WORK-002]
 | 项目常驻规范 | 当前项目的每一个任务 | 技术栈、源码/测试目录、必须命令、生成文件、安全和兼容性 | `.agent/rules/always.md` |
 | 工作项约束 | 当前 `WORK-*` | 本次目标、非目标、验收标准、特殊边界和已批准例外 | `.agent/changes/.../requirements.md` |
 
-使用 `MUST / SHOULD / MAY` 写项目规则：硬约束、默认做法、可选建议。初始化模板的 frontmatter 使用 `configured: false`；补全项目事实后改为 `configured: true`。工作项可以更严格，不能静默取消项目常驻规范；需要例外时记录理由、批准人、有效范围和验证方式。状态查询同时返回 `rules.ready` 和 `rules.configured`：前者表示规则文件结构可加载，后者表示项目事实已经补全。缺失或冲突时不能实现；尚未配置完整时可以讨论和设计，但进入实现前必须补全本次工作依赖的项目事实。
+使用 `MUST / SHOULD / MAY` 写已确认的项目规则：硬约束、默认做法、可选建议。初始化器不写入项目规则；首次初始化后由 Agent 根据仓库提出草案，用户确认后创建 `.agent/rules/always.md`，其 frontmatter 使用 `status: active` 和 `configured: true`。工作项可以更严格，不能静默取消项目常驻规范；需要例外时记录理由、批准人、有效范围和验证方式。状态查询同时返回 `rules.ready`、`rules.configured` 和 `rules.confirmation_required`：缺失、草案或未确认时不能实现，但可以继续讨论和设计。
 
 上下文压缩后不依赖聊天记忆。每次恢复按固定顺序读取 `AGENTS.override.md`、`AGENTS.md`、`.agent/rules/always.md`、状态查询 JSON、当前工作项 `requirements.md` 和本阶段批准工件，并重新输出“当前 / 本次 / 下一步”。因此即使上一轮的规则没有留在上下文里，项目文件仍是可恢复的事实源。
 

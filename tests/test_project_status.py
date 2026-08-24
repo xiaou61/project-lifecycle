@@ -64,7 +64,17 @@ class ProjectStatusTests(unittest.TestCase):
         work.mkdir(parents=True, exist_ok=True)
         return work
 
+    def confirm_rules(self) -> None:
+        rules = self.project / ".agent" / "rules" / "always.md"
+        rules.parent.mkdir(parents=True, exist_ok=True)
+        rules.write_text(
+            "---\nartifact: project_rules\nstatus: active\nconfigured: true\n---\n\n"
+            "# 项目常驻规范\n\n## MUST：所有任务\n\n- 运行测试\n",
+            encoding="utf-8",
+        )
+
     def approve_through_tasks(self, task_body: str = "") -> Path:
+        self.confirm_rules()
         work = self.work_dir()
         for kind in ("requirements", "proposal", "design", "tasks"):
             artifact(work / f"{kind}.md", kind, "approved", task_body if kind == "tasks" else "")
@@ -80,6 +90,7 @@ class ProjectStatusTests(unittest.TestCase):
         depends_on: tuple[str, ...] = (),
         related_to: tuple[str, ...] = (),
     ) -> Path:
+        self.confirm_rules()
         work_dir = self.project / ".agent" / "changes" / f"{work_id}-{name}"
         for kind in ("requirements", "proposal", "design", "tasks"):
             status = requirements_status if kind == "requirements" else "approved"
@@ -177,6 +188,15 @@ class ProjectStatusTests(unittest.TestCase):
         item = project_status.inspect_project(self.project)["work_items"][0]
         self.assertEqual(item["phase"], "verification")
         self.assertEqual(item["state"], "ready")
+
+    def test_unconfirmed_rules_block_implementation(self) -> None:
+        self.approve_through_tasks("### TASK-001 | pending | 实现登录")
+        (self.project / ".agent" / "rules" / "always.md").unlink()
+
+        item = project_status.inspect_project(self.project)["work_items"][0]
+        self.assertEqual(item["phase"], "implementation")
+        self.assertEqual(item["state"], "blocked")
+        self.assertTrue(any("用户确认" in warning for warning in item["warnings"]))
 
     def test_passed_report_completes_work(self) -> None:
         work = self.approve_through_tasks("### TASK-001 | done | 实现登录")
@@ -337,9 +357,9 @@ class InitializationTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("不会写入固定项目规则", result.stdout)
             agents = (project / "AGENTS.md").read_text(encoding="utf-8")
             workspace_readme = (project / ".agent" / "README.md").read_text(encoding="utf-8")
-            rules = (project / ".agent" / "rules" / "always.md").read_text(encoding="utf-8")
             self.assertIn("自然语言", agents)
             self.assertIn("当前 / 本次 / 下一步", agents)
             self.assertIn("用户点名 `WORK-*`", agents)
@@ -347,12 +367,12 @@ class InitializationTests(unittest.TestCase):
             self.assertIn("自然语言", workspace_readme)
             self.assertIn("跨对话接力", workspace_readme)
             self.assertIn("继续实施 WORK-003", workspace_readme)
-            self.assertIn("MUST / SHOULD / MAY", rules)
-            self.assertIn("上下文压缩", rules)
             status = project_status.inspect_project(project)
-            self.assertTrue(status["rules"]["ready"])
+            self.assertFalse((project / ".agent" / "rules" / "always.md").exists())
+            self.assertFalse(status["rules"]["ready"])
             self.assertFalse(status["rules"]["configured"])
-            self.assertTrue(status["rules"]["notices"])
+            self.assertTrue(status["rules"]["confirmation_required"])
+            self.assertTrue(any("用户确认" in warning for warning in status["rules"]["warnings"]))
 
 
 if __name__ == "__main__":
