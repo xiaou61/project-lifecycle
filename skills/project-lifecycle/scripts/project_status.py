@@ -34,6 +34,7 @@ STATE_LABELS = {
     "complete": "已完成",
 }
 WORK_ID_PATTERN = re.compile(r"WORK-\d+", re.IGNORECASE)
+WORKFLOW_MODES = {"full", "compact"}
 
 
 def read_text(path: Path) -> str:
@@ -134,6 +135,7 @@ def work_identity(work_dir: Path) -> dict[str, object]:
     return {
         "work_id": work_id,
         "name": name or work_dir.name,
+        "workflow": (requirements_fields.get("workflow") or "full").strip().lower(),
         "depends_on_ids": parse_id_list(requirements_fields.get("depends_on")),
         "related_to_ids": parse_id_list(requirements_fields.get("related_to")),
     }
@@ -174,6 +176,10 @@ def inspect_work(work_dir: Path, archived: bool = False) -> dict[str, object]:
     artifacts["test_report"] = report_status(work_dir / "testing" / "report.md")
     tasks = task_counts(work_dir / "tasks.md")
     warnings: list[str] = []
+    workflow = str(identity.get("workflow", "full"))
+    if workflow not in WORKFLOW_MODES:
+        warnings.append(f"工作项 workflow 必须为 full 或 compact，当前为 {workflow}。")
+        workflow = "full"
 
     identity_paths = {
         **{name: work_dir / f"{name}.md" for name in ARTIFACTS},
@@ -198,12 +204,19 @@ def inspect_work(work_dir: Path, archived: bool = False) -> dict[str, object]:
         warnings.append("新格式工作项应使用包含中文的名称。")
 
     stages = (
-        ("requirements", "需求尚未形成", "继续讨论并把已确认内容写入 requirements.md。"),
-        ("proposal", "方案尚未确认", "基于已批准需求起草或修订 proposal.md。"),
-        ("design", "设计尚未确认", "基于已批准方案完成 design.md。"),
-        ("tasks", "任务计划尚未确认", "把已批准设计拆成可执行、可验证的 tasks.md。"),
+        (
+            ("requirements", "需求尚未形成", "继续讨论并把已确认内容写入 requirements.md。"),
+            ("tasks", "简短计划尚未确认", "基于已批准需求起草或修订 tasks.md。"),
+        )
+        if workflow == "compact"
+        else (
+            ("requirements", "需求尚未形成", "继续讨论并把已确认内容写入 requirements.md。"),
+            ("proposal", "方案尚未确认", "基于已批准需求起草或修订 proposal.md。"),
+            ("design", "设计尚未确认", "基于已批准方案完成 design.md。"),
+            ("tasks", "任务计划尚未确认", "把已批准设计拆成可执行、可验证的 tasks.md。"),
+        )
     )
-    for phase, missing_reason, missing_action in stages:
+    for stage_index, (phase, missing_reason, missing_action) in enumerate(stages):
         status = artifacts[phase]
         if status == "approved":
             continue
@@ -224,7 +237,7 @@ def inspect_work(work_dir: Path, archived: bool = False) -> dict[str, object]:
             state = "needs_attention"
             next_action = f"修复 {phase}.md 的 frontmatter status，再继续。"
             warnings.append(f"{phase}.md 存在但没有可识别的 status。")
-        if any(artifacts[later] != "missing" for later in ARTIFACTS[ARTIFACTS.index(phase) + 1 :]):
+        if any(artifacts[later[0]] != "missing" for later in stages[stage_index + 1 :]):
             warnings.append(f"{missing_reason}，但已经存在下游工件；先处理最早未满足阶段。")
         return phase_result(
             identity, work_dir, archived, phase, state, next_action, artifacts, tasks, warnings

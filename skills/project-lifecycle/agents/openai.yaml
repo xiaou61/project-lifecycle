@@ -1,0 +1,4 @@
+interface:
+  display_name: "项目生命周期"
+  short_description: "按风险管理需要跨会话追踪的开发工作"
+  default_prompt: "使用 $project-lifecycle；先恢复项目规则和工作项状态，再按风险选择最短可行流程。"

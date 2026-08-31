@@ -4,7 +4,7 @@ Use this reference after the design is approved and before implementation begins
 
 ## Preconditions
 
-- Read the approved `requirements.md`, `proposal.md`, and `design.md`.
+- Read the approved `requirements.md`. In `full` mode also read the approved `proposal.md` and `design.md`; in `compact` mode the approved requirements and this task plan are the planning boundary.
 - Inspect the current repository so paths, symbols, test locations, and commands are real rather than guessed.
 - Return to the earliest affected artifact when a task would require new behavior or a material design decision.
 

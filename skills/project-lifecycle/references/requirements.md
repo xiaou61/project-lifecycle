@@ -14,6 +14,8 @@ Use this reference while clarifying and recording what the user needs. Requireme
 
 ## Requirements Artifact
 
+在 `requirements.md` 的 frontmatter 中可选写 `workflow: compact`。`full`（默认）使用完整阶段；`compact` 适用于需要持久追踪但不需要独立 proposal/design 的普通功能，只要求已批准的需求、简短任务计划和验证资料。流程选择是当前工作项的约束，必须在需求确认时明确；不要为小修复创建工作项只是为了填写这个字段。
+
 Write the shortest document that makes the work testable. Use these sections when relevant:
 
 ```markdown

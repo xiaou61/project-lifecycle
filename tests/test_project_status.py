@@ -9,8 +9,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-STATUS_SCRIPT = ROOT / "scripts" / "project_status.py"
-INIT_SCRIPT = ROOT / "scripts" / "init_project.py"
+SKILL_ROOT = ROOT / "skills" / "project-lifecycle"
+STATUS_SCRIPT = SKILL_ROOT / "scripts" / "project_status.py"
+INIT_SCRIPT = SKILL_ROOT / "scripts" / "init_project.py"
 
 
 def load_status_module():
@@ -33,19 +34,21 @@ def artifact(
     *,
     work: str = "login",
     work_id: str | None = None,
+    workflow: str | None = None,
     depends_on: tuple[str, ...] = (),
     related_to: tuple[str, ...] = (),
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     identity = f"work_id: {work_id}\n" if work_id else ""
     relations = ""
+    workflow_field = f"workflow: {workflow}\n" if kind == "requirements" and workflow else ""
     if kind == "requirements":
         relations = (
             f"depends_on: [{', '.join(depends_on)}]\n"
             f"related_to: [{', '.join(related_to)}]\n"
         )
     path.write_text(
-        f"---\n{identity}work: {work}\nartifact: {kind}\nstatus: {status}\n"
+        f"---\n{identity}work: {work}\nartifact: {kind}\nstatus: {status}\n{workflow_field}"
         f"{relations}updated: 2026-08-19\n---\n\n{body}\n",
         encoding="utf-8",
     )
@@ -86,6 +89,7 @@ class ProjectStatusTests(unittest.TestCase):
         name: str,
         *,
         requirements_status: str = "approved",
+        workflow: str = "full",
         task_body: str = "### TASK-001 | pending | 实现需求",
         depends_on: tuple[str, ...] = (),
         related_to: tuple[str, ...] = (),
@@ -101,6 +105,7 @@ class ProjectStatusTests(unittest.TestCase):
                 task_body if kind == "tasks" else "",
                 work=name,
                 work_id=work_id,
+                workflow=workflow,
                 depends_on=depends_on,
                 related_to=related_to,
             )
@@ -179,6 +184,17 @@ class ProjectStatusTests(unittest.TestCase):
         self.assertEqual(item["state"], "in_progress")
         self.assertEqual(item["tasks"]["pending"], 1)
         self.assertEqual(item["tasks"]["done"], 1)
+
+    def test_compact_workflow_skips_optional_design_stages(self) -> None:
+        self.confirm_rules()
+        work = self.project / ".agent" / "changes" / "WORK-004-快速修复"
+        artifact(work / "requirements.md", "requirements", "approved", work="快速修复", work_id="WORK-004", workflow="compact")
+        artifact(work / "tasks.md", "tasks", "approved", "### TASK-001 | pending | 修改实现", work="快速修复", work_id="WORK-004")
+
+        item = project_status.inspect_project(self.project)["work_items"][0]
+        self.assertEqual(item["workflow"], "compact")
+        self.assertEqual(item["phase"], "implementation")
+        self.assertEqual(item["state"], "in_progress")
 
     def test_finished_tasks_move_to_verification(self) -> None:
         work = self.approve_through_tasks("### TASK-001 | done | 实现登录")
