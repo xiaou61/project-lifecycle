@@ -26,52 +26,36 @@ LEGACY_WORKSPACE_DIRS = (
 
 WORKSPACE_README = """# .agent 项目工作区
 
-本目录保存项目的长期规则、稳定规格、工作项资料和验证证据；Skill 本体由 Codex 从安装目录加载。
-
-项目根目录的 `AGENTS.md` 是入口规则；若存在 `AGENTS.override.md`，Codex 会优先采用它。
+本目录保存已安装 `project-lifecycle` Skill 使用的项目资料，不保存 Skill 本体。根目录 `AGENTS.md` 负责入口路由；若存在 `AGENTS.override.md`，按更高优先级使用。
 
 ```text
 .agent/
-  memory.md                当前有效、可快速检索的项目长期记忆
-  rules/always.md          用户确认后生效的项目常驻规范（初始化时不自动创建）
-  specs/                   项目当前仍有效的共享规格与契约
-  changes/WORK-001-中文名/ 每个需求或变更的完整生命周期资料
-  references/              多个工作项共享的项目参考资料
-  notes/                   跨功能、长期有效的决策理由
-  history/                 根据 Git 生成的核心组件历史
-  scripts/                 项目内使用的确定性辅助脚本
+  memory.md                 跨任务仍有效的长期记忆
+  rules/always.md           用户确认后的项目常驻规范
+  specs/                    多个工作项共享的当前事实
+  changes/WORK-编号-中文名/  受管理需求的生命周期工件
+  notes/ references/        决策理由与共享资料
+  history/ scripts/         Git 历史视图与确定性辅助脚本
 ```
 
-低风险小修复可以不创建工作项。需要跨会话追踪的普通功能可在 `requirements.md` 使用 `workflow: compact`；高风险工作再按需求、方案、设计、任务和验证逐步记录。
+`specs/` 保存当前共享事实，`changes/` 保存一次变更的依据、任务和验证；源代码与可执行测试仍在项目原有目录。`always.md` 只保存经用户确认且适用于多个任务的长期规则，单次约束写在对应 `requirements.md`。
 
-`rules/always.md` 只保存经用户确认、且适用于项目多个任务的长期规范。初始化器不会替项目猜测规则；单次约束写在对应 `requirements.md`。
-
-项目源代码和可执行测试仍放在项目原有目录；`testing/` 只保存测试计划和验证报告。
-
-生命周期状态使用机器可读的英文值：`draft`、`approved`、`stale`、`passed`、`partial`、`failed`。
-
-直接用自然语言开始、确认、继续或查询状态。用户点名 `WORK-*` 时，Skill 从入口规则、状态和当前工件恢复，不依赖聊天记忆；“继续”只推进已获授权的动作。需要时用“当前 / 本次 / 下一步”说明方向，跨会话再给出接力。
-
-跨对话接力：新对话可说“$project-lifecycle 继续实施 WORK-003”，Skill 会重新读取规则、状态和当前工件。
-
-详细恢复、阶段和关系协议由已安装 Skill 的 `references/workflow.md` 提供。不要创建 `current.md` 或 `state.json`。
+直接用自然语言开始、确认、继续或查询状态即可。`WORK-*` 只用于跨对话定位，不代表阶段批准；恢复顺序、门槛、澄清、验证和完成语义统一见已安装 Skill 的 `references/workflow.md`。
 """
 
 AGENTS_TEMPLATE = """# 项目协作说明
 
-本项目使用已安装的 `project-lifecycle` Skill 管理需要持久追踪的开发工作。
+本项目使用已安装的 `project-lifecycle` Skill 管理需要持久追踪、多人协作或有明显风险的工作。
 
-## 工作规则
+## 入口规则
 
-- 低风险、边界清楚的小修复可直接修改并验证，不必创建 `WORK-*`。
-- 重要工作开始或恢复时使用 `$project-lifecycle`，读取项目规则、工作项状态和当前工件后再行动。
-- 实质性范围、接口、数据、安全或架构变化时停止并重新确认，不静默扩大目标。
-- 测试未运行、失败或存在人工缺口时据实报告，不把文档状态当成测试事实。
-- 不创建 `.agent/current.md` 或 `state.json`；源代码和可执行测试保留在项目原有目录。
-- 需要跨会话追踪时创建 `WORK-*`，并按当前风险保留必要工件。
-- 自然语言、用户点名 `WORK-*` 或“继续”都可作为入口；状态需要时用“当前 / 本次 / 下一步”说明，跨会话时再给出接力。
+- 低风险、边界清楚的单文件改动：确认目标 -> 修改 -> 窄验证，不创建 `WORK-*`。
+- 重要工作开始或恢复时，先读取适用入口规则、`.agent/rules/always.md`、状态结果和当前工件；多仓库先从外层 `PROJECT-INDEX.md` 定位真实项目。
+- 只有受管理需求创建 `WORK-*`；阶段批准、澄清、漂移、验证和完成语义统一遵循 Skill 的 `references/workflow.md`。
+- 未完成硬依赖阻断实现和验收；重大范围、接口、数据、安全、部署或架构变化回到最早受影响工件。
+- 规则未确认前不得进行实现、部署、迁移或数据变更；验证结果必须据实记录。
 
-详细阶段协议由已安装 Skill 的 `references/workflow.md` 提供。若未发现 `$project-lifecycle`，请先说明 Skill 未安装。
+若未发现 `$project-lifecycle`，请先说明 Skill 未安装。
 """
 
 MEMORY_TEMPLATE = """# 项目长期记忆

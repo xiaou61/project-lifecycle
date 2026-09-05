@@ -10,7 +10,7 @@ Use this reference while clarifying and recording what the user needs. Requireme
 - Reflect decisions back in concrete language and distinguish confirmed facts, assumptions, and open questions.
 - Load `.agent/rules/always.md` before recording constraints. Put only this work item's stricter or additional constraints in `requirements.md`; do not duplicate every project rule or silently waive one. Follow [rules.md](rules.md) when a requested exception conflicts with a project `MUST`.
 - Do not force the user through a generic questionnaire. Omit dimensions that do not matter to this work.
-- When two interpretations remain materially different, present the difference and ask the user to choose. Do not choose silently.
+- Ask only when the choice changes the goal, user-visible behavior, data ownership, external integration, public interface, acceptance, security, project rules, or deployment, and cannot be safely inferred from approved artifacts and repository patterns. Otherwise choose the existing pattern and record a material assumption.
 
 ## Requirements Artifact
 

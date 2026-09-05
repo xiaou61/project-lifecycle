@@ -1,6 +1,6 @@
 # Task Planning
 
-Use this reference after the design is approved and before implementation begins. A task plan converts design decisions into an executable sequence; it does not choose product scope or architecture.
+Use this reference after the planning boundary is approved and before implementation begins. In `full` mode that boundary is the approved proposal and design; in `compact` mode it is the approved requirements. A task plan converts those decisions into an executable sequence; it does not choose product scope or architecture.
 
 ## Preconditions
 

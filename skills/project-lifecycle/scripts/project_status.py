@@ -452,17 +452,31 @@ def resolve_relations(items: list[dict[str, object]]) -> None:
 
 
 def apply_rules_gate(items: list[dict[str, object]], rules: dict[str, object]) -> None:
-    """Prevent implementation or verification before project rules are confirmed."""
+    """Block mutations before rules are confirmed; keep read-only verification visible."""
     if rules.get("ready") and rules.get("configured"):
         return
-    message = "项目常驻规范尚未确认或无效；修复并取得用户确认后才能进入开发实现或测试验收。"
+    implementation_message = (
+        "项目常驻规范尚未确认或无效；实现、部署、迁移和数据变更前需修复并取得用户确认。"
+    )
+    verification_message = (
+        "项目常驻规范尚未确认或无效；只能执行不依赖未知规则的只读验证，不能据此完成结算。"
+    )
     for item in items:
-        if item["archived"] or item["phase"] not in {"implementation", "verification"}:
+        if item["archived"]:
             continue
-        if message not in item["warnings"]:
-            item["warnings"].append(message)
-        item["state"] = "blocked"
-        item["next_action"] = "先检查项目并向用户确认项目常驻规范，再继续当前工作项。"
+        if item["phase"] == "implementation":
+            if implementation_message not in item["warnings"]:
+                item["warnings"].append(implementation_message)
+            item["state"] = "blocked"
+            item["next_action"] = "先检查项目并向用户确认项目常驻规范，再继续实现。"
+        elif item["phase"] == "verification":
+            if verification_message not in item["warnings"]:
+                item["warnings"].append(verification_message)
+        elif item["phase"] == "completed":
+            if verification_message not in item["warnings"]:
+                item["warnings"].append(verification_message)
+            item["state"] = "needs_attention"
+            item["next_action"] = "保留验证证据；确认项目常驻规范后再完成结算。"
 
 
 def locate_project(start: Path) -> Path:
@@ -597,6 +611,8 @@ def inspect_project(
     result: dict[str, object] = {
         "project_root": str(project_root),
         "workspace": str(workspace),
+        "scope": "project",
+        "catalog": None,
         "initialized": workspace.is_dir(),
         "state": "uninitialized",
         "next_work_id": None,
@@ -614,6 +630,25 @@ def inspect_project(
         "warnings": [],
         "work_items": [],
     }
+    catalog = workspace / "PROJECT-INDEX.md"
+    if catalog.is_file() and not (workspace / "changes").is_dir():
+        result.update(
+            scope="workspace",
+            catalog=str(catalog),
+            state="workspace",
+            next_action="读取 PROJECT-INDEX.md，选择一个真实项目目录后再运行状态检查。",
+        )
+        result["rules"] = {
+            "path": str(workspace / "rules" / "always.md"),
+            "present": False,
+            "status": "not_applicable",
+            "ready": True,
+            "configured": False,
+            "confirmation_required": False,
+            "warnings": [],
+            "notices": ["外层 .agent 仅作为多仓库导航入口，不承载项目生命周期工件。"],
+        }
+        return result
     if not workspace.is_dir():
         return result
 
@@ -632,11 +667,15 @@ def inspect_project(
     else:
         visible_items = active_items + (archived_items if include_archive else [])
 
-    active = [item for item in active_items if item["phase"] != "completed"]
+    active = [
+        item
+        for item in active_items
+        if item["phase"] != "completed" or item["state"] != "complete"
+    ]
     result["work_items"] = visible_items
     if not visible_items and not all_items:
         next_action = (
-            "先检查项目并向用户确认项目常驻规范，再描述一个新需求。"
+            "先检查项目常驻规范并提出确认草案；可以同时描述一个新需求。"
             if not (result["rules"]["ready"] and result["rules"]["configured"])
             else "描述一个新需求；需要跨会话管理时创建带中文名称的工作项。"
         )
@@ -667,6 +706,15 @@ def relation_label(relation: dict[str, object]) -> str:
 
 
 def render_text(status: dict[str, object]) -> str:
+    if status.get("scope") == "workspace":
+        return "\n".join(
+            [
+                f"工作区：{status['project_root']}",
+                f"总入口：{status['catalog']}",
+                "范围：多仓库导航工作区（不承载 WORK-* 生命周期状态）",
+                f"下一步：{status['next_action']}",
+            ]
+        )
     lines = [f"项目：{status['project_root']}", f"工作区：{status['workspace']}"]
     if not status["initialized"]:
         lines.extend(["状态：未初始化", f"下一步：{status['next_action']}"])

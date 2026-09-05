@@ -1,6 +1,6 @@
 # Testing And Verification
 
-Use this reference after implementation to plan and record verification against the approved requirements and design.
+Use this reference after implementation to plan and record verification against the approved upstream boundary and acceptance criteria. `full` mode also uses the approved design; `compact` mode does not require a design.
 
 ## Test Plan
 
@@ -20,7 +20,7 @@ Create `<artifact-root>/testing/plan.md` with the same `work_id` and Chinese `wo
 
 The acceptance matrix maps each `AC-*` criterion to an executable test, a manual inspection, or an explicit gap. Name the intended test location or command when known. Test externally observable behavior and meaningful contracts rather than document wording or implementation trivia.
 
-Before running the plan, confirm that the required upstream artifacts are approved rather than `draft` or `stale`: `full` mode requires requirements, proposal, design and task plan; `compact` mode requires requirements and task plan. If any upstream artifact changes materially after a result is recorded, mark the report `stale` and rerun the affected checks; a previously passing command is not evidence for changed behavior.
+Before running the plan, confirm that the required upstream artifacts are approved rather than `draft` or `stale`: `full` mode requires requirements, proposal, design and task plan; `compact` mode requires requirements and task plan. This is an execution precondition, not a separate user approval of the test plan. If any upstream artifact changes materially after a result is recorded, mark the report `stale` and rerun the affected checks; a previously passing command is not evidence for changed behavior.
 
 Place executable tests in the repository's established unit, integration, end-to-end, or other test directories. Do not place executable tests under the documentation artifact root unless that is already the repository convention.
 
@@ -38,4 +38,4 @@ Run the narrowest checks that provide credible evidence for the affected behavio
 ## 剩余风险
 ```
 
-Distinguish `passed`, `failed`, and `not run`. Do not infer success from code inspection when execution is required, and do not hide unavailable infrastructure, credentials, flaky results, or environmental limitations. A partial or failed report is still useful evidence; it is not completion.
+Distinguish `passed`, `failed`, and `not run`. Do not infer success from code inspection when execution is required, and do not hide unavailable infrastructure, credentials, flaky results, or environmental limitations. A partial or failed report is still useful evidence; it is not completion. `passed` is test evidence and does not by itself mean user business acceptance or release.

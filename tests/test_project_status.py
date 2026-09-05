@@ -214,6 +214,26 @@ class ProjectStatusTests(unittest.TestCase):
         self.assertEqual(item["state"], "blocked")
         self.assertTrue(any("用户确认" in warning for warning in item["warnings"]))
 
+    def test_unconfirmed_rules_allow_read_only_verification_but_not_settlement(self) -> None:
+        work = self.approve_through_tasks("### TASK-001 | done | 实现登录")
+        plan = work / "testing" / "plan.md"
+        plan.parent.mkdir()
+        plan.write_text("# 测试计划\n", encoding="utf-8")
+        (self.project / ".agent" / "rules" / "always.md").unlink()
+
+        item = project_status.inspect_project(self.project)["work_items"][0]
+        self.assertEqual(item["phase"], "verification")
+        self.assertEqual(item["state"], "ready")
+        self.assertTrue(any("只读验证" in warning for warning in item["warnings"]))
+
+        (work / "testing" / "report.md").write_text(
+            "# 验证报告\n\n状态：passed\n", encoding="utf-8"
+        )
+        item = project_status.inspect_project(self.project)["work_items"][0]
+        self.assertEqual(item["phase"], "completed")
+        self.assertEqual(item["state"], "needs_attention")
+        self.assertIn("确认项目常驻规范", item["next_action"])
+
     def test_passed_report_completes_work(self) -> None:
         work = self.approve_through_tasks("### TASK-001 | done | 实现登录")
         report = work / "testing" / "report.md"
@@ -362,7 +382,7 @@ class InitializationTests(unittest.TestCase):
             self.assertEqual(rules.read_text(encoding="utf-8"), "# 用户自定义项目规范\n\n## MUST\n\n- 保留此规则\n")
             self.assertTrue((project / ".agent" / "scripts" / "generate_core_history.py").is_file())
 
-    def test_new_project_explains_natural_language_workflow(self) -> None:
+    def test_new_project_explains_lifecycle_entry(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             project = Path(temp)
             result = subprocess.run(
@@ -376,13 +396,12 @@ class InitializationTests(unittest.TestCase):
             self.assertIn("不会写入固定项目规则", result.stdout)
             agents = (project / "AGENTS.md").read_text(encoding="utf-8")
             workspace_readme = (project / ".agent" / "README.md").read_text(encoding="utf-8")
-            self.assertIn("自然语言", agents)
-            self.assertIn("当前 / 本次 / 下一步", agents)
-            self.assertIn("用户点名 `WORK-*`", agents)
-            self.assertIn("接力", agents)
-            self.assertIn("自然语言", workspace_readme)
-            self.assertIn("跨对话接力", workspace_readme)
-            self.assertIn("继续实施 WORK-003", workspace_readme)
+            self.assertIn("project-lifecycle", agents)
+            self.assertIn("PROJECT-INDEX.md", agents)
+            self.assertIn("references/workflow.md", agents)
+            self.assertIn("WORK-*", workspace_readme)
+            self.assertIn("阶段批准", workspace_readme)
+            self.assertIn("references/workflow.md", workspace_readme)
             status = project_status.inspect_project(project)
             self.assertFalse((project / ".agent" / "rules" / "always.md").exists())
             self.assertFalse(status["rules"]["ready"])
