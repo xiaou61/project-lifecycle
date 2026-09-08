@@ -4,6 +4,8 @@
 
 这里的 `skills/` 是可复用的 Skill 本体，`docs/` 是面向用户的正式教程，`output/` 是生成后的交付文件。初始化到其他项目后，该项目还会拥有自己的 `.agent/INDEX.md` 和 `.agent/html/`；理解型 HTML 的实际内容只在用户同意后写入目标项目。不要把它们混成一个事实源。
 
+Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiaou61/project-lifecycle/blob/main/CHANGELOG.md)；目标项目的逐轮历史见 `.agent/history/updates.md`。
+
 ## 按模块查找
 
 ### 运行时 Skill
@@ -12,7 +14,7 @@
 | --- | --- | --- | --- |
 | 入口与风险路由 | `skills/project-lifecycle/SKILL.md` | 何时触发 Skill、短路径和不可绕过的底线 | `quick_validate.py` |
 | 全流程协议 | `skills/project-lifecycle/references/workflow.md` | 恢复顺序、审批门槛、漂移、依赖和完成语义 | `tests/test_project_status.py` |
-| 规则与边界 | `references/rules.md`、`relationships.md`、`specs.md`、`memory.md` | 规则优先级、关系、稳定事实和长期记忆边界 | 状态检查 + 严格校验 |
+| 规则与边界 | `references/rules.md`、`relationships.md`、`specs.md`、`memory.md`、`update-history.md` | 规则优先级、关系、稳定事实、长期记忆和更新记录边界 | 状态检查 + 严格校验 |
 | 阶段工件规范 | `references/requirements.md`、`proposal.md`、`design.md`、`tasks.md`、`testing.md` | 需求、方案、设计、任务和验证报告怎么写 | 严格校验器 |
 | Git 历史视图 | `references/core-history.md` | 核心组件的历史证据和生成约定 | `generate_core_history.py` |
 | Codex 界面元数据 | `skills/project-lifecycle/agents/openai.yaml` | UI 显示名称、简述和默认入口 | Skill 校验 |
@@ -25,6 +27,7 @@
 | 状态汇总与恢复 | `skills/project-lifecycle/scripts/project_status.py` | 推导阶段、依赖、Git 归因和 `--resume` JSON | 单元测试 + JSON 解析 |
 | 严格校验器 | `skills/project-lifecycle/scripts/project_validate.py` | 校验结构、重复 ID、来源、证据和归因 | `--strict` |
 | 用户命令适配器 | `skills/project-lifecycle/scripts/project-lifecycle.ps1` | 用 `init/status/resume/validate/history` 隐藏底层 Python 实现 | PowerShell 命令冒烟检查 |
+| 更新历史命令 | `skills/project-lifecycle/scripts/update_history.py` | 查看、追加更新记录和检查本地提交检查点 | 命令冒烟检查 |
 | 回归测试 | `tests/test_project_status.py` | 固化生命周期和边界行为 | 维护者发布检查 |
 
 ### 面向用户的文档
@@ -47,7 +50,8 @@
 | 模块 | 主要位置 | 用途 | 约定 |
 | --- | --- | --- | --- |
 | 理解型 HTML 规则 | `skills/project-lifecycle/references/html.md` | 用户同意、保存位置和事实边界 | Skill 校验 |
-| 目标项目导航与 HTML | `.agent/INDEX.md`、`.agent/html/` | 按业务模块定位代码、规格、工作项和用户同意后的理解材料 | 由初始化器创建空目录，索引不复制阶段状态 |
+| 目标项目导航与历史 | `.agent/INDEX.md`、`.agent/history/updates.md` | 按业务模块定位代码、规格、工作项和每轮变更记录 | 更新记录追加维护，索引不复制阶段状态 |
+| 目标项目理解型 HTML | `.agent/html/` | 用户同意后的架构、流程和交互理解材料 | 由初始化器创建空目录 |
 | 正式教程源文件 | `docs/` | VitePress 页面和静态资源 | 用 `npm run docs:dev` 预览 |
 | 生成交付物 | `output/` | 可下载的 HTML、Draw.io 等最终产物 | 不把这里当运行时事实源 |
 | VitePress 配置 | `docs/.vitepress/config.mts` | 导航、侧栏、搜索和站点元信息 | `npm run docs:build` |

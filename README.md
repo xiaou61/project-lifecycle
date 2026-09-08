@@ -1,6 +1,6 @@
 # Project Lifecycle Skill
 
-面向 Codex 的中文项目开发 Skill。它把需要持久追踪的需求、决策、任务和验证证据保存到目标项目的 `.agent/`，让跨会话恢复有事实依据，同时按工作风险缩短流程。
+面向 Codex 的中文项目开发 Skill。它把需要持久追踪的需求、决策、任务和验证证据保存到目标项目的 `.agent/`，让跨会话恢复有事实依据，同时按工作风险缩短流程。Skill 仓库自身的维护记录见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 Skill 运行时入口是 `skills/project-lifecycle/SKILL.md`。详细协议按需从 `skills/project-lifecycle/references/` 读取；根目录 README 只做使用说明，不是运行时状态源。仓库的模块地图见 [VitePress 总索引](docs/reference/index.md)；项目理解型 HTML 的生成规则见 [`references/html.md`](skills/project-lifecycle/references/html.md)，实际文件只在用户同意后放入目标项目的 `.agent/html/`。
 
@@ -48,7 +48,8 @@ your-project/
       testing/report.md
     notes/ references/              决策理由和共享资料
     html/                            AI 生成的项目理解型 HTML
-    history/ scripts/               Git 历史视图和确定性脚本
+    history/                        更新历史和 Git 历史视图
+    scripts/                        项目内确定性辅助脚本
   src/                              项目原有源代码
   tests/                            项目原有可执行测试
 ```
@@ -72,8 +73,10 @@ skills/project-lifecycle/
   references/specs.md               稳定规格的写入边界
   references/memory.md              长期记忆的证据和失效规则
   references/core-history.md        Git 核心组件历史视图
+  references/update-history.md      更新日志字段、本地检查点和推送边界
   references/html.md                项目理解型 HTML 的同意与保存边界
   scripts/project-lifecycle.ps1    面向用户的统一命令入口
+  scripts/update_history.py        更新历史与本地检查点命令实现
   scripts/init_project.py           幂等初始化器
   scripts/project_status.py         只读状态汇总器
   scripts/project_validate.py       严格校验器
@@ -141,6 +144,18 @@ Agent 会主动给受管理需求分配不复用的中文名称和 `WORK-*` 编�
 ```
 
 状态查询返回当前阶段、工件状态、任务计数、依赖、关联、阻塞原因和下一步。`resume` 额外输出唯一可恢复工作项、建议读取路径和可复制接力句；JSON 顶层有稳定的 `schema_version` 和 `generated_at`，`git` 概览会标出脏工作区和归因状态。需要检查重复 `REQ-*`/`AC-*`/`TASK-*`、正式来源引用、结构化测试证据和项目规则时，使用 `project-lifecycle.ps1 validate`。外层工作区只返回导航提示，不承载 `WORK-*` 状态。
+
+更新历史命令：`updates` 查看 `.agent/history/updates.md`，`record` 按固定字段追加一条记录，`checkpoint` 检查本地 Git 工作区是否还有未提交改动。它们不会自动提交或推送。
+
+```powershell
+& $lifecycle updates "F:\我的项目" --tail 10
+& $lifecycle record "F:\我的项目" --work WORK-003 --title "修复登录超时" --type implementation `
+  --change "调整会话超时处理" --decision "保留现有接口" --basis ".agent/changes/WORK-003-登录/design.md" `
+  --verification "pytest tests/test_login.py -q：通过"
+& $lifecycle checkpoint "F:\我的项目" --json
+```
+
+每次实际修改后，Agent 还要在目标项目 `.agent/history/updates.md` 追加变更、决策、依据、验证和本地提交边界。切换独立工作项或完成沉淀前，先留下本地 commit 检查点；`git push`、远端分支、tag 和部署必须得到用户明确授权。
 
 ## 开发与发布
 

@@ -31,22 +31,24 @@
 
 1. **确定项目**：多仓库先读外层 `PROJECT-INDEX.md` 和项目映射，再读目标项目的 `AGENTS.override.md`、`AGENTS.md` 和说明；需要定位模块时再读项目 `.agent/INDEX.md`。
 2. **恢复规范**：读 `.agent/rules/always.md`。文件缺失、草案、无效或冲突时先查仓库并提出草案；可以继续只读讨论和不依赖未知规则的设计/验证，但实现、部署、迁移和数据变更必须等待确认。
-3. **查询状态**：从 Skill 安装目录运行：
+3. **查询状态**：通过已安装 Skill 的统一命令入口运行。不要把底层 Python 文件相对当前项目解析，也不要从目标项目的 `.agent/scripts/` 查找状态或校验脚本：
 
-   ```sh
-   python -X utf8 scripts/project_status.py <project-root> --json
-   python -X utf8 scripts/project_status.py <project-root> --resume --json
+   ```powershell
+   $lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+   & $lifecycle status <project-root> --json
+   & $lifecycle resume <project-root> --json
    ```
 
    `--resume` 返回 `auto_resume`、`ask_user` 或 `out_of_scope`，并给出阶段、阻塞、建议读取路径和接力提示。下游按 `schema_version` 和字段读取，不解析中文文本。
 4. **定位和加载依据**：按用户点名的编号、中文名、内容唯一匹配、唯一活动项的顺序选择；先读需求，再按阶段读取已批准工件、规格、记忆和共享资料。
 5. **检查门槛并执行一个动作**：核对规范、批准、硬依赖、关联影响和工件一致性；然后讨论、写当前工件、改代码、验证，或停在真实确认点。
-6. **同步事实**：只按实际结果更新工件和任务状态；需要接力或暴露阻塞时再输出状态。
+6. **同步事实**：只按实际结果更新工件和任务状态；每次实际修改后追加 `.agent/history/updates.md`，记录变更、决策、依据、验证和本地提交/远端推送边界；需要接力或暴露阻塞时再输出状态。
 
 发布或交接前可运行：
 
-```sh
-python -X utf8 scripts/project_validate.py <project-root> --strict --json
+```powershell
+$lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+& $lifecycle validate <project-root> --json
 ```
 
 它检查结构、标识符、来源引用、测试证据和 Git 归因；`--strict` 将兼容性警告视为失败。
@@ -122,3 +124,12 @@ $project-lifecycle 在当前项目继续 WORK-003，先恢复规范和状态，�
 现有项目没有 `.agent/` 时先读规则和文档；用户要求持久追踪或高风险管理时，说明初始化只增加项目资料、不改源码，再运行初始化器。单文件、低风险、边界清楚的小修复走短路径；新项目、跨模块、公共接口、迁移、安全和架构调整使用完整工作项。
 
 不要创建 `.agent/current.md`、`state.json` 或手工状态索引；状态必须来自项目工件和查询器。
+
+## 更新历史与检查点门槛
+
+更新历史的字段和写法统一见 [`update-history.md`](update-history.md)。它是项目时间线，不替代工作项工件或 Git 历史。
+
+- 实际改动完成后，先追加更新历史，再报告本轮结果；没有运行的验证写“未运行”，不能写成通过。
+- 切换到下一个独立工作项或进入“完成沉淀”前，必须确认当前记录已写入，并且当前改动已经本地提交，或明确记录“待用户授权本地提交”并停在检查点门槛。
+- 用户要求本地保存时，只提交已归因的当前工作项文件；用户已有和未知改动保持原样。
+- 不因“保存”“提交”“继续”推断远端授权；`git push`、远端分支、tag 和部署必须由用户明确要求。

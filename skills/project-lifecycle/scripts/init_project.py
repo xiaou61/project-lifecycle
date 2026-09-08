@@ -38,10 +38,11 @@ WORKSPACE_README = """# .agent 项目工作区
   changes/WORK-编号-中文名/  受管理需求的生命周期工件
   notes/ references/        决策理由与共享资料
   html/                     用户同意后生成的项目理解型 HTML
-  history/ scripts/         Git 历史视图与确定性辅助脚本
+  history/                  更新历史与 Git 历史视图
+  scripts/                  项目内确定性辅助脚本（不放 Skill 状态脚本）
 ```
 
-`specs/` 保存当前共享事实，`changes/` 保存一次变更的依据、任务和验证；源代码与可执行测试仍在项目原有目录。`always.md` 只保存经用户确认且适用于多个任务的长期规则，单次约束写在对应 `requirements.md`。`html/` 只在用户明确同意后写入理解材料，空目录本身不表示已批准。
+`specs/` 保存当前共享事实，`changes/` 保存一次变更的依据、任务和验证；`history/updates.md` 追加每轮变更、决策、依据、验证和本地提交边界，`history/core-components.md` 是 Git 历史的生成视图；源代码与可执行测试仍在项目原有目录。`always.md` 只保存经用户确认且适用于多个任务的长期规则，单次约束写在对应 `requirements.md`。`html/` 只在用户明确同意后写入理解材料，空目录本身不表示已批准。
 
 Git 工作区有未提交改动时，可在对应工作项下增加 `workspace.md`，记录基准 commit、每条改动路径的归属和说明，供恢复探针核对。
 
@@ -55,7 +56,7 @@ status: active
 
 # 项目总索引
 
-本页只负责按模块导航，帮助定位“代码改在哪里、依据和验证到哪里看”。工作项阶段、批准、任务进度和验证结果仍以对应工件及 `project_status.py` 输出为准，不在这里重复维护。
+本页只负责按模块导航，帮助定位“代码改在哪里、依据和验证到哪里看”。工作项阶段、批准、任务进度和验证结果仍以对应工件及 `project-lifecycle.ps1 status` 输出为准，不在这里重复维护。状态、恢复和严格校验脚本属于已安装 Skill 的内部实现，不在目标项目 `.agent/scripts/` 中查找。
 
 ## 内容在哪里
 
@@ -67,7 +68,7 @@ status: active
 | 决策说明与共享资料 | `.agent/notes/`、`.agent/references/` |
 | 长期记忆 | `.agent/memory.md` |
 | 项目理解型 HTML | `.agent/html/` |
-| Git 历史视图 | `.agent/history/` |
+| 更新历史与 Git 历史视图 | `.agent/history/updates.md`、`.agent/history/core-components.md` |
 
 ## 模块索引
 
@@ -96,6 +97,23 @@ status: active
 | 交付后项目应保持什么行为 | `.agent/specs/` |
 """
 
+UPDATE_HISTORY_TEMPLATE = """---
+artifact: update-history
+status: active
+schema_version: 1
+---
+
+# 项目更新历史
+
+这里按时间顺序追加每轮实际变更、关键决策、依据、验证结果和 Git 边界。它是面向人阅读的项目时间线，不替代 `.agent/changes/` 工件或 Git 历史。
+
+记录格式见已安装 Skill 的 `references/update-history.md`。每条记录至少包含变更、决策、依据、验证、本地提交和远端推送字段；没有实际持久化改动的聊天不追加；不要删除或覆盖旧记录。
+
+## 记录
+
+当前暂无更新记录。
+"""
+
 AGENTS_TEMPLATE = """# 项目协作说明
 
 本项目使用已安装的 `project-lifecycle` Skill 管理需要持久追踪、多人协作或有明显风险的工作。
@@ -108,6 +126,7 @@ AGENTS_TEMPLATE = """# 项目协作说明
 - 只有受管理需求创建 `WORK-*`；阶段批准、澄清、漂移、验证和完成语义统一遵循 Skill 的 `references/workflow.md`。
 - 未完成硬依赖阻断实现和验收；重大范围、接口、数据、安全、部署或架构变化回到最早受影响工件。
 - 规则未确认前不得进行实现、部署、迁移或数据变更；验证结果必须据实记录。
+- 每次实际修改后追加 `.agent/history/updates.md`，记录变更、决策、依据、验证和本地提交边界；远端 `push` 必须得到用户明确授权。
 
 若未发现 `$project-lifecycle`，请先说明 Skill 未安装。
 """
@@ -173,6 +192,7 @@ def main() -> int:
                 workspace / "INDEX.md",
                 workspace / "memory.md",
                 workspace / "rules" / "always.md",
+                workspace / "history" / "updates.md",
                 workspace / "scripts" / "generate_core_history.py",
             ),
             "文件",
@@ -186,6 +206,9 @@ def main() -> int:
         readme_status = create_text_if_missing(workspace / "README.md", WORKSPACE_README)
         index_status = create_text_if_missing(workspace / "INDEX.md", INDEX_TEMPLATE)
         memory_status = create_text_if_missing(workspace / "memory.md", MEMORY_TEMPLATE)
+        history_status = create_text_if_missing(
+            workspace / "history" / "updates.md", UPDATE_HISTORY_TEMPLATE
+        )
         generator_status = copy_if_missing(
             Path(__file__).with_name("generate_core_history.py"),
             workspace / "scripts" / "generate_core_history.py",
@@ -199,6 +222,7 @@ def main() -> int:
     print(f"{readme_status}：{workspace / 'README.md'}")
     print(f"{index_status}：{workspace / 'INDEX.md'}")
     print(f"{memory_status}：{workspace / 'memory.md'}")
+    print(f"{history_status}：{workspace / 'history' / 'updates.md'}")
     rules_path = workspace / "rules" / "always.md"
     if rules_path.is_file():
         print(f"保留：{rules_path}")

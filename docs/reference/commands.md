@@ -59,6 +59,27 @@ $lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-l
 
 配置格式和改名规则见[总索引](/reference/)中的“Git 历史视图”条目。
 
+## 更新历史与提交边界
+
+初始化后，目标项目会有 `.agent/history/updates.md`。每次实际修改后追加本轮的变更、决策、依据、验证和提交状态；详细字段见 [更新历史规则](https://github.com/xiaou61/project-lifecycle/blob/main/skills/project-lifecycle/references/update-history.md)。
+
+本地 commit 只是恢复和回滚检查点。切换工作项或完成沉淀前应先完成本地检查点；`git push`、远端分支、tag 和部署不会由 Skill 自动执行，必须由用户明确授权。
+
+可组合命令示例：
+
+```powershell
+# 查看最近 10 条更新
+& $lifecycle updates "F:\我的项目" --tail 10
+
+# 追加一条结构化更新记录
+& $lifecycle record "F:\我的项目" --work WORK-003 --title "修复登录超时" --type implementation `
+  --change "调整会话超时处理" --decision "保留现有接口" --basis ".agent/changes/WORK-003-登录/design.md" `
+  --verification "pytest tests/test_login.py -q：通过"
+
+# 切换工作项前检查是否还有未提交改动；有改动时返回非零
+& $lifecycle checkpoint "F:\我的项目" --json
+```
+
 ## 发布前检查
 
 维护者发布 Skill 时运行（用户不需要执行这组内部检查）：

@@ -11,6 +11,7 @@ description: 管理需要跨会话追踪、多人协作或明显风险的开发�
 
 - 开始或恢复受管理工作前，定位真实项目，读取适用的入口规则、`.agent/rules/always.md`、状态和当前工件；多仓库先从外层 `PROJECT-INDEX.md` 导航。
 - `.agent/INDEX.md` 只按模块导航到源码、规格、工作项和理解材料，不复制阶段或任务状态；项目理解型 HTML 仅在用户明确同意后放 `.agent/html/`。
+- 每次实际修改后都要在 `.agent/history/updates.md` 追加变更、决策、依据、验证和提交边界；切换工作项或完成沉淀前必须留下本地检查点，远端 `push` 只能在用户明确授权后执行。
 - 用户要求“问透需求”“详细调查需求”或明确要先访谈再出 PRD/Task 时，进入可选的需求深挖模式；普通需求和低风险修复不强制使用。
 - 用户明确批准需求、方案、设计或任务后，才能跨对应门槛；“继续”“开始做”“执行 `WORK-*`”不单独批准。
 - 只按已确认范围实施。目标、验收、公共行为、接口、数据、安全、部署或架构发生实质变化时，回到最早受影响工件并使下游失效。
@@ -29,7 +30,7 @@ description: 管理需要跨会话追踪、多人协作或明显风险的开发�
 
 ## 用户入口
 
-本 Skill 对用户提供一个总入口和几个可组合动作：初始化、状态、恢复、严格校验和历史视图。用户可以直接用自然语言表达这些动作，也可以调用 `scripts/project-lifecycle.ps1 <init|status|resume|validate|history>`；不要要求普通用户直接运行 Python 文件。
+本 Skill 对用户提供一个总入口和几个可组合动作：初始化、状态、恢复、严格校验、Git 历史视图、更新历史、记录更新和本地检查点检查。用户可以直接用自然语言表达这些动作，也可以调用 `scripts/project-lifecycle.ps1 <init|status|resume|validate|history|updates|record|checkpoint>`；不要要求普通用户直接运行 Python 文件。
 
 这些命令只是稳定的入口适配器，底层脚本属于 Skill 实现细节。`compact`、`full` 和需求深挖是生命周期模式或参考协议，不拆成会互相抢触发的重复 Skill。
 
@@ -41,6 +42,8 @@ description: 管理需要跨会话追踪、多人协作或明显风险的开发�
 - `references/requirements.md`、`proposal.md`、`design.md`、`tasks.md`、`testing.md`：阶段工件规则。
 - `references/html.md`：项目理解型 HTML 的用户同意、保存位置和事实边界。
 - `references/rules.md`、`relationships.md`、`specs.md`、`memory.md`、`core-history.md`：边界、关系和长期资料。
-- `scripts/init_project.py`、`scripts/project_status.py`：幂等初始化（含项目总索引和 HTML 目录）与只读状态汇总；恢复或跨对话接力时优先使用 `project_status.py --resume --json`。
-- `scripts/project_validate.py`：只读严格校验工件结构、标识符、来源引用、测试证据和 Git 归因；需要发布前检查时再运行。
+- `references/update-history.md`：更新日志字段、本地提交检查点和远端推送边界。
+- `scripts/init_project.py`、`scripts/project_status.py`：Skill 内部实现，负责幂等初始化（含项目总索引和 HTML 目录）与只读状态汇总；用户和 Agent 通过 `scripts/project-lifecycle.ps1 init/status/resume` 调用，不从目标项目 `.agent/scripts/` 查找这些文件。
+- `scripts/project_validate.py`：Skill 内部的只读严格校验实现；发布前通过 `scripts/project-lifecycle.ps1 validate` 调用，不要求普通用户直接运行 Python。
 - `scripts/project-lifecycle.ps1`：面向用户的命令适配器，隐藏底层 Python 实现并转发 `init`、`status`、`resume`、`validate`、`history`。
+- `scripts/update_history.py`：读取和追加 `.agent/history/updates.md`，并检查本地 Git 提交检查点。

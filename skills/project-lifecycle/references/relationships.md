@@ -12,7 +12,7 @@
 新需求首次讨论时：
 
 1. 先提出结果导向的中文名称；只有存在两个实质不同的解释时才询问名称。
-2. 运行 `scripts/project_status.py <project-root> --json`，使用返回的 `next_work_id`，不要从可见活动列表猜编号。
+2. 通过已安装 Skill 的统一入口运行 `project-lifecycle.ps1 status <project-root> --json`，使用返回的 `next_work_id`，不要从可见活动列表猜编号。不要从目标项目的 `.agent/scripts/` 查找 `project_status.py`；它只可能存在于 Skill 安装目录，且普通用户不需要直接运行它。
 3. 立即创建 `.agent/changes/WORK-003-用户登录/requirements.md`，写入用户原始目标和当前问题。
 4. 所有工件复用同一 `work_id` 和 `work`；状态中优先显示中文名，存在歧义时补充编号。
 

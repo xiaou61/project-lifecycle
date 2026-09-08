@@ -22,7 +22,7 @@ Project Lifecycle 只需要项目内工件和一个只读 Python 检查器。运
 
 ## 严格校验和普通状态有什么区别
 
-`project_status.py` 回答“现在到哪一步、下一步是什么”；`project_validate.py --strict` 回答“工件结构和证据是否合格”。前者必须兼容旧工件，后者可以把旧格式警告为失败，适合发布前或交接前使用。
+用户通过 `project-lifecycle.ps1 status/resume` 查询状态和恢复上下文；适配器内部的 `project_status.py` 回答“现在到哪一步、下一步是什么”，`project_validate.py --strict` 回答“工件结构和证据是否合格”。前者必须兼容旧工件，后者可以把旧格式警告为失败，适合发布前或交接前使用。
 
 ## `passed` 是不是业务验收通过
 

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet("init", "status", "resume", "validate", "history")]
+    [ValidateSet("init", "status", "resume", "validate", "history", "updates", "record", "checkpoint")]
     [string]$Command,
 
     [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
@@ -29,6 +29,9 @@ $scriptName = switch ($Command) {
     "resume" { "project_status.py" }
     "validate" { "project_validate.py" }
     "history" { "generate_core_history.py" }
+    "updates" { "update_history.py" }
+    "record" { "update_history.py" }
+    "checkpoint" { "update_history.py" }
 }
 
 $forwardedArgs = @($CommandArgs)
@@ -38,6 +41,9 @@ if ($Command -eq "resume" -and $forwardedArgs -notcontains "--resume") {
 if ($Command -eq "validate" -and $forwardedArgs -notcontains "--strict") {
     $forwardedArgs += "--strict"
 }
+if ($Command -eq "updates") { $forwardedArgs += "--list" }
+if ($Command -eq "record") { $forwardedArgs += "--record" }
+if ($Command -eq "checkpoint") { $forwardedArgs += "--check" }
 
 & $pythonCommand @pythonPrefix (Join-Path $scriptDir $scriptName) @forwardedArgs
 exit $LASTEXITCODE

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import subprocess
 import sys
 import tempfile
@@ -12,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = ROOT / "skills" / "project-lifecycle"
 STATUS_SCRIPT = SKILL_ROOT / "scripts" / "project_status.py"
 INIT_SCRIPT = SKILL_ROOT / "scripts" / "init_project.py"
+UPDATE_SCRIPT = SKILL_ROOT / "scripts" / "update_history.py"
 
 
 def load_status_module():
@@ -36,6 +38,19 @@ def load_validate_module():
 
 project_status = load_status_module()
 project_validate = load_validate_module()
+
+
+def load_update_module():
+    spec = importlib.util.spec_from_file_location("update_history", UPDATE_SCRIPT)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("无法加载 update_history.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["project_status"] = project_status
+    spec.loader.exec_module(module)
+    return module
+
+
+update_history = load_update_module()
 
 
 def artifact(
@@ -509,6 +524,57 @@ class ProjectStatusTests(unittest.TestCase):
 
 
 class InitializationTests(unittest.TestCase):
+    def test_update_history_record_and_list(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            project = Path(temp)
+            init = subprocess.run(
+                [sys.executable, "-X", "utf8", str(INIT_SCRIPT), str(project)],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=False,
+            )
+            self.assertEqual(init.returncode, 0, init.stderr)
+            record = subprocess.run(
+                [
+                    sys.executable,
+                    "-X",
+                    "utf8",
+                    str(UPDATE_SCRIPT),
+                    str(project),
+                    "--record",
+                    "--work",
+                    "WORK-001",
+                    "--title",
+                    "记录一次变更",
+                    "--change",
+                    "修改实现",
+                    "--decision",
+                    "复用现有入口",
+                    "--basis",
+                    ".agent/changes/WORK-001/tasks.md",
+                    "--verification",
+                    "单元测试通过",
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=False,
+            )
+            self.assertEqual(record.returncode, 0, record.stderr)
+            history = (project / ".agent" / "history" / "updates.md").read_text(encoding="utf-8")
+            self.assertIn("WORK-001 · 记录一次变更", history)
+            self.assertIn("本地提交：待用户授权/未提交", history)
+            listed = subprocess.run(
+                [sys.executable, "-X", "utf8", str(UPDATE_SCRIPT), str(project), "--list", "--json"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=False,
+            )
+            self.assertEqual(listed.returncode, 0, listed.stderr)
+            self.assertEqual(len(json.loads(listed.stdout)["entries"]), 1)
+
     def test_existing_project_is_preserved_and_repeatable(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             project = Path(temp)
@@ -544,6 +610,7 @@ class InitializationTests(unittest.TestCase):
             self.assertEqual(source.read_text(encoding="utf-8"), "VALUE = 1\n")
             self.assertTrue((project / ".agent" / "memory.md").is_file())
             self.assertTrue((project / ".agent" / "html").is_dir())
+            self.assertTrue((project / ".agent" / "history" / "updates.md").is_file())
             self.assertEqual(index.read_text(encoding="utf-8"), "# 用户维护的项目索引\n")
             self.assertEqual(rules.read_text(encoding="utf-8"), "# 用户自定义项目规范\n\n## MUST\n\n- 保留此规则\n")
             self.assertTrue((project / ".agent" / "scripts" / "generate_core_history.py").is_file())
@@ -571,6 +638,11 @@ class InitializationTests(unittest.TestCase):
             self.assertIn("references/workflow.md", workspace_readme)
             self.assertIn("## 模块索引", project_index)
             self.assertIn(".agent/html/", project_index)
+            self.assertIn("project-lifecycle.ps1 status", project_index)
+            self.assertNotIn(".agent/scripts/project_status.py", project_index)
+            update_history = project / ".agent" / "history" / "updates.md"
+            self.assertIn("artifact: update-history", update_history.read_text(encoding="utf-8"))
+            self.assertIn("本地提交", update_history.read_text(encoding="utf-8"))
             status = project_status.inspect_project(project)
             self.assertFalse((project / ".agent" / "rules" / "always.md").exists())
             self.assertFalse(status["rules"]["ready"])
