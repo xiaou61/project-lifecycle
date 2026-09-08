@@ -17,7 +17,8 @@
 初始化只增加 `.agent/` 资料目录和入口模板，不移动源码、不创建空白工作项，也不会替你猜测项目规则：
 
 ```powershell
-python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\init_project.py" "F:\我的项目"
+$lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+& $lifecycle init "F:\我的项目"
 ```
 
 初始化后的关键目录如下：
@@ -67,19 +68,22 @@ python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\init_project.py
 查询当前活动工作项：
 
 ```powershell
-python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.py" "F:\我的项目"
+$lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+& $lifecycle status "F:\我的项目"
 ```
 
 查询指定工作项：
 
 ```powershell
-python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.py" "F:\我的项目" --work WORK-003
+$lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+& $lifecycle status "F:\我的项目" --work WORK-003
 ```
 
 准备换对话或恢复工作时，使用恢复输出：
 
 ```powershell
-python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.py" "F:\我的项目" --resume
+$lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+& $lifecycle resume "F:\我的项目"
 ```
 
 需要让 Agent 读取结构化结果时加 `--json`。完整流程见[跨会话恢复与接力](/guide/resume)。

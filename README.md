@@ -73,6 +73,7 @@ skills/project-lifecycle/
   references/memory.md              长期记忆的证据和失效规则
   references/core-history.md        Git 核心组件历史视图
   references/html.md                项目理解型 HTML 的同意与保存边界
+  scripts/project-lifecycle.ps1    面向用户的统一命令入口
   scripts/init_project.py           幂等初始化器
   scripts/project_status.py         只读状态汇总器
   scripts/project_validate.py       严格校验器
@@ -96,7 +97,7 @@ skills/project-lifecycle/
 ### 初始化项目
 
 ```powershell
-python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\init_project.py" "F:\我的项目"
+& "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" init "F:\我的项目"
 ```
 
 初始化器是幂等的：缺少时创建资料目录、入口模板和历史脚本，保留已有 `AGENTS.md`、`.agent/`、源代码、测试和 Git 历史。它不会安装 Skill、猜测项目规则、移动旧目录、修改产品文件或创建空白工作项。
@@ -123,31 +124,31 @@ Agent 会主动给受管理需求分配不复用的中文名称和 `WORK-*` 编�
 
 ```powershell
 # 当前非归档工作项
-python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.py" "F:\我的项目"
+& "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" status "F:\我的项目"
 
 # 只看可恢复上下文、阻塞、建议读取路径和接力提示
-python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.py" "F:\我的项目" --resume
+& "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" resume "F:\我的项目"
 
 # 发布前严格检查工件和证据
-python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_validate.py" "F:\我的项目" --strict
+& "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" validate "F:\我的项目"
 
 # 按编号或中文名称查询
-python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.py" "F:\我的项目" --work WORK-003
-python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.py" "F:\我的项目" --work "用户登录"
+& "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" status "F:\我的项目" --work WORK-003
+& "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" status "F:\我的项目" --work "用户登录"
 
 # 包含归档资料
-python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.py" "F:\我的项目" --include-archive
+& "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" status "F:\我的项目" --include-archive
 ```
 
-状态查询返回当前阶段、工件状态、任务计数、依赖、关联、阻塞原因和下一步。`--resume` 额外输出唯一可恢复工作项、建议读取路径和可复制接力句；JSON 顶层有稳定的 `schema_version` 和 `generated_at`，`git` 概览会标出脏工作区和归因状态。需要检查重复 `REQ-*`/`AC-*`/`TASK-*`、正式来源引用、结构化测试证据和项目规则时，使用 `project_validate.py --strict`。外层工作区只返回导航提示，不承载 `WORK-*` 状态。
+状态查询返回当前阶段、工件状态、任务计数、依赖、关联、阻塞原因和下一步。`resume` 额外输出唯一可恢复工作项、建议读取路径和可复制接力句；JSON 顶层有稳定的 `schema_version` 和 `generated_at`，`git` 概览会标出脏工作区和归因状态。需要检查重复 `REQ-*`/`AC-*`/`TASK-*`、正式来源引用、结构化测试证据和项目规则时，使用 `project-lifecycle.ps1 validate`。外层工作区只返回导航提示，不承载 `WORK-*` 状态。
 
 ## 开发与发布
 
-提交前至少运行：
+维护者提交前至少运行：
 
 ```powershell
 python -m unittest discover -s tests -p "test_*.py" -v
-python -m py_compile skills/project-lifecycle/scripts/*.py
+python -m compileall -q skills/project-lifecycle/scripts
 python -X utf8 skills/project-lifecycle/scripts/project_validate.py "F:\我的项目" --strict
 git diff --check
 ```

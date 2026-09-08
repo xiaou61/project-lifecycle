@@ -7,7 +7,8 @@
 在新对话或上下文压缩后先运行：
 
 ```powershell
-python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.py" "F:\我的项目" --resume --json
+$lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+& $lifecycle resume "F:\我的项目" --json
 ```
 
 结果中的 `resume.mode` 有三种：
@@ -33,7 +34,8 @@ JSON 顶层还带 `schema_version` 和 `generated_at`。脚本集成应读取字
 如果同时有多个未完成工作项，不能按目录时间、Git 最近修改时间或最近聊天猜测。先列候选，再明确指定：
 
 ```powershell
-python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.py" "F:\我的项目" --work WORK-003 --resume
+$lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+& $lifecycle resume "F:\我的项目" --work WORK-003
 ```
 
 也可以直接说：

@@ -17,3 +17,9 @@
 - 想了解需求怎么问透：看[需求深挖访谈](/guide/requirements-interview)。
 - 已经有 `WORK-*`：看[跨会话恢复与接力](/guide/resume)。
 - 需要定位仓库文件：看[总索引](/reference/)。
+
+## 为什么不是一堆重复 Skills
+
+Superpowers 的做法是把开发方法拆成多个可组合 Skills，并把每个 Skill 的脚本留在包内，详见 [obra/superpowers](https://github.com/obra/superpowers)。我们借鉴它的“阶段可组合、实现内聚”原则，但保留一个 `project-lifecycle` 总 Skill：需求、批准、依赖、漂移和事实恢复必须共享同一套边界，拆成多个同名近似 Skills 反而会造成重复触发和状态分叉。
+
+用户侧看到的是稳定动作入口：`init`、`status`、`resume`、`validate`、`history`；Agent 也可以直接用自然语言触发它们。PowerShell 适配器会在后台调用内部脚本，普通用户不需要直接使用 Python。

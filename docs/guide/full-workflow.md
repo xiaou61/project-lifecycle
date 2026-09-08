@@ -61,7 +61,7 @@ status: draft
 
 只有上游工件一致、任务完成、验证报告通过，工作项才进入完成沉淀。`passed` 不等于用户已经验收，也不自动授权发布。
 
-发布或交接前可运行 `project_validate.py --strict`，检查重复标识符、来源引用、结构化测试证据和 Git 归因。
+发布或交接前可运行 `project-lifecycle.ps1 validate`，检查重复标识符、来源引用、结构化测试证据和 Git 归因。
 
 ## 普通功能的 compact 流程
 

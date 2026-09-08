@@ -27,6 +27,12 @@ description: 管理需要跨会话追踪、多人协作或明显风险的开发�
 
 详细的自然语言触发、恢复顺序、澄清边界、阶段门槛、关系和完成语义只维护在 `references/workflow.md`；各阶段写法按需读取对应参考文件。
 
+## 用户入口
+
+本 Skill 对用户提供一个总入口和几个可组合动作：初始化、状态、恢复、严格校验和历史视图。用户可以直接用自然语言表达这些动作，也可以调用 `scripts/project-lifecycle.ps1 <init|status|resume|validate|history>`；不要要求普通用户直接运行 Python 文件。
+
+这些命令只是稳定的入口适配器，底层脚本属于 Skill 实现细节。`compact`、`full` 和需求深挖是生命周期模式或参考协议，不拆成会互相抢触发的重复 Skill。
+
 ## 参考入口
 
 - `references/workflow.md`：唯一的恢复、批准、漂移、依赖、验证和完成协议。
@@ -37,3 +43,4 @@ description: 管理需要跨会话追踪、多人协作或明显风险的开发�
 - `references/rules.md`、`relationships.md`、`specs.md`、`memory.md`、`core-history.md`：边界、关系和长期资料。
 - `scripts/init_project.py`、`scripts/project_status.py`：幂等初始化（含项目总索引和 HTML 目录）与只读状态汇总；恢复或跨对话接力时优先使用 `project_status.py --resume --json`。
 - `scripts/project_validate.py`：只读严格校验工件结构、标识符、来源引用、测试证据和 Git 归因；需要发布前检查时再运行。
+- `scripts/project-lifecycle.ps1`：面向用户的命令适配器，隐藏底层 Python 实现并转发 `init`、`status`、`resume`、`validate`、`history`。

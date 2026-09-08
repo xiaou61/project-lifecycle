@@ -48,10 +48,12 @@ This answers when, by whom, and where the repository changed the unit. The repor
 The normal command is:
 
 ```sh
-python .agent/scripts/generate_core_history.py \
+project-lifecycle.ps1 history \
   --config .agent/core-components.json \
   --output .agent/history/core-components.md
 ```
+
+在 Windows 上通过已安装 Skill 的命令适配器运行；不要要求用户直接调用 Python 文件。若项目配置了自动化 hook，hook 可以继续使用内部脚本，但必须由项目维护者显式配置。
 
 For CI or a review check, add `--check`; it exits non-zero when the report is absent or does not match current Git history. The output is deterministic and contains no generation timestamp.
 

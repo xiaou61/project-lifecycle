@@ -24,7 +24,8 @@
 | 初始化器 | `skills/project-lifecycle/scripts/init_project.py` | 幂等创建目标项目的 `.agent/` 和入口模板 | 单元测试 |
 | 状态汇总与恢复 | `skills/project-lifecycle/scripts/project_status.py` | 推导阶段、依赖、Git 归因和 `--resume` JSON | 单元测试 + JSON 解析 |
 | 严格校验器 | `skills/project-lifecycle/scripts/project_validate.py` | 校验结构、重复 ID、来源、证据和归因 | `--strict` |
-| 回归测试 | `tests/test_project_status.py` | 固化生命周期和边界行为 | `python -m unittest discover ...` |
+| 用户命令适配器 | `skills/project-lifecycle/scripts/project-lifecycle.ps1` | 用 `init/status/resume/validate/history` 隐藏底层 Python 实现 | PowerShell 命令冒烟检查 |
+| 回归测试 | `tests/test_project_status.py` | 固化生命周期和边界行为 | 维护者发布检查 |
 
 ### 面向用户的文档
 
