@@ -2,7 +2,7 @@
 
 面向 Codex 的中文项目开发 Skill。它把需要持久追踪的需求、决策、任务和验证证据保存到目标项目的 `.agent/`，让跨会话恢复有事实依据，同时按工作风险缩短流程。
 
-Skill 运行时入口是 `skills/project-lifecycle/SKILL.md`。详细协议按需从 `skills/project-lifecycle/references/` 读取；根目录 README 只做使用说明，不是运行时状态源。仓库的模块地图见 [VitePress 总索引](docs/reference/index.md)；AI 生成的理解型 HTML 放在 [`html/`](html/)，不要混入正式教程或产品源码。
+Skill 运行时入口是 `skills/project-lifecycle/SKILL.md`。详细协议按需从 `skills/project-lifecycle/references/` 读取；根目录 README 只做使用说明，不是运行时状态源。仓库的模块地图见 [VitePress 总索引](docs/reference/index.md)；项目理解型 HTML 的生成规则见 [`references/html.md`](skills/project-lifecycle/references/html.md)，实际文件只在用户同意后放入目标项目的 `.agent/html/`。
 
 ## 什么时候使用
 
@@ -72,6 +72,7 @@ skills/project-lifecycle/
   references/specs.md               稳定规格的写入边界
   references/memory.md              长期记忆的证据和失效规则
   references/core-history.md        Git 核心组件历史视图
+  references/html.md                项目理解型 HTML 的同意与保存边界
   scripts/init_project.py           幂等初始化器
   scripts/project_status.py         只读状态汇总器
   scripts/project_validate.py       严格校验器

@@ -2,7 +2,7 @@
 
 这页是仓库的维护地图，回答两个问题：**这类内容应该改哪里？改完到哪里看？**
 
-这里的 `skills/` 是可复用的 Skill 本体，`docs/` 是面向用户的正式教程，根目录 `html/` 是本仓库的理解型可视化产物，`output/` 是生成后的交付文件。初始化到其他项目后，该项目还会拥有自己的 `.agent/INDEX.md` 和 `.agent/html/`。不要把它们混成一个事实源。
+这里的 `skills/` 是可复用的 Skill 本体，`docs/` 是面向用户的正式教程，`output/` 是生成后的交付文件。初始化到其他项目后，该项目还会拥有自己的 `.agent/INDEX.md` 和 `.agent/html/`；理解型 HTML 的实际内容只在用户同意后写入目标项目。不要把它们混成一个事实源。
 
 ## 按模块查找
 
@@ -45,8 +45,8 @@
 
 | 模块 | 主要位置 | 用途 | 约定 |
 | --- | --- | --- | --- |
-| 本仓库 HTML 理解产物 | `html/` | AI 生成的架构图、流程演示、状态解释和交互草图 | 规则见 `html/README.md`；不作为产品源码 |
-| 目标项目导航与 HTML | `.agent/INDEX.md`、`.agent/html/` | 按业务模块定位代码、规格、工作项和项目理解材料 | 由初始化器创建，索引不复制阶段状态 |
+| 理解型 HTML 规则 | `skills/project-lifecycle/references/html.md` | 用户同意、保存位置和事实边界 | Skill 校验 |
+| 目标项目导航与 HTML | `.agent/INDEX.md`、`.agent/html/` | 按业务模块定位代码、规格、工作项和用户同意后的理解材料 | 由初始化器创建空目录，索引不复制阶段状态 |
 | 正式教程源文件 | `docs/` | VitePress 页面和静态资源 | 用 `npm run docs:dev` 预览 |
 | 生成交付物 | `output/` | 可下载的 HTML、Draw.io 等最终产物 | 不把这里当运行时事实源 |
 | VitePress 配置 | `docs/.vitepress/config.mts` | 导航、侧栏、搜索和站点元信息 | `npm run docs:build` |
@@ -62,14 +62,14 @@
 | 增加一个严格质量门槛 | `scripts/project_validate.py` | 测试、`--strict --json` 输出 |
 | 改教程文字或新增用户页面 | `docs/guide/` 或 `docs/reference/` | `npm run docs:build`、浏览器页面 |
 | 改站点导航或搜索 | `docs/.vitepress/config.mts` | 教程站导航和构建 |
-| 做一个帮助理解的独立 HTML | `html/<主题>.html` | 直接打开或用静态服务器预览，并更新 `html/README.md` |
+| 做一个帮助理解的独立 HTML | 先读 `skills/project-lifecycle/references/html.md`，再写目标项目 `.agent/html/<主题>.html` | 先获用户明确同意，并更新目标项目 `.agent/INDEX.md` |
 | 生成可交付文件 | `output/` | 对应生成脚本和最终文件检查 |
 
 ## 事实源边界
 
 - Skill 的通用规则在 `skills/project-lifecycle/`；目标项目的实际状态在目标项目自己的 `.agent/`。
 - 正式教程解释怎么使用，不替代运行时状态，也不手工维护 `WORK-*` 状态。
-- `html/` 中的文件用于解释和探索，不能代替源码、测试、需求批准或验证报告。
+- 目标项目 `.agent/html/` 中的文件用于解释和探索，不能代替源码、测试、需求批准或验证报告。
 - 新增模块时，先在对应目录落文件，再在本页补一行入口；索引是导航，不是第二份状态数据库。
 
 ## 常用验证

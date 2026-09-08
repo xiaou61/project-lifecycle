@@ -39,3 +39,9 @@ Project Lifecycle 只需要项目内工件和一个只读 Python 检查器。运
 - 每个项目自己的 `.agent/INDEX.md` 按业务模块定位源码、测试、规格、工作项和 HTML 理解材料。
 
 三者都只做导航，不保存阶段、批准、任务进度或测试结果。
+
+## 理解型 HTML 放在哪里
+
+`skills/project-lifecycle/` 是可复用的 Skill 本体，里面的 `references/html.md` 只规定 HTML 理解材料何时生成、如何保存和不能替代什么；它不保存某个项目的图。
+
+初始化目标项目时，Skill 会预建空的 `.agent/html/`。只有用户明确同意生成某份架构图、流程演示或状态解释后，Agent 才把实际 HTML 写入该项目的 `.agent/html/`，并登记到 `.agent/INDEX.md`。`docs/` 是正式 VitePress 教程，`output/` 是可交付产物，二者都不是项目理解材料的默认存放处。
