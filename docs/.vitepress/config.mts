@@ -9,6 +9,7 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: '教程首页', link: '/' },
+      { text: '技术架构图', link: '/architecture' },
       { text: '总索引', link: '/reference/' },
       { text: '全流程', link: '/guide/full-workflow' },
       { text: '恢复与接力', link: '/guide/resume' },
@@ -21,6 +22,7 @@ export default defineConfig({
           text: '上手教程',
           items: [
             { text: '开始使用', link: '/guide/getting-started' },
+            { text: '技术架构与流转图', link: '/architecture' },
             { text: '全流程教程', link: '/guide/full-workflow' },
             { text: '跨会话恢复与接力', link: '/guide/resume' },
             { text: '需求、来源与验收', link: '/guide/requirements' },

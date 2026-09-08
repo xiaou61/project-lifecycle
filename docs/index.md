@@ -10,8 +10,8 @@ hero:
       text: 开始全流程教程
       link: /guide/getting-started
     - theme: alt
-      text: 我已经有工作项
-      link: /guide/resume
+      text: 查看技术架构图
+      link: /architecture
 
 features:
   - title: 按风险选择流程
@@ -26,6 +26,9 @@ features:
   - title: 先把需求问透
     details: 需要详细调查时，按决策树逐轮确认关键选择，再生成 PRD 和任务计划。
     link: /guide/requirements-interview
+  - title: 点击查看技术细节
+    details: 架构图中的每个节点都能展开输入、处理、输出、门槛和对应 Markdown。
+    link: /architecture
 ---
 
 ## 这套教程适合谁
@@ -41,4 +44,4 @@ features:
 3. 确认项目常驻规则。
 4. 用自然语言讨论需求，或用 `WORK-*` 恢复已有工作。
 
-下一步阅读：[开始使用](/guide/getting-started)，或者先看[总索引](/reference/)了解每个模块应该改哪里、到哪里查看。
+下一步阅读：[开始使用](/guide/getting-started)，或者直接打开[技术架构与流转图](/architecture)。

@@ -31,6 +31,7 @@
 | 模块 | 主要位置 | 负责什么 | 浏览入口 |
 | --- | --- | --- | --- |
 | 教程首页 | `docs/index.md` | 用户第一次进入时的概览和入口 | [教程首页](/) |
+| 技术架构图 | `docs/architecture.md`、`docs/.vitepress/theme/components/LifecycleArchitecture.vue` | 交互式执行流、分层关系和节点级 Markdown 链接 | [技术架构与流转图](/architecture) |
 | 开始使用 | `docs/guide/getting-started.md` | 安装、初始化和第一次工作 | [开始使用](/guide/getting-started) |
 | 全流程 | `docs/guide/full-workflow.md` | 需求到完成的阶段说明 | [全流程教程](/guide/full-workflow) |
 | 恢复与接力 | `docs/guide/resume.md` | 跨会话恢复、多个工作项和 Git 归因 | [恢复与接力](/guide/resume) |

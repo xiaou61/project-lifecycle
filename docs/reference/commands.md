@@ -55,7 +55,10 @@ npm run docs:dev
 ```powershell
 npm run docs:build
 npm run docs:preview
+npm run docs:serve
 ```
+
+`docs:serve` 使用 Python 标准库提供 clean URL 回退，适合把 `docs/.vitepress/dist` 放到没有 Nginx 重写规则的服务器上。
 
 ## 稳定 JSON
 
