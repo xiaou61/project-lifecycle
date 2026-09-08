@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Project Lifecycle Skill · 架构导航</title>
+<style>
+:root {
+  --bg: #0a101b;
+  --panel: #111a29;
+  --panel-2: #162235;
+  --ink: #edf4ff;
+  --muted: #8fa2bd;
+  --line: #27364d;
+  --cyan: #45d6d1;
+  --violet: #a88cff;
+  --amber: #f3b65c;
+  --green: #67d49a;
+  --rose: #f08b9c;
+  --blue: #74a9ff;
+  --shadow: 0 18px 50px rgba(0,0,0,.25);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; }
+body { min-width: 1060px; }
+button, input { font: inherit; }
+button { color: inherit; }
+.app { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; }
+.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 22px; padding: 18px 24px; border-bottom: 1px solid var(--line); background: rgba(10,16,27,.94); backdrop-filter: blur(14px); }
+.brand { min-width: 285px; }
+.eyebrow { color: var(--cyan); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+h1 { margin: 4px 0 0; font-size: 22px; line-height: 1.2; letter-spacing: 0; }
+.brand p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.metrics { display: flex; gap: 8px; flex-wrap: wrap; }
+.metric { min-width: 74px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); }
+.metric strong { display: block; font-size: 16px; }
+.metric span { color: var(--muted); font-size: 10px; }
+.toolbar { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.search { width: 220px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px; outline: 0; color: var(--ink); background: var(--panel); }
+.search:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(69,214,209,.12); }
+.tool-btn { width: 34px; height: 34px; padding: 0; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); cursor: pointer; }
+.tool-btn:hover, .tool-btn:focus-visible { border-color: var(--cyan); color: var(--cyan); outline: 0; }
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 310px; min-height: 0; }
+.board-wrap { position: relative; min-width: 0; overflow: auto; padding: 22px; }
+.board { position: relative; min-width: 1720px; min-height: 1220px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background-color: #0d1625; background-image: linear-gradient(rgba(127,161,205,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(127,161,205,.055) 1px, transparent 1px); background-size: 32px 32px; box-shadow: var(--shadow); }
+svg { display: block; width: 1720px; height: 1220px; transform-origin: 0 0; user-select: none; }
+.zone { fill: rgba(13,24,39,.76); stroke: var(--line); stroke-width: 1.2; }
+.zone.entry { stroke: rgba(69,214,209,.4); }
+.zone.package { stroke: rgba(168,140,255,.38); }
+.zone.project { stroke: rgba(243,182,92,.4); }
+.zone.flow { stroke: rgba(116,169,255,.4); }
+.zone-title { fill: #bfd0e8; font-size: 12px; font-weight: 700; letter-spacing: .12em; }
+.zone-note { fill: #61738d; font-size: 11px; }
+.edge { fill: none; stroke: #52708e; stroke-width: 1.5; opacity: .68; marker-end: url(#arrow); transition: opacity .2s, stroke .2s, stroke-width .2s; }
+.edge.read { stroke: #8c78cc; }
+.edge.write { stroke: #cb9151; stroke-dasharray: 5 4; }
+.edge.guard { stroke: #db778b; stroke-dasharray: 3 4; }
+.edge.active { stroke: var(--cyan); stroke-width: 3; opacity: 1; }
+.edge.dim { opacity: .06; }
+.edge-label { fill: #7e93ad; font-size: 10px; text-anchor: middle; paint-order: stroke; stroke: #0d1625; stroke-width: 4px; stroke-linejoin: round; }
+.node { cursor: pointer; outline: 0; transition: opacity .2s; }
+.node rect { fill: #142237; stroke: #30435f; stroke-width: 1.2; transition: fill .2s, stroke .2s, stroke-width .2s; }
+.node:hover rect, .node:focus-visible rect { stroke: var(--cyan); stroke-width: 2; }
+.node.selected rect { fill: #1d3445; stroke: var(--cyan); stroke-width: 2.4; }
+.node.connected rect { stroke: #83e6dc; }
+.node.dim { opacity: .13; }
+.node .label { fill: #f2f6fd; font-size: 13px; font-weight: 700; }
+.node .sub { fill: #8498b3; font-size: 10px; }
+.node .dot { stroke: #0d1625; stroke-width: 2; }
+.dot.entry { fill: var(--cyan); }
+.dot.package { fill: var(--violet); }
+.dot.reference { fill: var(--blue); }
+.dot.runtime { fill: var(--rose); }
+.dot.script { fill: var(--green); }
+.dot.artifact { fill: var(--amber); }
+.dot.guard { fill: #ef737e; }
+.legend { position: absolute; left: 34px; bottom: 34px; display: flex; gap: 12px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px; background: rgba(17,26,41,.92); font-size: 10px; color: var(--muted); }
+.legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.legend i.entry { background: var(--cyan); }.legend i.package { background: var(--violet); }.legend i.reference { background: var(--blue); }.legend i.runtime { background: var(--rose); }.legend i.script { background: var(--green); }.legend i.artifact { background: var(--amber); }
+.panel { min-width: 0; padding: 24px 20px; border-left: 1px solid var(--line); background: var(--panel); overflow: auto; }
+.panel-kicker { color: var(--muted); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+.panel h2 { margin: 6px 0 3px; font-size: 20px; line-height: 1.25; }
+.panel-path { margin: 0 0 18px; color: var(--cyan); font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
+.panel-copy { margin: 0 0 18px; color: #c0cde0; font-size: 13px; line-height: 1.65; }
+.tag { display: inline-block; margin-bottom: 18px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 10px; }
+.panel-section { padding-top: 16px; border-top: 1px solid var(--line); }
+.panel-section + .panel-section { margin-top: 16px; }
+.panel-section h3 { margin: 0 0 9px; color: #aabbd3; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+.panel-section ul { margin: 0; padding: 0; list-style: none; }
+.panel-section li { padding: 6px 0; color: #d5dfec; font-size: 12px; line-height: 1.45; }
+.panel-section li button { padding: 0; border: 0; color: var(--cyan); background: transparent; cursor: pointer; text-align: left; }
+.panel-section li button:hover { text-decoration: underline; }
+.filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; }
+.filter { padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: transparent; cursor: pointer; font-size: 10px; }
+.filter[aria-pressed="true"] { border-color: var(--cyan); color: var(--ink); background: rgba(69,214,209,.12); }
+.empty { color: var(--muted); font-size: 12px; line-height: 1.6; }
+@media (max-width: 1180px) { body { min-width: 0; } .topbar { flex-wrap: wrap; } .toolbar { width: 100%; margin-left: 0; } .workspace { grid-template-columns: 1fr; } .panel { border-top: 1px solid var(--line); border-left: 0; min-height: 280px; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="eyebrow">Project Lifecycle Skill</div>
+      <h1>架构导航</h1>
+      <p>入口、编排、工件与验证边界的一张可交互地图</p>
+    </div>
+    <div class="metrics" id="metrics" aria-label="架构统计"></div>
+    <div class="toolbar">
+      <input id="search" class="search" type="search" placeholder="搜索节点、路径或职责" aria-label="搜索节点、路径或职责">
+      <button class="tool-btn" id="zoomOut" type="button" title="缩小" aria-label="缩小">−</button>
+      <button class="tool-btn" id="zoomReset" type="button" title="重置视图" aria-label="重置视图">1:1</button>
+      <button class="tool-btn" id="zoomIn" type="button" title="放大" aria-label="放大">+</button>
+      <button class="tool-btn" id="clear" type="button" title="清除选择" aria-label="清除选择">×</button>
+    </div>
+  </header>
+  <main class="workspace">
+    <section class="board-wrap" aria-label="架构图画布">
+      <div class="board" id="board">
+        <svg id="graph" viewBox="0 0 1720 1220" role="img" aria-label="Project Lifecycle Skill 架构图">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#52708e"></path></marker>
+            <marker id="arrow-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#45d6d1"></path></marker>
+          </defs>
+          <g id="zones"></g>
+          <g id="edges"></g>
+          <g id="nodes"></g>
+        </svg>
+        <div class="legend" id="legend"></div>
+      </div>
+    </section>
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </main>
+</div>
+<noscript>此架构图需要启用 JavaScript 才能交互。</noscript>
+<script>
+(function () {
+  var nodes = [
+    {id:'user', group:'entry', x:65,y:120,w:300,h:72, label:'用户自然语言', sub:'想法 / 确认 / 继续 / 查询', path:'自然语言入口', purpose:'用户不需要记住文件名或命令；表达意图即可进入对应阶段。'},
+    {id:'discover', group:'entry', x:65,y:235,w:300,h:72, label:'Codex Skill 发现', sub:'$project-lifecycle · AGENTS.md', path:'发现与路由', purpose:'Codex 从 Skill 目录和项目入口发现运行时能力；项目入口负责把相关工作路由到 Skill。'},
+    {id:'skill', group:'package', x:465,y:120,w:280,h:82, label:'SKILL.md', sub:'全局底线 + 风险路由', path:'skills/project-lifecycle/SKILL.md', purpose:'保持运行时入口短小，定义事实源、批准门槛、范围控制、验证诚实和小改动短路径。'},
+    {id:'ui', group:'package', x:465,y:235,w:280,h:72, label:'openai.yaml', sub:'Codex UI 元数据', path:'skills/project-lifecycle/agents/openai.yaml', purpose:'提供显示名称、简述和默认调用入口，让 Codex UI 能识别这个 Skill。'},
+    {id:'router', group:'runtime', x:65,y:360,w:300,h:72, label:'风险路由', sub:'按范围选择最短流程', path:'SKILL.md · workflow.md', purpose:'根据工作风险选择低风险短路径、compact 或完整流程，避免形式主义也避免越过必要门槛。'},
+    {id:'low', group:'runtime', x:65,y:480,w:300,h:70, label:'低风险短路径', sub:'确认 → 修改 → 窄验证', path:'workflow.md · 现有项目与小改动', purpose:'边界清楚的孤立小改动不创建完整 WORK-*，直接修改并留下最小验证。'},
+    {id:'compact', group:'runtime', x:65,y:590,w:300,h:70, label:'普通功能 · compact', sub:'需求 → 任务 → 验证', path:'workflow.md · workflow: compact', purpose:'需要跨会话追踪但不涉及高风险变化时，保留需求、任务计划和验证报告。'},
+    {id:'full', group:'runtime', x:65,y:700,w:300,h:70, label:'高风险完整流程', sub:'需求 → 方案 → 设计 → 任务', path:'workflow.md · 阶段门槛', purpose:'新项目、跨模块、公共接口、数据、安全、迁移或架构工作需要完整门槛。'},
+    {id:'rules', group:'reference', x:790,y:120,w:280,h:72, label:'分层规范', sub:'rules.md', path:'references/rules.md', purpose:'区分 Skill 全局底线、项目常驻规范和工作项约束，规定冲突优先级与恢复协议。'},
+    {id:'workflow', group:'reference', x:790,y:235,w:280,h:72, label:'执行与接力', sub:'workflow.md', path:'references/workflow.md', purpose:'定义自然语言触发、每轮固定顺序、阶段门槛、多需求选择和跨对话恢复。'},
+    {id:'relations', group:'reference', x:790,y:350,w:280,h:72, label:'身份与关系', sub:'relationships.md', path:'references/relationships.md', purpose:'稳定 work_id 与中文名称，区分硬依赖 depends_on、软关联 related_to 和应合并的需求。'},
+    {id:'specs', group:'reference', x:790,y:465,w:280,h:72, label:'稳定规格', sub:'specs.md', path:'references/specs.md', purpose:'判断哪些资料代表项目当前事实，约束规格与活动变更之间的回写和冲突处理。'},
+    {id:'memory', group:'reference', x:465,y:350,w:280,h:72, label:'长期记忆', sub:'memory.md', path:'references/memory.md', purpose:'只沉淀有证据、能影响未来任务的稳定知识；记忆不替代需求、设计、Git 或测试。'},
+    {id:'corehistory', group:'reference', x:465,y:465,w:280,h:72, label:'核心历史视图', sub:'core-history.md', path:'references/core-history.md', purpose:'以 Git 为事实源，按显式配置生成核心组件的可读变更历史，不手工追加。'},
+    {id:'requirements', group:'reference', x:465,y:580,w:280,h:72, label:'需求发现', sub:'requirements.md', path:'references/requirements.md', purpose:'把模糊想法收敛成背景、目标、非目标、约束和可观察验收标准。'},
+    {id:'proposal', group:'reference', x:790,y:580,w:280,h:72, label:'方案选择', sub:'proposal.md', path:'references/proposal.md', purpose:'分开“要什么”和“选什么方案”，保留真实备选、取舍、风险与验收映射。'},
+    {id:'design', group:'reference', x:465,y:695,w:280,h:72, label:'详细设计', sub:'design.md', path:'references/design.md', purpose:'结合真实代码明确组件边界、接口、数据、失败行为、安全和测试策略。'},
+    {id:'tasks', group:'reference', x:790,y:695,w:280,h:72, label:'实施任务', sub:'tasks.md', path:'references/tasks.md', purpose:'把已批准设计拆成有依赖关系、可执行且可验证的任务，避免凭感觉编码。'},
+    {id:'testing', group:'reference', x:1105,y:695,w:280,h:72, label:'测试与验证', sub:'testing.md', path:'references/testing.md', purpose:'把验收标准映射到实际命令、人工检查、未验证项和剩余风险。'},
+    {id:'init', group:'script', x:465,y:805,w:280,h:72, label:'init_project.py', sub:'幂等初始化器', path:'scripts/init_project.py', purpose:'为目标项目补齐 .agent 目录、AGENTS.md 模板和辅助脚本；不覆盖已有资料。'},
+    {id:'status', group:'script', x:790,y:805,w:280,h:72, label:'project_status.py', sub:'只读状态汇总', path:'scripts/project_status.py', purpose:'从项目工件推导阶段、任务计数、关系、阻塞和下一步，不维护第二份状态数据库。'},
+    {id:'genhistory', group:'script', x:1105,y:805,w:280,h:72, label:'generate_core_history.py', sub:'确定性 Git 投影', path:'scripts/generate_core_history.py', purpose:'读取 Git 提交和显式组件配置，生成可重建的历史 Markdown 视图。'},
+    {id:'index', group:'artifact', x:1110,y:125,w:260,h:70, label:'外层工作区索引', sub:'.agent/PROJECT-INDEX.md', path:'外层 .agent/PROJECT-INDEX.md', purpose:'多仓库模式下只做导航，指向真实项目；不保存 WORK-* 状态或批准状态。'},
+    {id:'workspace', group:'artifact', x:1410,y:125,w:230,h:70, label:'目标项目资料', sub:'.agent/', path:'目标项目/.agent/', purpose:'项目生命周期的持久事实源，和 Skill 包保持边界分离。'},
+    {id:'rulesfile', group:'artifact', x:1110,y:240,w:260,h:70, label:'项目常驻规范', sub:'.agent/rules/always.md', path:'目标项目/.agent/rules/always.md', purpose:'用户确认后生效，记录技术栈、目录、命令、安全和兼容性等跨任务约束。'},
+    {id:'specdir', group:'artifact', x:1410,y:240,w:230,h:70, label:'稳定规格', sub:'.agent/specs/', path:'目标项目/.agent/specs/', purpose:'保存已验证且仍然有效的项目事实、契约和边界。'},
+    {id:'changes', group:'artifact', x:1110,y:355,w:260,h:70, label:'活动变更', sub:'.agent/changes/WORK-*', path:'目标项目/.agent/changes/', purpose:'保存一次工作的需求、方案、设计、任务和测试证据；完成后可归档但不删除。'},
+    {id:'support', group:'artifact', x:1410,y:355,w:230,h:70, label:'共享资料', sub:'notes/ · references/', path:'目标项目/.agent/notes/ + references/', purpose:'notes 记录跨变更决策理由，references 保存共享业务规则、协议和外部资料。'},
+    {id:'memoryfile', group:'artifact', x:1110,y:470,w:260,h:70, label:'项目记忆', sub:'.agent/memory.md', path:'目标项目/.agent/memory.md', purpose:'给后续 Agent 的紧凑检索入口，必须带证据、范围和失效条件。'},
+    {id:'historydir', group:'artifact', x:1410,y:470,w:230,h:70, label:'历史视图', sub:'.agent/history/', path:'目标项目/.agent/history/', purpose:'由 Git 生成的阅读视图，不是手工事实源。'},
+    {id:'workdocs', group:'artifact', x:1110,y:585,w:260,h:70, label:'工作项工件', sub:'requirements → testing/report', path:'目标项目/.agent/changes/WORK-*/', purpose:'阶段状态、批准关系、任务状态和验证证据都从这里恢复。'},
+    {id:'source', group:'guard', x:1410,y:585,w:230,h:70, label:'源码与测试', sub:'src/ · tests/ · Git', path:'目标项目源码仓库', purpose:'源码、可执行测试和 Git 历史仍是各自领域的事实源，Skill 不替代它们。'},
+    {id:'flowReq', group:'runtime', x:465,y:935,w:210,h:74, label:'需求', sub:'确认目标与验收', purpose:'把模糊想法收敛为已确认的目标、边界和可观察验收标准。'},
+    {id:'flowProp', group:'runtime', x:710,y:935,w:210,h:74, label:'方案', sub:'比较真实取舍', purpose:'在不扩大需求范围的前提下比较方案、风险与仓库影响。'},
+    {id:'flowDesign', group:'runtime', x:955,y:935,w:210,h:74, label:'设计', sub:'锁定边界与数据流', purpose:'结合真实代码明确组件边界、接口、数据流、失败处理和测试策略。'},
+    {id:'flowTasks', group:'runtime', x:1200,y:935,w:210,h:74, label:'实施', sub:'按批准任务修改', purpose:'只按已批准任务计划修改源码、测试和任务状态；实质偏离要退回确认。'},
+    {id:'flowTest', group:'runtime', x:1445,y:935,w:210,h:74, label:'验证与沉淀', sub:'记录证据并回写规格', purpose:'运行真实检查，记录通过、失败和未验证项；将已验证的公共事实回写规格。'}
+  ];
+  var edges = [
+    ['user','discover','触发','control'], ['discover','skill','加载','control'], ['ui','skill','元数据','control'], ['skill','router','路由','control'], ['router','low','短路径','guard'], ['router','compact','compact','guard'], ['router','full','完整','guard'],
+    ['skill','rules','底线','read'], ['skill','workflow','编排','read'], ['workflow','relations','关系','read'], ['workflow','requirements','阶段','read'], ['workflow','testing','验收','read'], ['rules','rulesfile','约束','write'], ['workflow','status','恢复','read'], ['relations','status','解析','read'],
+    ['requirements','flowReq','依据','control'], ['proposal','flowProp','依据','control'], ['design','flowDesign','依据','control'], ['tasks','flowTasks','依据','control'], ['testing','flowTest','依据','control'], ['flowReq','flowProp','批准','guard'], ['flowProp','flowDesign','批准','guard'], ['flowDesign','flowTasks','批准','guard'], ['flowTasks','flowTest','证据','guard'],
+    ['init','workspace','初始化','write'], ['status','workdocs','读取','read'], ['status','rulesfile','读取','read'], ['status','specdir','读取','read'], ['status','memoryfile','读取','read'], ['genhistory','source','读取 Git','read'], ['genhistory','historydir','生成','write'],
+    ['index','workspace','指向','control'], ['workspace','rulesfile','包含','control'], ['workspace','specdir','包含','control'], ['workspace','changes','包含','control'], ['workspace','support','包含','control'], ['workspace','memoryfile','包含','control'], ['workspace','historydir','包含','control'], ['changes','workdocs','阶段工件','control'], ['workdocs','source','实现与测试','guard'],
+    ['memory','memoryfile','沉淀','write'], ['specs','specdir','回写','write'], ['corehistory','historydir','投影','write'], ['rules','rulesfile','加载','read'], ['testing','source','运行检查','guard']
+  ];
+  var zones = [
+    {cls:'entry', x:30,y:30,w:370,h:1145,title:'01 · 入口与风险路由',note:'用户意图先被分类，再进入最短可行流程'},
+    {cls:'package', x:420,y:30,w:680,h:1145,title:'02 · Skill 包（可复用）',note:'入口规则保持短小，参考资料按阶段按需加载'},
+    {cls:'project', x:1080,y:30,w:610,h:780,title:'03 · 目标项目事实源',note:'状态、规则、规格和验证留在真实项目仓库'},
+    {cls:'flow', x:420,y:865,w:1270,h:300,title:'04 · 生命周期主线',note:'只有已批准的上游工件才能跨过下一道门槛'}
+  ];
+  var palette = {entry:'#45d6d1',package:'#a88cff',reference:'#74a9ff',runtime:'#f08b9c',script:'#67d49a',artifact:'#f3b65c',guard:'#ef737e'};
+  var byId = {}; nodes.forEach(function (n) { byId[n.id] = n; });
+  var selected = null, query = '', activeGroups = new Set(Object.keys(palette)), scale = 1;
+  var graph = document.getElementById('graph'), zonesEl = document.getElementById('zones'), edgesEl = document.getElementById('edges'), nodesEl = document.getElementById('nodes'), panel = document.getElementById('panel');
+  var ns = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs, parent) { var item = document.createElementNS(ns, tag); Object.keys(attrs || {}).forEach(function (key) { item.setAttribute(key, attrs[key]); }); if (parent) parent.appendChild(item); return item; }
+  function text(parent, x, y, value, cls, anchor) { var t = el('text', {x:x,y:y,class:cls || '', 'text-anchor':anchor || 'start'}, parent); t.textContent = value; return t; }
+  function renderZones() { zonesEl.innerHTML = ''; zones.forEach(function (z) { el('rect', {x:z.x,y:z.y,width:z.w,height:z.h,rx:8,class:'zone '+z.cls}, zonesEl); text(zonesEl,z.x+18,z.y+27,z.title,'zone-title'); text(zonesEl,z.x+18,z.y+48,z.note,'zone-note'); }); }
+  function edgePath(a,b) { var ax=a.x+a.w/2, ay=a.y+a.h/2, bx=b.x+b.w/2, by=b.y+b.h/2; var dx=bx-ax, dy=by-ay; if (Math.abs(dx) > Math.abs(dy)) { ax += dx>0 ? a.w/2 : -a.w/2; bx += dx>0 ? -b.w/2 : b.w/2; } else { ay += dy>0 ? a.h/2 : -a.h/2; by += dy>0 ? -b.h/2 : b.h/2; } var bend = Math.max(34, Math.min(120, Math.abs(dx+dy)*.12)); if (Math.abs(dx) > Math.abs(dy)) return 'M '+ax+' '+ay+' C '+(ax+(bx-ax)/2)+' '+ay+', '+(bx-(bx-ax)/2)+' '+by+', '+bx+' '+by; return 'M '+ax+' '+ay+' C '+ax+' '+(ay+(by-ay)/2)+', '+bx+' '+(by-(by-ay)/2)+', '+bx+' '+by; }
+  function renderEdges() { edgesEl.innerHTML = ''; edges.forEach(function (e, i) { var a=byId[e[0]], b=byId[e[1]], p=el('path',{d:edgePath(a,b),class:'edge '+e[3], 'data-edge':i},edgesEl); p.setAttribute('data-from',e[0]); p.setAttribute('data-to',e[1]); var mx=(a.x+a.w/2+b.x+b.w/2)/2, my=(a.y+a.h/2+b.y+b.h/2)/2; if (Math.abs(a.x-b.x)<500 || Math.abs(a.y-b.y)<250) text(edgesEl,mx,my-5,e[2],'edge-label'); }); }
+  function renderNodes() { nodesEl.innerHTML = ''; nodes.forEach(function (n) { var g=el('g',{class:'node', tabindex:'0', role:'button', 'aria-label':n.label+'，'+n.purpose, 'data-id':n.id},nodesEl); el('rect',{x:n.x,y:n.y,width:n.w,height:n.h,rx:7},g); el('circle',{cx:n.x+18,cy:n.y+21,r:5,class:'dot '+n.group},g); text(g,n.x+32,n.y+26,n.label,'label'); if(n.sub) text(g,n.x+18,n.y+50,n.sub,'sub'); g.addEventListener('click',function(){selectNode(n.id);}); g.addEventListener('keydown',function(evt){if(evt.key==='Enter'||evt.key===' '){evt.preventDefault();selectNode(n.id);}}); }); }
+  function relatedIds(id) { var set = new Set([id]); edges.forEach(function(e){if(e[0]===id)set.add(e[1]); if(e[1]===id)set.add(e[0]);}); return set; }
+  function matches(n) { if(!activeGroups.has(n.group)) return false; if(!query) return true; var hay=(n.label+' '+(n.sub||'')+' '+(n.path||'')+' '+n.purpose).toLowerCase(); return hay.indexOf(query.toLowerCase())>=0; }
+  function applyState() { var related=selected?relatedIds(selected):new Set(); document.querySelectorAll('.node').forEach(function(g){var n=byId[g.getAttribute('data-id')]; g.classList.toggle('selected',n.id===selected); g.classList.toggle('connected',selected && related.has(n.id) && n.id!==selected); g.classList.toggle('dim',!matches(n) || (selected && !related.has(n.id)));}); document.querySelectorAll('.edge').forEach(function(p){var a=p.getAttribute('data-from'),b=p.getAttribute('data-to'); var active=selected && (a===selected||b===selected); p.classList.toggle('active',!!active); p.classList.toggle('dim',!!selected && !active);}); }
+  function selectNode(id) { selected = id; renderPanel(); applyState(); }
+  function clearSelection() { selected=null; renderPanel(); applyState(); }
+  function linked(id) { var list=[]; edges.forEach(function(e){if(e[0]===id)list.push({id:e[1],kind:'out'}); if(e[1]===id)list.push({id:e[0],kind:'in'});}); return list; }
+  function renderPanel() { if(!selected){ var names={entry:'入口',package:'Skill 包',reference:'参考',runtime:'流程',script:'脚本',artifact:'项目资料',guard:'边界'}; var filters=Object.keys(palette).map(function(k){return '<button class="filter" type="button" data-filter="'+k+'" aria-pressed="'+activeGroups.has(k)+'" title="切换'+names[k]+'层">'+names[k]+'</button>';}).join(''); panel.innerHTML='<div class="panel-kicker">Architecture overview</div><h2>Project Lifecycle</h2><p class="panel-copy">把一次开发工作拆成可恢复的事实链：入口识别风险，Skill 按需加载规则与参考，项目仓库保存状态和证据。</p><div class="panel-section"><h3>事实边界</h3><ul><li>Skill 包：通用规则、参考文档、确定性脚本</li><li>目标项目：.agent/ 里的规则、规格、工作项、记忆和验证</li><li>源码 / 测试 / Git：各自领域的最终事实源</li></ul></div><div class="panel-section"><h3>层级筛选</h3><div class="filter-row">'+filters+'</div></div>'; panel.querySelectorAll('[data-filter]').forEach(function(b){b.addEventListener('click',function(){var key=b.getAttribute('data-filter'); if(activeGroups.has(key)){if(activeGroups.size===1)return; activeGroups.delete(key);}else activeGroups.add(key); renderPanel(); applyState();});}); return; } var n=byId[selected], links=linked(selected); var incoming=links.filter(function(x){return x.kind==='in';}), outgoing=links.filter(function(x){return x.kind==='out';}); var list=function(items){return items.length?'<ul>'+items.map(function(x){return '<li><button type="button" data-jump="'+x.id+'">'+byId[x.id].label+'</button></li>';}).join('')+'</ul>':'<p class="empty">无直接关系</p>';}; panel.innerHTML='<div class="panel-kicker">'+n.group+'</div><h2>'+n.label+'</h2>'+(n.path?'<p class="panel-path">'+n.path+'</p>':'')+'<span class="tag">'+(n.sub||'架构节点')+'</span><p class="panel-copy">'+n.purpose+'</p><div class="panel-section"><h3>进入此节点</h3>'+list(incoming)+'</div><div class="panel-section"><h3>从此节点出去</h3>'+list(outgoing)+'</div>'; panel.querySelectorAll('[data-jump]').forEach(function(b){b.addEventListener('click',function(){selectNode(b.getAttribute('data-jump'));});}); }
+  function renderMetrics() { var counts={}; nodes.forEach(function(n){counts[n.group]=(counts[n.group]||0)+1;}); document.getElementById('metrics').innerHTML='<div class="metric"><strong>'+nodes.length+'</strong><span>节点</span></div><div class="metric"><strong>'+edges.length+'</strong><span>关系</span></div><div class="metric"><strong>'+counts.reference+'</strong><span>参考文档</span></div><div class="metric"><strong>'+counts.script+'</strong><span>确定性脚本</span></div>'; }
+  function renderLegend() { document.getElementById('legend').innerHTML=Object.keys(palette).map(function(k){var names={entry:'入口',package:'Skill 包',reference:'参考',runtime:'流程',script:'脚本',artifact:'项目资料',guard:'边界'};return '<span class="legend-item"><i class="'+k+'"></i>'+names[k]+'</span>';}).join(''); }
+  function setZoom(next) { scale=Math.max(.72,Math.min(1.35,next)); graph.style.transform='scale('+scale+')'; graph.style.width=(1720*scale)+'px'; graph.style.height=(1220*scale)+'px'; }
+  document.getElementById('search').addEventListener('input',function(e){query=e.target.value.trim();applyState();});
+  document.getElementById('zoomIn').addEventListener('click',function(){setZoom(scale+.1);}); document.getElementById('zoomOut').addEventListener('click',function(){setZoom(scale-.1);}); document.getElementById('zoomReset').addEventListener('click',function(){setZoom(1);}); document.getElementById('clear').addEventListener('click',clearSelection);
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')clearSelection(); if(e.key==='/' && document.activeElement.tagName!=='INPUT'){e.preventDefault();document.getElementById('search').focus();}});
+  renderZones(); renderEdges(); renderNodes(); renderMetrics(); renderLegend(); renderPanel(); applyState(); setZoom(1);
+})();
+</script>
+</body>
+</html>

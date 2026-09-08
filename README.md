@@ -2,7 +2,7 @@
 
 面向 Codex 的中文项目开发 Skill。它把需要持久追踪的需求、决策、任务和验证证据保存到目标项目的 `.agent/`，让跨会话恢复有事实依据，同时按工作风险缩短流程。
 
-Skill 运行时入口是 `skills/project-lifecycle/SKILL.md`。详细协议按需从 `skills/project-lifecycle/references/` 读取；根目录 README 只做使用说明，不是运行时状态源。
+Skill 运行时入口是 `skills/project-lifecycle/SKILL.md`。详细协议按需从 `skills/project-lifecycle/references/` 读取；根目录 README 只做使用说明，不是运行时状态源。仓库的模块地图见 [VitePress 总索引](docs/reference/index.md)；AI 生成的理解型 HTML 放在 [`html/`](html/)，不要混入正式教程或产品源码。
 
 ## 什么时候使用
 
@@ -35,6 +35,7 @@ your-project/
   AGENTS.override.md                用户自己的更高优先级规则（可选）
   .agent/
     README.md                       工作区说明
+    INDEX.md                        按模块定位代码、规格、变更和理解材料
     rules/always.md                 用户确认后的项目常驻规范
     memory.md                       跨任务仍有效的长期记忆
     specs/                          当前共享事实、契约和边界
@@ -46,12 +47,13 @@ your-project/
       testing/plan.md
       testing/report.md
     notes/ references/              决策理由和共享资料
+    html/                            AI 生成的项目理解型 HTML
     history/ scripts/               Git 历史视图和确定性脚本
   src/                              项目原有源代码
   tests/                            项目原有可执行测试
 ```
 
-`.agent/specs/` 回答“项目现在应该怎样工作”，只保存已验证的当前事实；`.agent/changes/` 回答“这次要改什么以及怎样证明改对”，从草稿到完成后可归档但不删除。`rules/always.md` 只放经用户确认、适用于多个任务的长期规则，单次限制放在对应 `requirements.md`。
+`.agent/INDEX.md` 回答“这个模块的代码、规格、变更和理解材料在哪里”，只做导航，不复制阶段状态；`.agent/html/` 保存帮助理解项目的独立 HTML。`.agent/specs/` 回答“项目现在应该怎样工作”，`.agent/changes/` 回答“这次要改什么以及怎样证明改对”。`rules/always.md` 只放经用户确认、适用于多个任务的长期规则。
 
 ## Skill 包
 
@@ -72,6 +74,7 @@ skills/project-lifecycle/
   references/core-history.md        Git 核心组件历史视图
   scripts/init_project.py           幂等初始化器
   scripts/project_status.py         只读状态汇总器
+  scripts/project_validate.py       严格校验器
   scripts/generate_core_history.py  Git 历史生成器
 ```
 
@@ -121,6 +124,12 @@ Agent 会主动给受管理需求分配不复用的中文名称和 `WORK-*` 编�
 # 当前非归档工作项
 python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.py" "F:\我的项目"
 
+# 只看可恢复上下文、阻塞、建议读取路径和接力提示
+python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.py" "F:\我的项目" --resume
+
+# 发布前严格检查工件和证据
+python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_validate.py" "F:\我的项目" --strict
+
 # 按编号或中文名称查询
 python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.py" "F:\我的项目" --work WORK-003
 python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.py" "F:\我的项目" --work "用户登录"
@@ -129,7 +138,7 @@ python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.
 python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.py" "F:\我的项目" --include-archive
 ```
 
-状态查询返回当前阶段、工件状态、任务计数、依赖、关联、阻塞原因和下一步。外层工作区只返回导航提示，不承载 `WORK-*` 状态。
+状态查询返回当前阶段、工件状态、任务计数、依赖、关联、阻塞原因和下一步。`--resume` 额外输出唯一可恢复工作项、建议读取路径和可复制接力句；JSON 顶层有稳定的 `schema_version` 和 `generated_at`，`git` 概览会标出脏工作区和归因状态。需要检查重复 `REQ-*`/`AC-*`/`TASK-*`、正式来源引用、结构化测试证据和项目规则时，使用 `project_validate.py --strict`。外层工作区只返回导航提示，不承载 `WORK-*` 状态。
 
 ## 开发与发布
 
@@ -138,6 +147,7 @@ python "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project_status.
 ```powershell
 python -m unittest discover -s tests -p "test_*.py" -v
 python -m py_compile skills/project-lifecycle/scripts/*.py
+python -X utf8 skills/project-lifecycle/scripts/project_validate.py "F:\我的项目" --strict
 git diff --check
 ```
 

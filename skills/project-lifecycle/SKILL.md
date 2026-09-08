@@ -1,6 +1,6 @@
 ---
 name: project-lifecycle
-description: 管理需要跨会话追踪、多人协作或明显风险的开发工作，把需求、决策、任务和验证写入项目工件；边界清楚的小修复走短路径。
+description: 管理需要跨会话追踪、多人协作或明显风险的开发工作，把需求、决策、任务和验证写入项目工件；支持可选的需求深挖访谈，边界清楚的小修复走短路径。
 ---
 
 # Project Lifecycle
@@ -10,6 +10,8 @@ description: 管理需要跨会话追踪、多人协作或明显风险的开发�
 ## 通用底线
 
 - 开始或恢复受管理工作前，定位真实项目，读取适用的入口规则、`.agent/rules/always.md`、状态和当前工件；多仓库先从外层 `PROJECT-INDEX.md` 导航。
+- `.agent/INDEX.md` 只按模块导航到源码、规格、工作项和理解材料，不复制阶段或任务状态；项目理解型 HTML 统一放 `.agent/html/`。
+- 用户要求“问透需求”“详细调查需求”或明确要先访谈再出 PRD/Task 时，进入可选的需求深挖模式；普通需求和低风险修复不强制使用。
 - 用户明确批准需求、方案、设计或任务后，才能跨对应门槛；“继续”“开始做”“执行 `WORK-*`”不单独批准。
 - 只按已确认范围实施。目标、验收、公共行为、接口、数据、安全、部署或架构发生实质变化时，回到最早受影响工件并使下游失效。
 - 未完成 `depends_on` 阻断实现和验收；`related_to` 只要求跨阶段前检查影响。
@@ -28,6 +30,9 @@ description: 管理需要跨会话追踪、多人协作或明显风险的开发�
 ## 参考入口
 
 - `references/workflow.md`：唯一的恢复、批准、漂移、依赖、验证和完成协议。
+- `references/requirements-interview.md`：需求深挖的触发、决策树、逐轮提问、停止条件和 PRD/Task 输出边界。
+- `references/tasks.md`：任务拆分、阻塞关系和可独立验证的纵向切片规则。
 - `references/requirements.md`、`proposal.md`、`design.md`、`tasks.md`、`testing.md`：阶段工件规则。
 - `references/rules.md`、`relationships.md`、`specs.md`、`memory.md`、`core-history.md`：边界、关系和长期资料。
-- `scripts/init_project.py`、`scripts/project_status.py`：幂等初始化与只读状态汇总。
+- `scripts/init_project.py`、`scripts/project_status.py`：幂等初始化（含项目总索引和 HTML 目录）与只读状态汇总；恢复或跨对话接力时优先使用 `project_status.py --resume --json`。
+- `scripts/project_validate.py`：只读严格校验工件结构、标识符、来源引用、测试证据和 Git 归因；需要发布前检查时再运行。

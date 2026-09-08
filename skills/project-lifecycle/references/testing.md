@@ -39,3 +39,13 @@ Run the narrowest checks that provide credible evidence for the affected behavio
 ```
 
 Distinguish `passed`, `failed`, and `not run`. Do not infer success from code inspection when execution is required, and do not hide unavailable infrastructure, credentials, flaky results, or environmental limitations. A partial or failed report is still useful evidence; it is not completion. `passed` is test evidence and does not by itself mean user business acceptance or release.
+
+如果要把报告作为完成结算依据，在 frontmatter 中增加 `evidence: required`，并在“验证结果”或“检查证据”章节提供结构化矩阵：
+
+```markdown
+| 检查项 | 命令 | 退出码 | 结果 | 证据 |
+| --- | --- | --- | --- | --- |
+| AC-001 | `pytest tests/test_login.py -q` | 0 | passed | `testing/logs/login.txt` |
+```
+
+每个 `AC-*` 都必须出现在至少一行，命令、退出码（人工检查可写 `manual`）、结果和证据位置都不能为空；只写 `status: passed` 而没有这些信息时，严格校验不能通过。

@@ -1,29 +1,26 @@
 # Work Identity And Relationships
 
-Use this reference when creating a managed work item, querying work status, or handling two requirements that may affect each other.
+创建工作项、查询状态或判断两个需求是否互相影响时读取本参考。
 
-## Stable Identity And Chinese Name
+## Stable Identity And Name
 
-Every managed requirement has two identifiers with different jobs:
+每个受管理需求有两个不同用途的标识：
 
-- `work_id`: a stable machine identifier such as `WORK-003`; it never changes and is used by relationships and queries.
-- `work`: a concise Chinese name such as `用户登录`; it is what the user sees throughout discussion, design, implementation, testing, and completion.
+- `work_id`：稳定的机器标识，如 `WORK-003`，用于关系和查询，不能复用。
+- `work`：用户可读的简短中文名称，如 `用户登录`，贯穿讨论、设计、实现和验收。
 
-When a new managed requirement appears:
+新需求首次讨论时：
 
-1. Propose a short, outcome-focused Chinese name in the first orientation response. Do not ask for a name unless two materially different interpretations remain.
-2. Run `scripts/project_status.py <project-root> --json` and use its `next_work_id`, which scans active and archived work items. Never guess from the visible active list and never reuse an archived number.
-3. Create `.agent/changes/WORK-003-用户登录/requirements.md` during the initial requirement discussion. Record the user's original outcome and current open questions so the file is not an empty placeholder.
-4. Use the same `work_id` and `work` values in the frontmatter and H1 of every artifact for that work item.
-5. In user-facing status, prefer `用户登录`; include `WORK-003` when several work items exist, a relationship is discussed, or disambiguation is useful.
+1. 先提出结果导向的中文名称；只有存在两个实质不同的解释时才询问名称。
+2. 运行 `scripts/project_status.py <project-root> --json`，使用返回的 `next_work_id`，不要从可见活动列表猜编号。
+3. 立即创建 `.agent/changes/WORK-003-用户登录/requirements.md`，写入用户原始目标和当前问题。
+4. 所有工件复用同一 `work_id` 和 `work`；状态中优先显示中文名，存在歧义时补充编号。
 
-Use a filesystem-safe Chinese directory name. Avoid Windows-reserved characters `< > : " / \ | ? *`, trailing periods or spaces, and generic names such as “新需求”, “功能开发”, or “问题修复”. Product and technical identifiers may remain in their original spelling inside a Chinese name, for example `OAuth 登录` or `API 限流`.
+目录名必须兼容文件系统；不要使用保留字符、尾部空格/句点或“新需求”等泛名。已持久化工作项不静默改名；用户改变含义时保留编号并按漂移规则处理。
 
-Do not silently rename a persisted work item. If the user explicitly changes its meaning or name, preserve `work_id`, update the Chinese name and artifact headings consistently, and treat a material meaning change through normal drift control. Relations refer to `work_id`, so a deliberate directory rename does not break the graph.
+新陈述如果仍服务同一结果，就更新当前工作项；能独立批准、交付和验收时才创建新工作项。无法判断时只问一个聚焦问题。
 
-When a new statement appears during an active work item, decide whether it changes the same outcome or introduces an independently approvable and testable outcome. Keep it in the current work item when it changes that item's scope or acceptance criteria and apply drift control. Create a new `WORK-*` item when it can be approved, delivered, and accepted independently; state the new Chinese name and whether focus is switching. If this distinction changes delivery and remains ambiguous, ask one focused question instead of silently splitting or merging.
-
-Use this frontmatter for new lifecycle artifacts:
+## Artifact Frontmatter
 
 ```yaml
 ---
@@ -37,43 +34,34 @@ updated: YYYY-MM-DD
 ---
 ```
 
-`depends_on` and `related_to` belong only in `requirements.md`; omit them from downstream artifacts. Test reports use their verification statuses instead of `draft | approved | stale`. Existing work items without `work_id` remain valid; do not perform metadata-only migrations unless the user asks.
+`depends_on` 与 `related_to` 只写在 `requirements.md`；测试报告使用自己的验证状态。旧工件缺少 `work_id` 时保持兼容，不做只改元数据的迁移。
 
-## Two Relationship Types
+## Relationship Types
 
-Use only the relationship needed by delivery:
-
-| Type | Meaning | Workflow effect |
+| 类型 | 含义 | 流程影响 |
 | --- | --- | --- |
-| `depends_on` | This work item cannot be implemented or verified correctly until another work item is complete | Hard blocker before implementation; status query shows the unfinished dependency |
-| `related_to` | The work items share behavior, contracts, modules, data, or decisions, but can still be delivered independently | Does not block; requires an impact check before either item crosses a phase boundary |
+| `depends_on` | 没有另一个工作项的结果就不能正确实现或验收 | 实现前硬阻塞，状态查询显示未完成依赖 |
+| `related_to` | 共享行为、契约、模块、数据或决策，但可独立交付 | 不阻塞；跨阶段前检查影响 |
 
-Relationships use `WORK-*` IDs, not names or paths. A hard dependency is directional: if `WORK-003` depends on `WORK-001`, record it only in `WORK-003`. A soft relation is conceptually symmetric; recording it in either requirements file is enough because the status inspector resolves the reverse view.
+关系引用 `WORK-*` 而非名称或路径。依赖是单向的；关联概念上对称，状态检查器会解析反向关系。Agent 根据活动工作项和稳定规格提出关系与理由，用户可在批准前修正；在 `requirements.md` 的 `## 关联工作项` 说明连接的契约、模块或验收。
 
-The agent discovers and proposes these relationships by comparing the new request with active work items and stable specs; the user should not have to maintain the graph manually. State the inferred relationship and reason during requirements discussion, and let the user correct a materially wrong classification before approval.
+## Link Or Merge
 
-In `requirements.md`, add a short `## 关联工作项` section explaining why each declared relationship exists and which contract, acceptance criterion, module, or decision connects them. The frontmatter is the machine-readable relationship; the section provides the rationale.
+按以下顺序判断：
 
-## Decide Whether To Link Or Merge
+1. 同一结果或不能独立批准/验收：合并范围，不伪造依赖图。
+2. 一个必须等待另一个的具体结果：分开并使用 `depends_on`。
+3. 可独立交付但共享行为或所有权：使用 `related_to`。
+4. 只有文件重叠而无共享行为或决策：不建立关系。
 
-Use this order:
-
-1. If two requests pursue the same outcome or cannot be approved and accepted independently, keep one work item and discuss the combined scope. Do not create a dependency graph to disguise one requirement as two.
-2. If one request needs a concrete result from the other, keep separate work items and use `depends_on`.
-3. If both can ship independently but may change shared behavior or ownership, use `related_to`.
-4. If they merely touch the same file without sharing behavior or a decision, do not create a relation; file overlap alone is not a product dependency.
-
-Do not automatically merge already approved work. Report the overlap and let the user choose the surviving scope. Preserve the retired work item's history rather than deleting it.
+已批准工作不能自动合并；报告重叠并保留被淘汰工作项的历史。
 
 ## Impact And Drift
 
-Before approving, implementing, or verifying a work item with relations:
+批准、实现或验证有关系的工作项前：
 
-1. Query both outgoing and incoming relations.
-2. Compare the shared requirements, stable specs, interfaces, data, security constraints, affected paths, and acceptance criteria.
-3. If the current change materially alters something another active work item relies on, return the earliest affected artifact in that work item to `draft` and mark its downstream artifacts `stale`.
-4. If there is no material impact, record that conclusion briefly in the current proposal, design, or verification report; do not edit the other work item merely because it is related.
+1. 查询出向和入向关系，比较共享需求、规格、接口、数据、安全约束、路径和验收。
+2. 若当前变更影响另一活动工作项依赖的事实，将对方最早受影响工件退回 `draft`，下游标为 `stale`。
+3. 若无实质影响，在当前 proposal、design 或验证报告中简要记录结论，不因“有关联”而修改对方。
 
-A dependency cycle is invalid workflow state. Resolve it by combining work items that cannot be independently accepted, or by extracting their shared prerequisite into a third work item that both depend on. Do not start implementation while the cycle remains.
-
-When several requirements define the same long-lived contract, keep the current contract in `.agent/specs/` and let each work item reference it. Do not copy the contract into every requirements document.
+依赖环是无效状态：合并无法独立验收的工作，或抽出共同前置工作项；环未解除前不得实现。共享长期契约放 `.agent/specs/`，工作项只引用它，不复制全文。

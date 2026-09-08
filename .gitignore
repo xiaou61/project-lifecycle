@@ -1,3 +1,6 @@
 __pycache__/
 *.py[cod]
 /output/playwright/
+/node_modules/
+/docs/.vitepress/cache/
+/docs/.vitepress/dist/

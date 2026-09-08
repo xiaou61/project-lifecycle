@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -35,6 +37,7 @@ STATE_LABELS = {
 }
 WORK_ID_PATTERN = re.compile(r"WORK-\d+", re.IGNORECASE)
 WORKFLOW_MODES = {"full", "compact"}
+STATUS_SCHEMA_VERSION = "1"
 
 
 def read_text(path: Path) -> str:
@@ -119,6 +122,213 @@ def task_counts(path: Path) -> dict[str, int]:
     return counts
 
 
+def markdown_section(text: str, heading: str) -> str:
+    match = re.search(rf"^##\s+{re.escape(heading)}\s*$", text, re.IGNORECASE | re.MULTILINE)
+    if not match:
+        return ""
+    section = text[match.end() :]
+    next_heading = re.search(r"^##\s+", section, re.MULTILINE)
+    return section[: next_heading.start()] if next_heading else section
+
+
+def markdown_table_rows(section: str) -> list[list[str]]:
+    rows: list[list[str]] = []
+    for line in section.splitlines():
+        if not line.lstrip().startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if not cells or all(re.fullmatch(r":?-{3,}:?", cell) for cell in cells):
+            continue
+        rows.append(cells)
+    return rows
+
+
+def table_column(headers: list[str], *names: str) -> int | None:
+    normalized = [header.casefold() for header in headers]
+    for name in names:
+        if name.casefold() in normalized:
+            return normalized.index(name.casefold())
+    return None
+
+
+def source_coverage_status(requirements_path: Path) -> dict[str, object]:
+    """Validate the optional source-to-requirement coverage table."""
+    result: dict[str, object] = {
+        "required": False,
+        "status": "not_required",
+        "level": "none",
+        "path": str(requirements_path),
+        "rows": 0,
+        "mapped": 0,
+        "unmapped": 0,
+        "rich_rows": 0,
+        "warnings": [],
+    }
+    if not requirements_path.is_file():
+        return result
+
+    fields = file_fields(requirements_path)
+    if fields.get("source_coverage", "").strip().lower() != "required":
+        return result
+
+    result["required"] = True
+    text = read_text(requirements_path)
+    heading = re.search(r"^##\s+来源覆盖\s*$", text, re.IGNORECASE | re.MULTILINE)
+    if not heading:
+        result["status"] = "incomplete"
+        result["warnings"].append("requirements.md 声明需要来源覆盖，但缺少“## 来源覆盖”表格。")
+        return result
+
+    section = markdown_section(text, "来源覆盖")
+    rows = markdown_table_rows(section)
+
+    if len(rows) < 2:
+        result["status"] = "incomplete"
+        result["warnings"].append("来源覆盖表格没有可验证的数据行。")
+        return result
+
+    headers = rows[0]
+    source_column = table_column(headers, "来源", "source")
+    anchor_column = table_column(headers, "锚点", "anchor")
+    requirement_column = table_column(headers, "REQ", "需求")
+    acceptance_column = table_column(headers, "AC", "验收")
+    status_column = table_column(headers, "状态", "status")
+    if None in {source_column, anchor_column, requirement_column, acceptance_column, status_column}:
+        result["status"] = "invalid"
+        result["warnings"].append("来源覆盖表格必须包含来源、锚点、REQ、AC、状态列。")
+        return result
+
+    rich_columns = {
+        "type": table_column(headers, "类型", "type"),
+        "summary": table_column(headers, "摘要", "summary"),
+        "paths": table_column(headers, "适用路径", "paths", "applies_to"),
+        "verification": table_column(headers, "验证", "verification", "verify"),
+    }
+    rich = all(value is not None for value in rich_columns.values())
+    result["level"] = "rich" if rich else "basic"
+    result["rows"] = len(rows) - 1
+    result["rich_rows"] = len(rows) - 1 if rich else 0
+    for row in rows[1:]:
+        cells = row + [""] * (len(headers) - len(row))
+        source = cells[source_column].strip()
+        anchor = cells[anchor_column].strip()
+        requirement = cells[requirement_column].strip()
+        acceptance = cells[acceptance_column].strip()
+        coverage_state = cells[status_column].strip().casefold()
+        mapped = bool(
+            source
+            and anchor
+            and re.search(r"\bREQ-\d+\b", requirement, re.IGNORECASE)
+            and re.search(r"\bAC-\d+\b", acceptance, re.IGNORECASE)
+            and coverage_state in {"verified", "已验证", "complete", "completed"}
+        )
+        if mapped and rich:
+            mapped = all(cells[index].strip() for index in rich_columns.values())
+        if mapped:
+            result["mapped"] += 1
+        else:
+            result["unmapped"] += 1
+
+    if result["unmapped"]:
+        result["status"] = "incomplete"
+        result["warnings"].append("来源覆盖存在未读取、未定位、未映射或未验证的来源。")
+    else:
+        result["status"] = "complete"
+    return result
+
+
+def testing_evidence_status(
+    report_path: Path,
+    expected_acceptance_ids: set[str] | None = None,
+) -> dict[str, object]:
+    """Validate the optional executable evidence matrix in testing/report.md."""
+    result: dict[str, object] = {
+        "required": False,
+        "status": "not_required",
+        "path": str(report_path),
+        "rows": 0,
+        "passed": 0,
+        "unmapped": 0,
+        "covered_acceptance": [],
+        "missing_acceptance": [],
+        "warnings": [],
+    }
+    if not report_path.is_file():
+        result["status"] = "missing"
+        return result
+
+    text = read_text(report_path)
+    fields = frontmatter_fields(text)
+    result["required"] = fields.get("evidence", "").strip().lower() == "required"
+    section = "\n".join(
+        markdown_section(text, heading)
+        for heading in ("检查证据", "证据矩阵", "验证结果", "验收矩阵")
+    )
+    rows = markdown_table_rows(section or text)
+    if len(rows) < 2:
+        if result["required"] or expected_acceptance_ids:
+            result["status"] = "incomplete"
+            result["warnings"].append("验证报告缺少覆盖验收标准的结构化证据表。")
+        else:
+            result["status"] = "legacy"
+        return result
+
+    headers = rows[0]
+    columns = {
+        "check": table_column(headers, "检查项", "check", "id", "验收项"),
+        "command": table_column(headers, "命令", "command", "procedure", "步骤"),
+        "exit_code": table_column(headers, "退出码", "exit_code", "exit"),
+        "result": table_column(headers, "结果", "result", "状态"),
+        "evidence": table_column(headers, "证据", "evidence", "evidence_path"),
+    }
+    if any(value is None for value in columns.values()):
+        result["status"] = "invalid"
+        result["warnings"].append("结构化验证证据必须包含检查项、命令、退出码、结果和证据列。")
+        return result
+
+    result["rows"] = len(rows) - 1
+    covered_acceptance: set[str] = set()
+    for row in rows[1:]:
+        cells = row + [""] * (len(headers) - len(row))
+        check = cells[columns["check"]].strip()
+        command = cells[columns["command"]].strip()
+        exit_code = cells[columns["exit_code"]].strip().casefold()
+        outcome = cells[columns["result"]].strip().casefold()
+        evidence = cells[columns["evidence"]].strip()
+        passed = bool(
+            check
+            and command
+            and (re.fullmatch(r"-?\d+", exit_code) or exit_code in {"manual", "人工"})
+            and outcome in {"passed", "pass", "通过", "verified", "已验证"}
+            and evidence
+        )
+        covered_acceptance.update(
+            value.upper()
+            for value in re.findall(r"\bAC-\d+\b", check, re.IGNORECASE)
+        )
+        if passed:
+            result["passed"] += 1
+        else:
+            result["unmapped"] += 1
+
+    expected = {value.upper() for value in (expected_acceptance_ids or set())}
+    result["covered_acceptance"] = sorted(covered_acceptance)
+    result["missing_acceptance"] = sorted(expected - covered_acceptance)
+    if result["missing_acceptance"]:
+        result["warnings"].append(
+            "验证证据未覆盖全部验收标准：" + "、".join(result["missing_acceptance"]) + "。"
+        )
+    if result["unmapped"] or result["missing_acceptance"]:
+        result["status"] = "incomplete"
+        if result["unmapped"]:
+            result["warnings"].append("验证证据存在缺少命令、结果、退出码或证据位置的检查项。")
+    elif report_status(report_path) == "passed":
+        result["status"] = "complete"
+    else:
+        result["status"] = "incomplete" if result["required"] else "legacy"
+    return result
+
+
 def work_identity(work_dir: Path) -> dict[str, object]:
     identity_fields: dict[str, str] = {}
     for artifact in ARTIFACTS:
@@ -141,6 +351,17 @@ def work_identity(work_dir: Path) -> dict[str, object]:
     }
 
 
+def requirement_acceptance_ids(requirements_path: Path) -> set[str]:
+    if not requirements_path.is_file():
+        return set()
+    return {
+        value.upper()
+        for value in re.findall(
+            r"\bAC-\d+\b", read_text(requirements_path), re.IGNORECASE
+        )
+    }
+
+
 def phase_result(
     identity: dict[str, object],
     work_dir: Path,
@@ -152,7 +373,12 @@ def phase_result(
     tasks: dict[str, int],
     warnings: list[str],
 ) -> dict[str, object]:
-    return {
+    source_coverage = source_coverage_status(work_dir / "requirements.md")
+    test_evidence = testing_evidence_status(
+        work_dir / "testing" / "report.md",
+        requirement_acceptance_ids(work_dir / "requirements.md"),
+    )
+    result: dict[str, object] = {
         **identity,
         "slug": work_dir.name,
         "directory": work_dir.name,
@@ -164,9 +390,28 @@ def phase_result(
         "next_action": next_action,
         "artifacts": artifacts,
         "tasks": tasks,
+        "source_coverage": source_coverage,
+        "test_evidence": test_evidence,
         "relations": {"depends_on": [], "dependents": [], "related": []},
-        "warnings": warnings,
+        "warnings": [
+            *warnings,
+            *source_coverage["warnings"],
+            *test_evidence["warnings"],
+        ],
     }
+    blocking_reasons: list[str] = []
+    if source_coverage["status"] in {"incomplete", "invalid"} and phase in {
+        "implementation",
+        "verification",
+        "completed",
+    }:
+        blocking_reasons.append("先补齐需求来源覆盖：逐项读取来源、记录锚点，并映射到 REQ-* 和 AC-*")
+    if test_evidence["status"] in {"incomplete", "invalid"} and phase == "completed":
+        blocking_reasons.append("先补齐结构化验证证据：记录命令、退出码、结果和证据位置")
+    if blocking_reasons:
+        result["state"] = "needs_attention" if phase == "completed" else "blocked"
+        result["next_action"] = "；".join(blocking_reasons) + "。"
+    return result
 
 
 def inspect_work(work_dir: Path, archived: bool = False) -> dict[str, object]:
@@ -492,6 +737,293 @@ def locate_project(start: Path) -> Path:
     return resolved
 
 
+def git_status(project_root: Path) -> dict[str, object]:
+    """Return a small, read-only Git workspace overview."""
+    result: dict[str, object] = {
+        "status": "unknown",
+        "branch": None,
+        "head": None,
+        "tracking": None,
+        "changed_files": 0,
+        "staged": 0,
+        "unstaged": 0,
+        "untracked": 0,
+        "entries": [],
+        "attribution": "unknown",
+        "attribution_required": None,
+        "warning": None,
+    }
+    try:
+        completed = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(project_root),
+                "-c",
+                "core.quotePath=false",
+                "status",
+                "--porcelain=v1",
+                "--branch",
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except OSError as error:
+        result["warning"] = f"无法读取 Git 工作区：{error}。"
+        return result
+
+    if completed.returncode != 0:
+        error = (completed.stderr or "").strip()
+        if "not a git repository" in error.casefold():
+            result.update(
+                status="not_a_repository",
+                attribution="not_applicable",
+                attribution_required=False,
+                warning=None,
+            )
+        else:
+            result["warning"] = f"Git 状态读取失败：{error or f'退出码 {completed.returncode}'}。"
+        return result
+
+    lines = completed.stdout.splitlines()
+    if lines and lines[0].startswith("## "):
+        tracking = lines[0][3:]
+        result["tracking"] = tracking
+        result["branch"] = tracking.split("...", 1)[0]
+    entries: list[dict[str, str]] = []
+    for line in lines[1:]:
+        if len(line) < 3:
+            continue
+        index_state, worktree_state = line[0], line[1]
+        entries.append({"index": index_state, "worktree": worktree_state, "path": line[3:]})
+    result["entries"] = entries
+    result["changed_files"] = len(entries)
+    result["staged"] = sum(entry["index"] not in {" ", "?"} for entry in entries)
+    result["unstaged"] = sum(entry["worktree"] != " " for entry in entries)
+    result["untracked"] = sum(
+        entry["index"] == "?" and entry["worktree"] == "?" for entry in entries
+    )
+    head = subprocess.run(
+        ["git", "-C", str(project_root), "rev-parse", "--verify", "HEAD"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    if head.returncode == 0:
+        result["head"] = head.stdout.strip()
+    result["status"] = "dirty" if entries else "clean"
+    result["attribution"] = "unclassified" if entries else "none"
+    result["attribution_required"] = bool(entries)
+    return result
+
+
+def normalize_git_path(value: str) -> str:
+    return value.strip().strip('"').replace("\\", "/")
+
+
+def workspace_attribution_status(work_dir: Path, git: dict[str, object]) -> dict[str, object]:
+    """Match dirty Git paths to an explicit per-work-item attribution table."""
+    path = work_dir / "workspace.md"
+    result: dict[str, object] = {
+        "status": "not_required" if git["status"] != "dirty" else "missing",
+        "path": str(path),
+        "base_commit": None,
+        "rows": 0,
+        "classified": 0,
+        "unknown_paths": [],
+        "warnings": [],
+    }
+    if git["status"] != "dirty":
+        return result
+    if not path.is_file():
+        result["warnings"].append("Git 工作区有改动，但缺少 workspace.md 归因表。")
+        return result
+
+    text = read_text(path)
+    fields = file_fields(path)
+    base_commit = fields.get("base_commit")
+    result["base_commit"] = base_commit
+    current_head = str(git.get("head") or "")
+    if current_head and base_commit and not (
+        current_head.startswith(base_commit) or base_commit.startswith(current_head)
+    ):
+        result["status"] = "stale"
+        result["warnings"].append("workspace.md 的 base_commit 与当前 HEAD 不一致，需要重新归因。")
+        return result
+    if current_head and not base_commit:
+        result["warnings"].append("workspace.md 缺少 base_commit，无法锚定本次工作区归因。")
+
+    section = markdown_section(text, "工作区归因") or markdown_section(text, "归因")
+    rows = markdown_table_rows(section)
+    if len(rows) < 2:
+        result["warnings"].append("workspace.md 缺少可验证的工作区归因表。")
+        return result
+    headers = rows[0]
+    path_column = table_column(headers, "路径", "path")
+    owner_column = table_column(headers, "归属", "owner", "类别")
+    note_column = table_column(headers, "说明", "note", "备注")
+    if path_column is None or owner_column is None:
+        result["status"] = "invalid"
+        result["warnings"].append("工作区归因表必须包含路径和归属列。")
+        return result
+
+    # The attribution file records the classification and must not classify itself.
+    self_attribution_path = normalize_git_path(
+        f".agent/changes/{work_dir.name}/workspace.md"
+    )
+    entries = {
+        normalize_git_path(entry["path"]): entry
+        for entry in git["entries"]
+        if entry["path"] and normalize_git_path(entry["path"]) != self_attribution_path
+    }
+    owners: dict[str, str] = {}
+    allowed_owners = {"current", "current_work", "user", "user_existing", "unknown"}
+    result["rows"] = len(rows) - 1
+    for row in rows[1:]:
+        cells = row + [""] * (len(headers) - len(row))
+        source_path = normalize_git_path(cells[path_column])
+        owner = cells[owner_column].strip().casefold()
+        if source_path:
+            owners[source_path] = owner
+        elif owner:
+            result["warnings"].append("工作区归因表存在缺少路径的行。")
+        if note_column is not None and not cells[note_column].strip():
+            result["warnings"].append(f"归因路径 {source_path} 缺少说明。")
+    unknown_paths = [path for path in entries if path not in owners]
+    unknown_paths.extend(
+        path for path, owner in owners.items() if owner not in allowed_owners or owner == "unknown"
+    )
+    result["unknown_paths"] = list(dict.fromkeys(unknown_paths))
+    result["classified"] = len(entries) - len([path for path in entries if path in result["unknown_paths"]])
+    if result["unknown_paths"] or (current_head and not base_commit) or result["warnings"]:
+        result["status"] = "incomplete" if result["status"] == "missing" else result["status"]
+        if result["unknown_paths"]:
+            result["warnings"].append("存在未归类或归属值无效的 Git 路径。")
+    else:
+        result["status"] = "complete"
+    return result
+
+
+def resume_read_paths(project_root: Path, item: dict[str, object]) -> list[str]:
+    work_dir = Path(str(item["path"]))
+    paths = [
+        str(project_root / ".agent" / "rules" / "always.md"),
+        str(work_dir / "requirements.md"),
+    ]
+    if str(item.get("workspace_attribution", {}).get("status")) in {"missing", "incomplete", "invalid", "stale"}:
+        paths.append(str(work_dir / "workspace.md"))
+    phase_paths = {
+        "proposal": work_dir / "proposal.md",
+        "design": work_dir / "design.md",
+        "tasks": work_dir / "tasks.md",
+        "implementation": work_dir / "tasks.md",
+        "verification": work_dir / "testing" / "plan.md",
+        "completed": work_dir / "testing" / "report.md",
+    }
+    phase_path = phase_paths.get(str(item["phase"]))
+    if phase_path:
+        paths.append(str(phase_path))
+    if str(item["phase"]) in {"verification", "completed"}:
+        paths.append(str(work_dir / "testing" / "report.md"))
+    return list(dict.fromkeys(paths))
+
+
+def unavailable_resume(reason: str, *, blockers: list[str] | None = None) -> dict[str, object]:
+    return {
+        "mode": "out_of_scope",
+        "reason": reason,
+        "work_item": None,
+        "candidates": [],
+        "blockers": blockers or [],
+        "read_paths": [],
+        "handoff_prompt": None,
+    }
+
+
+def resume_context(
+    project_root: Path,
+    active_items: list[dict[str, object]],
+    selected_items: list[dict[str, object]],
+    query: str | None,
+    git: dict[str, object],
+) -> dict[str, object]:
+    candidate: dict[str, object] | None = None
+    if query:
+        if not selected_items:
+            return unavailable_resume(f"未找到可恢复的工作项：{query}。")
+        selected = selected_items[0]
+        if selected["archived"]:
+            return unavailable_resume("归档工作项只用于查阅，不能自动恢复。")
+        candidate = selected
+    elif len(active_items) == 1:
+        candidate = active_items[0]
+    elif len(active_items) > 1:
+        return {
+            "mode": "ask_user",
+            "reason": "存在多个活动工作项，不能凭目录时间或聊天上下文猜测要恢复哪一个。",
+            "work_item": None,
+            "candidates": [
+                {
+                    "work_id": item["work_id"],
+                    "name": item["name"],
+                    "phase": item["phase"],
+                    "state": item["state"],
+                }
+                for item in active_items
+            ],
+            "blockers": ["请明确提供 WORK-* 编号或中文工作项名称。"],
+            "read_paths": [],
+            "handoff_prompt": None,
+        }
+    else:
+        return unavailable_resume("当前没有未完成的活动工作项。")
+
+    blockers: list[str] = []
+    if git["status"] == "dirty":
+        attribution = candidate.get("workspace_attribution", {})
+        if attribution.get("status") != "complete":
+            blockers.append("Git 工作区有未完成归因；请先区分当前工作项改动、用户改动和未知改动。")
+            blockers.extend(str(warning) for warning in attribution.get("warnings", []))
+    elif git["status"] == "unknown":
+        blockers.append(str(git["warning"] or "Git 工作区状态未知；恢复前先人工核对。"))
+    if candidate["state"] not in {"ready", "in_progress"}:
+        blockers.append(str(candidate["next_action"]))
+    blockers.extend(str(warning) for warning in candidate["warnings"])
+    blockers = list(dict.fromkeys(blockers))
+    can_auto_resume = candidate["state"] in {"ready", "in_progress"} and not blockers
+    mode = "auto_resume" if can_auto_resume else "ask_user"
+    reason = (
+        "唯一活动工作项且没有阶段、依赖或工作区阻塞，可以按当前阶段继续。"
+        if can_auto_resume
+        else "工作项可以定位，但恢复前需要处理确认、阻塞或工作区归因。"
+    )
+    work_item = {
+        "work_id": candidate["work_id"],
+        "name": candidate["name"],
+        "phase": candidate["phase"],
+        "phase_label": candidate["phase_label"],
+        "state": candidate["state"],
+        "next_action": candidate["next_action"],
+        "workspace_attribution": candidate.get("workspace_attribution"),
+    }
+    return {
+        "mode": mode,
+        "reason": reason,
+        "work_item": work_item,
+        "candidates": [],
+        "blockers": blockers,
+        "read_paths": resume_read_paths(project_root, candidate),
+        "handoff_prompt": (
+            f"$project-lifecycle 继续 {candidate['work_id']}，先恢复规范和状态，再按当前阶段执行。"
+        ),
+    }
+
+
 def work_directories(changes: Path) -> tuple[list[Path], list[Path]]:
     if not changes.is_dir():
         return [], []
@@ -609,6 +1141,8 @@ def inspect_project(
     project_root = locate_project(start)
     workspace = project_root / ".agent"
     result: dict[str, object] = {
+        "schema_version": STATUS_SCHEMA_VERSION,
+        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "project_root": str(project_root),
         "workspace": str(workspace),
         "scope": "project",
@@ -629,6 +1163,8 @@ def inspect_project(
         },
         "warnings": [],
         "work_items": [],
+        "git": git_status(project_root),
+        "resume": unavailable_resume("项目尚未初始化。"),
     }
     catalog = workspace / "PROJECT-INDEX.md"
     if catalog.is_file() and not (workspace / "changes").is_dir():
@@ -648,6 +1184,7 @@ def inspect_project(
             "warnings": [],
             "notices": ["外层 .agent 仅作为多仓库导航入口，不承载项目生命周期工件。"],
         }
+        result["resume"] = unavailable_resume("外层工作区只负责导航，请先选择真实项目。")
         return result
     if not workspace.is_dir():
         return result
@@ -658,6 +1195,10 @@ def inspect_project(
     active_items = [inspect_work(path) for path in active_dirs]
     archived_items = [inspect_work(path, archived=True) for path in archived_dirs]
     all_items = active_items + archived_items
+    for item in all_items:
+        item["workspace_attribution"] = workspace_attribution_status(
+            Path(str(item["path"])), result["git"]
+        )
     resolve_relations(all_items)
     apply_rules_gate(all_items, result["rules"])
     result["next_work_id"] = next_work_id(all_items)
@@ -695,6 +1236,13 @@ def inspect_project(
         result.update(state="multiple", next_action="根据中文名称或 WORK 编号选择工作项；无法确定时只问一次。")
     else:
         result.update(state="idle", next_action="开始新工作项，或按项目需要归档已完成工作项。")
+    result["resume"] = resume_context(
+        project_root,
+        active,
+        visible_items if work else [],
+        work,
+        result["git"],
+    )
     return result
 
 
@@ -703,6 +1251,46 @@ def relation_label(relation: dict[str, object]) -> str:
         return f"{relation['work_id']}（未找到）"
     state = STATE_LABELS.get(str(relation["state"]), str(relation["state"]))
     return f"{relation['work_id']} {relation['name']}（{relation['phase_label']}，{state}）"
+
+
+def git_status_label(git: dict[str, object]) -> str:
+    labels = {
+        "clean": "干净",
+        "dirty": "有未归因改动",
+        "not_a_repository": "不是 Git 仓库",
+        "unknown": "未知",
+    }
+    return labels.get(str(git["status"]), str(git["status"]))
+
+
+def render_resume(status: dict[str, object]) -> str:
+    resume = status["resume"]
+    lines = [
+        f"项目：{status['project_root']}",
+        f"Git：{git_status_label(status['git'])}",
+        f"恢复：{resume['mode']}",
+        f"原因：{resume['reason']}",
+    ]
+    work_item = resume["work_item"]
+    if work_item:
+        lines.append(
+            f"工作项：{work_item['work_id']} · {work_item['name']} | "
+            f"{work_item['phase_label']} | {STATE_LABELS.get(str(work_item['state']), work_item['state'])}"
+        )
+        lines.append(f"下一步：{work_item['next_action']}")
+    if resume["candidates"]:
+        lines.append(
+            "候选："
+            + "；".join(
+                f"{candidate['work_id']} {candidate['name']}（{candidate['phase']}，{candidate['state']}）"
+                for candidate in resume["candidates"]
+            )
+        )
+    lines.extend(f"阻塞：{blocker}" for blocker in resume["blockers"])
+    lines.extend(f"建议读取：{path}" for path in resume["read_paths"])
+    if resume["handoff_prompt"]:
+        lines.append(f"接力：{resume['handoff_prompt']}")
+    return "\n".join(lines)
 
 
 def render_text(status: dict[str, object]) -> str:
@@ -720,6 +1308,9 @@ def render_text(status: dict[str, object]) -> str:
         lines.extend(["状态：未初始化", f"下一步：{status['next_action']}"])
         return "\n".join(lines)
     rules = status["rules"]
+    lines.append(f"Git：{git_status_label(status['git'])}")
+    if status["git"]["warning"]:
+        lines.append(f"Git 注意：{status['git']['warning']}")
     rules_label = (
         "已加载"
         if rules["ready"] and rules["configured"]
@@ -771,6 +1362,7 @@ def main() -> int:
     parser.add_argument("target", nargs="?", type=Path, default=Path.cwd(), help="项目内任意路径")
     parser.add_argument("--work", help="按 WORK 编号、中文名称或目录名查询一个工作项")
     parser.add_argument("--include-archive", action="store_true", help="同时列出已归档工作项")
+    parser.add_argument("--resume", action="store_true", help="只输出可恢复上下文、阻塞和接力提示")
     parser.add_argument("--json", action="store_true", help="输出便于 Agent 读取的 JSON")
     args = parser.parse_args()
     try:
@@ -781,7 +1373,7 @@ def main() -> int:
     if args.json:
         print(json.dumps(status, ensure_ascii=False, indent=2))
     else:
-        print(render_text(status))
+        print(render_resume(status) if args.resume else render_text(status))
     return 0
 
 

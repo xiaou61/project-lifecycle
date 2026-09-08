@@ -1,0 +1,26 @@
+<mxfile host="app.diagrams.net" modified="2026-09-07T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="requirements-interview" name="需求深挖访谈">
+    <mxGraphModel adaptiveColors="auto" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Project Lifecycle · 需求深挖访谈与阶段门槛" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;fontColor=#18324a;" vertex="1" parent="1"><mxGeometry x="50" y="35" width="900" height="45" as="geometry" /></mxCell>
+        <mxCell id="fact" value="1 · 调查事实&#xa;项目规则、源码、接口、测试、正式资料" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5ee;strokeColor=#2f855a;fontColor=#1d5136;fontSize=16;spacing=12;" vertex="1" parent="1"><mxGeometry x="50" y="150" width="245" height="120" as="geometry" /></mxCell>
+        <mxCell id="tree" value="2 · 建立决策树&#xa;区分事实、用户决定、实现选择&#xa;只保留影响交付结果的节点" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1ebff;strokeColor=#805ad5;fontColor=#4b2e80;fontSize=16;spacing=12;" vertex="1" parent="1"><mxGeometry x="355" y="150" width="245" height="120" as="geometry" /></mxCell>
+        <mxCell id="ask" value="3 · 逐轮提问&#xa;一次一个关键问题&#xa;给出选项、推荐和实际影响" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff1e6;strokeColor=#dd6b20;fontColor=#7a3b0b;fontSize=16;spacing=12;" vertex="1" parent="1"><mxGeometry x="660" y="150" width="245" height="120" as="geometry" /></mxCell>
+        <mxCell id="record" value="4 · 同步 requirements.md&#xa;写入用户决定和验收标准&#xa;保留真实阻塞问题" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f1fb;strokeColor=#3182ce;fontColor=#1e4f80;fontSize=16;spacing=12;" vertex="1" parent="1"><mxGeometry x="965" y="150" width="245" height="120" as="geometry" /></mxCell>
+        <mxCell id="confirm" value="5 · 最终确认&#xa;目标、范围、非目标、约束、验收&#xa;无阻塞后等待用户明确确认" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fbe8f2;strokeColor=#d53f8c;fontColor=#7a2450;fontSize=16;spacing=12;" vertex="1" parent="1"><mxGeometry x="1270" y="150" width="245" height="120" as="geometry" /></mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#718096;strokeWidth=2;endArrow=block;" edge="1" parent="1" source="fact" target="tree"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#718096;strokeWidth=2;endArrow=block;" edge="1" parent="1" source="tree" target="ask"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#718096;strokeWidth=2;endArrow=block;" edge="1" parent="1" source="ask" target="record"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#718096;strokeWidth=2;endArrow=block;" edge="1" parent="1" source="record" target="confirm"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="scope" value="访谈只解决用户决策，不让用户填写代码可以调查的事实，也不替代阶段批准。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f7fafc;strokeColor=#a0aec0;fontColor=#2d3748;fontSize=15;spacing=12;" vertex="1" parent="1"><mxGeometry x="260" y="360" width="1050" height="75" as="geometry" /></mxCell>
+        <mxCell id="compact" value="compact&#xa;需求确认 → tasks.md 草稿 → 任务计划确认" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#edf2f7;strokeColor=#4a5568;fontColor=#2d3748;fontSize=16;spacing=12;" vertex="1" parent="1"><mxGeometry x="255" y="560" width="390" height="105" as="geometry" /></mxCell>
+        <mxCell id="full" value="full&#xa;需求确认 → proposal.md → design.md → tasks.md&#xa;每个阶段都需要明确批准" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#edf2f7;strokeColor=#4a5568;fontColor=#2d3748;fontSize=16;spacing=12;" vertex="1" parent="1"><mxGeometry x="875" y="560" width="470" height="105" as="geometry" /></mxCell>
+        <mxCell id="e5" value="确认后按流程路由" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#718096;strokeWidth=2;endArrow=block;fontSize=14;fontColor=#4a5568;" edge="1" parent="1" source="confirm" target="scope"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1390" y="330" /><mxPoint x="785" y="330" /></Array></mxGeometry></mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#718096;strokeWidth=2;endArrow=block;" edge="1" parent="1" source="scope" target="compact"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#718096;strokeWidth=2;endArrow=block;" edge="1" parent="1" source="scope" target="full"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

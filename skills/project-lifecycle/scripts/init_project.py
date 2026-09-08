@@ -15,6 +15,7 @@ WORKSPACE_DIRS = (
     "rules",
     "references",
     "notes",
+    "html",
     "history",
     "scripts",
 )
@@ -30,17 +31,69 @@ WORKSPACE_README = """# .agent 项目工作区
 
 ```text
 .agent/
+  INDEX.md                  按模块定位代码、规格、变更和理解材料
   memory.md                 跨任务仍有效的长期记忆
   rules/always.md           用户确认后的项目常驻规范
   specs/                    多个工作项共享的当前事实
   changes/WORK-编号-中文名/  受管理需求的生命周期工件
   notes/ references/        决策理由与共享资料
+  html/                     AI 生成的项目理解型 HTML
   history/ scripts/         Git 历史视图与确定性辅助脚本
 ```
 
 `specs/` 保存当前共享事实，`changes/` 保存一次变更的依据、任务和验证；源代码与可执行测试仍在项目原有目录。`always.md` 只保存经用户确认且适用于多个任务的长期规则，单次约束写在对应 `requirements.md`。
 
+Git 工作区有未提交改动时，可在对应工作项下增加 `workspace.md`，记录基准 commit、每条改动路径的归属和说明，供恢复探针核对。
+
 直接用自然语言开始、确认、继续或查询状态即可。`WORK-*` 只用于跨对话定位，不代表阶段批准；恢复顺序、门槛、澄清、验证和完成语义统一见已安装 Skill 的 `references/workflow.md`。
+"""
+
+INDEX_TEMPLATE = """---
+artifact: project_index
+status: active
+---
+
+# 项目总索引
+
+本页只负责按模块导航，帮助定位“代码改在哪里、依据和验证到哪里看”。工作项阶段、批准、任务进度和验证结果仍以对应工件及 `project_status.py` 输出为准，不在这里重复维护。
+
+## 内容在哪里
+
+| 内容 | 位置 |
+| --- | --- |
+| 项目常驻规范 | `.agent/rules/always.md` |
+| 当前稳定规格 | `.agent/specs/` |
+| 需求与变更依据 | `.agent/changes/WORK-编号-中文名/` |
+| 决策说明与共享资料 | `.agent/notes/`、`.agent/references/` |
+| 长期记忆 | `.agent/memory.md` |
+| 项目理解型 HTML | `.agent/html/` |
+| Git 历史视图 | `.agent/history/` |
+
+## 模块索引
+
+只登记已经从仓库确认的模块和路径；发现新模块或路径发生实质变化时更新对应行。
+
+| 模块 | 源码或配置 | 测试 | 稳定规格 | 相关工作项 |
+| --- | --- | --- | --- | --- |
+
+当前尚未登记项目模块。
+
+## HTML 理解材料
+
+将用于解释架构、流程、状态机、数据流或交互的独立 HTML 放在 `.agent/html/`。新增保留文件后，在这里补充名称、用途和相对路径；这类材料不替代源码、测试或批准工件。
+
+当前暂无 HTML 理解材料。
+
+## 查看一次变更
+
+| 想确认什么 | 查看位置 |
+| --- | --- |
+| 为什么要改、验收什么 | 对应工作项的 `requirements.md` |
+| 为什么选择这种方案 | `proposal.md`、`design.md` |
+| 实际改哪些步骤 | `tasks.md` |
+| 当前未提交文件属于谁 | `workspace.md` 与 `git diff` |
+| 如何证明改对 | `testing/plan.md`、`testing/report.md` |
+| 交付后项目应保持什么行为 | `.agent/specs/` |
 """
 
 AGENTS_TEMPLATE = """# 项目协作说明
@@ -51,6 +104,7 @@ AGENTS_TEMPLATE = """# 项目协作说明
 
 - 低风险、边界清楚的单文件改动：确认目标 -> 修改 -> 窄验证，不创建 `WORK-*`。
 - 重要工作开始或恢复时，先读取适用入口规则、`.agent/rules/always.md`、状态结果和当前工件；多仓库先从外层 `PROJECT-INDEX.md` 定位真实项目。
+- 需要定位模块、历史变更或理解材料时先读 `.agent/INDEX.md`；它只做导航，不替代状态检查。
 - 只有受管理需求创建 `WORK-*`；阶段批准、澄清、漂移、验证和完成语义统一遵循 Skill 的 `references/workflow.md`。
 - 未完成硬依赖阻断实现和验收；重大范围、接口、数据、安全、部署或架构变化回到最早受影响工件。
 - 规则未确认前不得进行实现、部署、迁移或数据变更；验证结果必须据实记录。
@@ -116,6 +170,7 @@ def main() -> int:
         validate_existing_paths(
             (
                 workspace / "README.md",
+                workspace / "INDEX.md",
                 workspace / "memory.md",
                 workspace / "rules" / "always.md",
                 workspace / "scripts" / "generate_core_history.py",
@@ -129,6 +184,7 @@ def main() -> int:
 
         agents_status = create_text_if_missing(agents_path, AGENTS_TEMPLATE)
         readme_status = create_text_if_missing(workspace / "README.md", WORKSPACE_README)
+        index_status = create_text_if_missing(workspace / "INDEX.md", INDEX_TEMPLATE)
         memory_status = create_text_if_missing(workspace / "memory.md", MEMORY_TEMPLATE)
         generator_status = copy_if_missing(
             Path(__file__).with_name("generate_core_history.py"),
@@ -141,6 +197,7 @@ def main() -> int:
     print(f".agent 初始化完成：{workspace}")
     print(f"{agents_status}：{agents_path}")
     print(f"{readme_status}：{workspace / 'README.md'}")
+    print(f"{index_status}：{workspace / 'INDEX.md'}")
     print(f"{memory_status}：{workspace / 'memory.md'}")
     rules_path = workspace / "rules" / "always.md"
     if rules_path.is_file():

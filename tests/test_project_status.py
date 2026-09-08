@@ -23,7 +23,19 @@ def load_status_module():
     return module
 
 
+def load_validate_module():
+    validate_path = SKILL_ROOT / "scripts" / "project_validate.py"
+    spec = importlib.util.spec_from_file_location("project_validate", validate_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("无法加载 project_validate.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["project_status"] = project_status
+    spec.loader.exec_module(module)
+    return module
+
+
 project_status = load_status_module()
+project_validate = load_validate_module()
 
 
 def artifact(
@@ -37,18 +49,20 @@ def artifact(
     workflow: str | None = None,
     depends_on: tuple[str, ...] = (),
     related_to: tuple[str, ...] = (),
+    source_coverage: bool = False,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     identity = f"work_id: {work_id}\n" if work_id else ""
     relations = ""
     workflow_field = f"workflow: {workflow}\n" if kind == "requirements" and workflow else ""
+    source_coverage_field = "source_coverage: required\n" if kind == "requirements" and source_coverage else ""
     if kind == "requirements":
         relations = (
             f"depends_on: [{', '.join(depends_on)}]\n"
             f"related_to: [{', '.join(related_to)}]\n"
         )
     path.write_text(
-        f"---\n{identity}work: {work}\nartifact: {kind}\nstatus: {status}\n{workflow_field}"
+        f"---\n{identity}work: {work}\nartifact: {kind}\nstatus: {status}\n{workflow_field}{source_coverage_field}"
         f"{relations}updated: 2026-08-19\n---\n\n{body}\n",
         encoding="utf-8",
     )
@@ -93,6 +107,7 @@ class ProjectStatusTests(unittest.TestCase):
         task_body: str = "### TASK-001 | pending | 实现需求",
         depends_on: tuple[str, ...] = (),
         related_to: tuple[str, ...] = (),
+        source_coverage: bool = False,
     ) -> Path:
         self.confirm_rules()
         work_dir = self.project / ".agent" / "changes" / f"{work_id}-{name}"
@@ -108,6 +123,7 @@ class ProjectStatusTests(unittest.TestCase):
                 workflow=workflow,
                 depends_on=depends_on,
                 related_to=related_to,
+                source_coverage=source_coverage,
             )
         return work_dir
 
@@ -184,6 +200,152 @@ class ProjectStatusTests(unittest.TestCase):
         self.assertEqual(item["state"], "in_progress")
         self.assertEqual(item["tasks"]["pending"], 1)
         self.assertEqual(item["tasks"]["done"], 1)
+
+    def test_required_source_coverage_blocks_implementation_until_mapped(self) -> None:
+        work = self.managed_work("WORK-010", "导入需求", source_coverage=True)
+
+        item = project_status.inspect_project(self.project)["work_items"][0]
+        self.assertEqual(item["state"], "blocked")
+        self.assertEqual(item["source_coverage"]["status"], "incomplete")
+
+        requirements = work / "requirements.md"
+        requirements.write_text(
+            requirements.read_text(encoding="utf-8")
+            + "\n## 来源覆盖\n\n| 来源 | 锚点 | REQ | AC | 状态 |\n"
+            + "| --- | --- | --- | --- | --- |\n"
+            + "| PRD.md | 第 12-18 行 | REQ-001 | AC-001 | verified |\n",
+            encoding="utf-8",
+        )
+        item = project_status.inspect_project(self.project)["work_items"][0]
+        self.assertEqual(item["state"], "in_progress")
+        self.assertEqual(item["source_coverage"]["status"], "complete")
+
+    def test_resume_context_auto_selects_one_active_work_item(self) -> None:
+        self.managed_work("WORK-011", "恢复登录")
+
+        status = project_status.inspect_project(self.project)
+        resume = status["resume"]
+        self.assertEqual(resume["mode"], "auto_resume")
+        self.assertEqual(resume["work_item"]["work_id"], "WORK-011")
+        self.assertIn("requirements.md", "\n".join(resume["read_paths"]))
+        self.assertIn("WORK-011", resume["handoff_prompt"])
+
+    def test_resume_context_requires_selection_for_multiple_active_work_items(self) -> None:
+        self.managed_work("WORK-011", "恢复登录")
+        self.managed_work("WORK-012", "恢复权限")
+
+        resume = project_status.inspect_project(self.project)["resume"]
+        self.assertEqual(resume["mode"], "ask_user")
+        self.assertEqual({item["work_id"] for item in resume["candidates"]}, {"WORK-011", "WORK-012"})
+
+    def test_dirty_git_workspace_requires_attribution_before_resume(self) -> None:
+        self.managed_work("WORK-013", "恢复归因")
+        result = subprocess.run(
+            ["git", "init"],
+            cwd=self.project,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        status = project_status.inspect_project(self.project)
+        self.assertEqual(status["git"]["status"], "dirty")
+        self.assertEqual(status["git"]["attribution"], "unclassified")
+        self.assertEqual(status["resume"]["mode"], "ask_user")
+        self.assertTrue(any("归因" in blocker for blocker in status["resume"]["blockers"]))
+
+    def test_workspace_attribution_completes_resume(self) -> None:
+        self.managed_work("WORK-014", "归因完成")
+        (self.project / "src").mkdir()
+        (self.project / "src" / "login.py").write_text("VALUE = 1\n", encoding="utf-8")
+        subprocess.run(["git", "init"], cwd=self.project, capture_output=True, check=True)
+        subprocess.run(["git", "add", "."], cwd=self.project, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "base"],
+            cwd=self.project,
+            capture_output=True,
+            check=True,
+        )
+        (self.project / "src" / "login.py").write_text("VALUE = 2\n", encoding="utf-8")
+        status = project_status.inspect_project(self.project)
+        head = status["git"]["head"]
+        work = self.project / ".agent" / "changes" / "WORK-014-归因完成"
+        (work / "workspace.md").write_text(
+            f"---\nbase_commit: {head}\n---\n\n## 工作区归因\n\n"
+            "| 路径 | 归属 | 说明 |\n| --- | --- | --- |\n"
+            "| src/login.py | current_work | TASK-001 的实现 |\n",
+            encoding="utf-8",
+        )
+        status = project_status.inspect_project(self.project)
+        self.assertEqual(status["work_items"][0]["workspace_attribution"]["status"], "complete")
+        self.assertEqual(status["resume"]["mode"], "auto_resume")
+
+    def test_unknown_workspace_attribution_still_blocks_resume(self) -> None:
+        self.managed_work("WORK-014", "未知归因")
+        (self.project / "src").mkdir()
+        (self.project / "src" / "login.py").write_text("VALUE = 1\n", encoding="utf-8")
+        subprocess.run(["git", "init"], cwd=self.project, capture_output=True, check=True)
+        subprocess.run(["git", "add", "."], cwd=self.project, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "base"],
+            cwd=self.project,
+            capture_output=True,
+            check=True,
+        )
+        (self.project / "src" / "login.py").write_text("VALUE = 2\n", encoding="utf-8")
+        status = project_status.inspect_project(self.project)
+        work = self.project / ".agent" / "changes" / "WORK-014-未知归因"
+        (work / "workspace.md").write_text(
+            f"---\nbase_commit: {status['git']['head']}\n---\n\n## 工作区归因\n\n"
+            "| 路径 | 归属 | 说明 |\n| --- | --- | --- |\n"
+            "| src/login.py | unknown | 等待确认 |\n",
+            encoding="utf-8",
+        )
+        status = project_status.inspect_project(self.project)
+        self.assertEqual(status["work_items"][0]["workspace_attribution"]["status"], "incomplete")
+        self.assertEqual(status["resume"]["mode"], "ask_user")
+
+    def test_structured_evidence_covers_all_acceptance_criteria(self) -> None:
+        work = self.managed_work("WORK-015", "证据矩阵", task_body="### TASK-001 | done | 完成")
+        requirements = work / "requirements.md"
+        requirements.write_text(
+            requirements.read_text(encoding="utf-8")
+            + "\n## 目标\n目标\n\n## 验收标准\n- AC-001：登录成功\n- AC-002：退出成功\n",
+            encoding="utf-8",
+        )
+        report = work / "testing" / "report.md"
+        report.parent.mkdir()
+        report.write_text(
+            "---\nstatus: passed\nevidence: required\n---\n\n# 验证报告\n\n"
+            "## 检查证据\n\n| 检查项 | 命令 | 退出码 | 结果 | 证据 |\n"
+            "| --- | --- | --- | --- | --- |\n"
+            "| AC-001 | pytest tests/test_login.py -q | 0 | passed | testing/logs/login.txt |\n"
+            "| AC-002 | pytest tests/test_logout.py -q | 0 | passed | testing/logs/logout.txt |\n",
+            encoding="utf-8",
+        )
+        item = project_status.inspect_project(self.project)["work_items"][0]
+        self.assertEqual(item["test_evidence"]["status"], "complete")
+        self.assertEqual(item["test_evidence"]["missing_acceptance"], [])
+        self.assertEqual(item["phase"], "completed")
+
+    def test_status_json_has_stable_metadata(self) -> None:
+        status = project_status.inspect_project(self.project)
+        self.assertEqual(status["schema_version"], "1")
+        self.assertRegex(status["generated_at"], r"^20\d\d-")
+
+    def test_strict_validator_reports_duplicate_identifier(self) -> None:
+        work = self.managed_work("WORK-016", "严格校验")
+        requirements = work / "requirements.md"
+        requirements.write_text(
+            requirements.read_text(encoding="utf-8")
+            + "\n## 目标\n目标\n\n## 验收标准\n- AC-001：一次\n- AC-001：重复\n",
+            encoding="utf-8",
+        )
+        result = project_validate.validate_project(self.project)
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("AC-001" in error["message"] for error in result["errors"]))
 
     def test_compact_workflow_skips_optional_design_stages(self) -> None:
         self.confirm_rules()
@@ -366,7 +528,9 @@ class InitializationTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
 
             rules = project / ".agent" / "rules" / "always.md"
+            index = project / ".agent" / "INDEX.md"
             rules.write_text("# 用户自定义项目规范\n\n## MUST\n\n- 保留此规则\n", encoding="utf-8")
+            index.write_text("# 用户维护的项目索引\n", encoding="utf-8")
             result = subprocess.run(
                 [sys.executable, "-X", "utf8", str(INIT_SCRIPT), str(project)],
                 capture_output=True,
@@ -379,6 +543,8 @@ class InitializationTests(unittest.TestCase):
             self.assertEqual(agents.read_text(encoding="utf-8"), "# 用户原有规则\n")
             self.assertEqual(source.read_text(encoding="utf-8"), "VALUE = 1\n")
             self.assertTrue((project / ".agent" / "memory.md").is_file())
+            self.assertTrue((project / ".agent" / "html").is_dir())
+            self.assertEqual(index.read_text(encoding="utf-8"), "# 用户维护的项目索引\n")
             self.assertEqual(rules.read_text(encoding="utf-8"), "# 用户自定义项目规范\n\n## MUST\n\n- 保留此规则\n")
             self.assertTrue((project / ".agent" / "scripts" / "generate_core_history.py").is_file())
 
@@ -396,12 +562,15 @@ class InitializationTests(unittest.TestCase):
             self.assertIn("不会写入固定项目规则", result.stdout)
             agents = (project / "AGENTS.md").read_text(encoding="utf-8")
             workspace_readme = (project / ".agent" / "README.md").read_text(encoding="utf-8")
+            project_index = (project / ".agent" / "INDEX.md").read_text(encoding="utf-8")
             self.assertIn("project-lifecycle", agents)
             self.assertIn("PROJECT-INDEX.md", agents)
             self.assertIn("references/workflow.md", agents)
             self.assertIn("WORK-*", workspace_readme)
             self.assertIn("阶段批准", workspace_readme)
             self.assertIn("references/workflow.md", workspace_readme)
+            self.assertIn("## 模块索引", project_index)
+            self.assertIn(".agent/html/", project_index)
             status = project_status.inspect_project(project)
             self.assertFalse((project / ".agent" / "rules" / "always.md").exists())
             self.assertFalse(status["rules"]["ready"])
