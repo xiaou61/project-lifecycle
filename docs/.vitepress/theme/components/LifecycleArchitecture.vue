@@ -124,7 +124,7 @@ function selectNode(id: string) {
               <strong>{{ node.title }}</strong>
               <small>{{ node.summary }}</small>
             </button>
-            <span v-if="index < nodes.length - 1" class="flow-connector" aria-hidden="true">→</span>
+            <span v-if="index < nodes.length - 1" class="flow-connector" aria-hidden="true">{{ index % 2 === 0 ? '→' : '↙' }}</span>
           </template>
         </div>
         <div class="flow-footer"><span>↺ 发生目标 / 接口 / 数据 / 安全 / 架构变化</span><span>返回最早受影响阶段，令下游工件 stale</span></div>
