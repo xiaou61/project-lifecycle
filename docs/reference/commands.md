@@ -48,6 +48,7 @@ $lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-l
 | `validate` | 检查工件、来源、证据和归因，保留兼容性警告 | 日常交接检查 |
 | `validate --strict` | 在上述检查基础上把警告视为失败 | 发布前质量门槛 |
 | `history` | 生成核心组件历史视图 | 可追溯性 |
+| `push-check` | 用 `git ls-remote` 核对远端提交和更新历史 | 推送后核验 |
 
 这借鉴了 Superpowers 的组合方式：每个动作有清晰边界，但仍由一个生命周期 Skill 统一处理事实、批准和漂移。用户侧风险模式是 `lite`、`managed`、`strict`；`compact`、`full` 是写入工件的兼容工作流字段，需求深挖和 HTML 理解材料按需读取，不是重复安装的 Skill。
 
@@ -82,6 +83,12 @@ $lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-l
 
 # 切换工作项前检查是否还有未提交改动；有改动时返回非零
 & $lifecycle checkpoint "F:\我的项目" --json
+
+# 推送后核对远端 HEAD 是否已同步，及 updates.md 是否记录
+& $lifecycle push-check "F:\我的项目" --json
+
+# 核验成功后追加本地远端记录（不会提交或再次推送）
+& $lifecycle push-check "F:\我的项目" --record-push --work WORK-003
 ```
 
 ## 发布前检查
@@ -127,3 +134,5 @@ git push origin v0.0.2
 ## 稳定 JSON
 
 状态和严格校验 JSON 都带 `schema_version` 与 `generated_at`。集成脚本应按 `resume.mode`、`git.status`、`source_coverage.status`、`test_evidence.status` 和 `errors`/`warnings` 字段处理，不要解析文本输出。
+
+`resume --json` 选中工作项时还提供 `resume.work_item.goal`、`acceptance_criteria`、`constraints`、`goal_status`、`state_evidence` 和 `document_budget`。这些字段来自 `requirements.md`、已记录测试和 Git 快照，用于上下文压缩后的恢复；`state_evidence.code_sync` 为 `verified`、`stale`、`unknown` 或 `invalid`，只有 `verified` 才表示验证报告锚定的代码提交之后没有源码改动且当前工作区干净。缺失内容只会进入 `resume.warnings`，不会从聊天摘要推断。

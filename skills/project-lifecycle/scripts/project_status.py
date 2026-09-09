@@ -39,7 +39,12 @@ WORK_ID_PATTERN = re.compile(r"WORK-\d+", re.IGNORECASE)
 WORKFLOW_MODES = {"full", "compact"}
 LIFECYCLE_MODES = {"lite", "managed", "strict"}
 MODE_LABELS = {"lite": "轻量", "managed": "受管理", "strict": "严格"}
-STATUS_SCHEMA_VERSION = "1"
+STATUS_SCHEMA_VERSION = "2"
+DOCUMENT_LIMITS = {
+    "per_file_bytes": 20_000,
+    "work_item_bytes": 80_000,
+    "file_count": 6,
+}
 
 
 def read_text(path: Path) -> str:
@@ -331,6 +336,110 @@ def testing_evidence_status(
     return result
 
 
+def document_budget_status(work_dir: Path) -> dict[str, object]:
+    """Measure primary work-item Markdown without reading evidence logs into context."""
+    paths = [
+        work_dir / "requirements.md",
+        work_dir / "proposal.md",
+        work_dir / "design.md",
+        work_dir / "tasks.md",
+        work_dir / "testing" / "plan.md",
+        work_dir / "testing" / "report.md",
+        work_dir / "workspace.md",
+    ]
+    files: list[dict[str, object]] = []
+    for path in paths:
+        if not path.is_file():
+            continue
+        try:
+            size = path.stat().st_size
+        except OSError:
+            continue
+        files.append({"path": str(path), "bytes": size})
+
+    total_bytes = sum(int(entry["bytes"]) for entry in files)
+    oversized = [
+        entry for entry in files if int(entry["bytes"]) > DOCUMENT_LIMITS["per_file_bytes"]
+    ]
+    warnings: list[str] = []
+    if oversized:
+        labels = "、".join(Path(str(entry["path"])).name for entry in oversized)
+        warnings.append(
+            f"核心 Markdown 超过 {DOCUMENT_LIMITS['per_file_bytes']} bytes：{labels}；建议把日志和讨论移到独立证据文件。"
+        )
+    if total_bytes > DOCUMENT_LIMITS["work_item_bytes"]:
+        warnings.append(
+            f"当前工作项核心 Markdown 共 {total_bytes} bytes，超过 {DOCUMENT_LIMITS['work_item_bytes']} bytes 软阈值；恢复时只读取当前阶段内容。"
+        )
+    if len(files) > DOCUMENT_LIMITS["file_count"]:
+        warnings.append(
+            f"当前工作项有 {len(files)} 个核心 Markdown，超过 {DOCUMENT_LIMITS['file_count']} 个恢复软阈值；按阶段拆分读取。"
+        )
+    return {
+        "status": "warning" if warnings else "ok",
+        "total_bytes": total_bytes,
+        "file_count": len(files),
+        "files": files,
+        "limits": DOCUMENT_LIMITS.copy(),
+        "warnings": warnings,
+    }
+
+
+def verification_anchor(work_dir: Path, git: dict[str, object]) -> dict[str, object]:
+    """Check whether a report still covers the current code snapshot."""
+    report_path = work_dir / "testing" / "report.md"
+    fields = file_fields(report_path)
+    verified_commit = fields.get("verified_commit", "").strip().lower()
+    verified_at = fields.get("verified_at", "").strip()
+    result: dict[str, object] = {
+        "status": "unknown",
+        "report": str(report_path),
+        "verified_commit": verified_commit or None,
+        "verified_at": verified_at or None,
+        "reason": "验证报告没有 verified_commit，无法把证据绑定到当前源码。",
+    }
+    if not report_path.is_file() or not verified_commit:
+        return result
+    if not re.fullmatch(r"[0-9a-f]{7,40}", verified_commit):
+        result["status"] = "invalid"
+        result["reason"] = "验证报告的 verified_commit 不是有效 Git 提交哈希。"
+        return result
+    head = str(git.get("head") or "").lower()
+    if not head:
+        result["reason"] = "当前无法读取 HEAD，不能核对验证锚点。"
+        return result
+    if git.get("status") != "clean":
+        result["status"] = "stale"
+        result["reason"] = "验证报告绑定的提交之后工作区又有改动，需要重新验证。"
+        return result
+    if head.startswith(verified_commit) or verified_commit.startswith(head):
+        result["status"] = "verified"
+        result["reason"] = "验证报告已绑定当前干净工作区的 HEAD。"
+        return result
+
+    root = locate_project(work_dir)
+    diff = subprocess.run(
+        ["git", "-C", str(root), "diff", "--name-only", f"{verified_commit}..HEAD"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    if diff.returncode != 0:
+        result["status"] = "stale"
+        result["reason"] = "验证报告绑定的提交无法解析为当前仓库的历史，需要重新验证。"
+        return result
+    changed = [normalize_git_path(line) for line in diff.stdout.splitlines() if line.strip()]
+    if any(not path.startswith(".agent/") for path in changed):
+        result["status"] = "stale"
+        result["reason"] = "验证锚点之后出现源码或非工件改动，需要重新验证。"
+        return result
+    result["status"] = "verified"
+    result["reason"] = "验证报告绑定的代码提交之后只有 .agent/ 工件变化，当前工作区干净。"
+    return result
+
+
 def work_identity(work_dir: Path) -> dict[str, object]:
     identity_fields: dict[str, str] = {}
     for artifact in ARTIFACTS:
@@ -384,6 +493,86 @@ def requirement_acceptance_ids(requirements_path: Path) -> set[str]:
     }
 
 
+def markdown_list_lines(section: str) -> list[str]:
+    return [
+        line.strip()
+        for line in section.splitlines()
+        if re.match(r"^(?:[-*+]|\d+[.)])\s+\S", line.strip())
+    ]
+
+
+def resume_requirements(requirements_path: Path) -> dict[str, object]:
+    result: dict[str, object] = {
+        "goal": "",
+        "acceptance_criteria": [],
+        "constraints": [],
+        "goal_status": "missing",
+        "warnings": [],
+    }
+    if not requirements_path.is_file():
+        result["warnings"] = ["requirements.md 缺失，无法恢复当前任务目标、验收标准和约束。"]
+        return result
+
+    text = read_text(requirements_path)
+    goal = "\n".join(
+        line.strip() for line in markdown_section(text, "目标").splitlines() if line.strip()
+    )
+    acceptance_criteria = [
+        line
+        for line in markdown_list_lines(markdown_section(text, "验收标准"))
+        if re.search(r"\bAC-\d+\b", line, re.IGNORECASE)
+    ]
+    constraints = markdown_list_lines(markdown_section(text, "约束与依赖"))
+    result.update(
+        goal=goal,
+        acceptance_criteria=acceptance_criteria,
+        constraints=constraints,
+        goal_status="present" if goal else "missing",
+    )
+    warnings: list[str] = []
+    if not goal:
+        warnings.append("requirements.md 缺少可恢复的“## 目标”内容；不要根据聊天摘要臆造目标。")
+    if not acceptance_criteria:
+        warnings.append("requirements.md 缺少带 AC-* 的“## 验收标准”列表；恢复后先补齐验收标准。")
+    result["warnings"] = warnings
+    return result
+
+
+def state_evidence(item: dict[str, object], git: dict[str, object]) -> dict[str, object]:
+    """Describe what the status projection proves, without claiming live code completion."""
+    test_status = str(item.get("test_evidence", {}).get("status", "missing"))
+    recorded_tests = test_status == "complete"
+    anchor = verification_anchor(Path(str(item["path"])), git)
+    code_sync = str(anchor["status"])
+    return {
+        "source": "work_item_artifacts",
+        "documented_state": item["state"],
+        "documented_phase": item["phase"],
+        "tasks": item.get("tasks", {}),
+        "test_evidence": test_status,
+        "git_status": git.get("status", "unknown"),
+        "git_changed_files": git.get("changed_files", 0),
+        "confidence": (
+            "verified_at_commit"
+            if code_sync == "verified"
+            else "artifact_plus_reported_evidence"
+            if recorded_tests
+            else "artifact_only"
+        ),
+        "code_sync": code_sync,
+        "reconciliation": anchor,
+        "settlement_status": "confirmed" if code_sync == "verified" else "pending_reconciliation",
+        "requires_reconciliation": code_sync != "verified",
+        "note": (
+            "验证报告已绑定当前 HEAD；状态仍需结合用户验收，不等于自动发布。"
+            if code_sync == "verified"
+            else "状态由工作项工件和已记录的测试证据推导；源码是否与工件同步仍需检查。"
+            if recorded_tests
+            else "状态主要由工作项工件推导；源码实际完成度和文档是否同步仍需检查。"
+        ),
+    }
+
+
 def phase_result(
     identity: dict[str, object],
     work_dir: Path,
@@ -400,6 +589,7 @@ def phase_result(
         work_dir / "testing" / "report.md",
         requirement_acceptance_ids(work_dir / "requirements.md"),
     )
+    document_budget = document_budget_status(work_dir)
     result: dict[str, object] = {
         **identity,
         "slug": work_dir.name,
@@ -414,11 +604,13 @@ def phase_result(
         "tasks": tasks,
         "source_coverage": source_coverage,
         "test_evidence": test_evidence,
+        "document_budget": document_budget,
         "relations": {"depends_on": [], "dependents": [], "related": []},
         "warnings": [
             *warnings,
             *source_coverage["warnings"],
             *test_evidence["warnings"],
+            *document_budget["warnings"],
         ],
     }
     blocking_reasons: list[str] = []
@@ -973,6 +1165,7 @@ def unavailable_resume(reason: str, *, blockers: list[str] | None = None) -> dic
         "work_item": None,
         "candidates": [],
         "blockers": blockers or [],
+        "warnings": [],
         "read_paths": [],
         "handoff_prompt": None,
     }
@@ -1010,6 +1203,7 @@ def resume_context(
                 for item in active_items
             ],
             "blockers": ["请明确提供 WORK-* 编号或中文工作项名称。"],
+            "warnings": [],
             "read_paths": [],
             "handoff_prompt": None,
         }
@@ -1017,6 +1211,8 @@ def resume_context(
         return unavailable_resume("当前没有未完成的活动工作项。")
 
     blockers: list[str] = []
+    requirements = resume_requirements(Path(str(candidate["path"])) / "requirements.md")
+    evidence = candidate.get("state_evidence") or state_evidence(candidate, git)
     if git["status"] == "dirty":
         attribution = candidate.get("workspace_attribution", {})
         if attribution.get("status") != "complete":
@@ -1026,7 +1222,13 @@ def resume_context(
         blockers.append(str(git["warning"] or "Git 工作区状态未知；恢复前先人工核对。"))
     if candidate["state"] not in {"ready", "in_progress"}:
         blockers.append(str(candidate["next_action"]))
-    blockers.extend(str(warning) for warning in candidate["warnings"])
+    soft_warnings = {
+        str(warning)
+        for warning in (candidate.get("document_budget") or {}).get("warnings", [])
+    }
+    blockers.extend(
+        str(warning) for warning in candidate["warnings"] if str(warning) not in soft_warnings
+    )
     blockers = list(dict.fromkeys(blockers))
     can_auto_resume = candidate["state"] in {"ready", "in_progress"} and not blockers
     mode = "auto_resume" if can_auto_resume else "ask_user"
@@ -1044,18 +1246,28 @@ def resume_context(
         "mode": candidate["mode"],
         "mode_label": candidate["mode_label"],
         "mode_reason": candidate.get("mode_reason", ""),
+        "goal": requirements["goal"],
+        "acceptance_criteria": requirements["acceptance_criteria"],
+        "constraints": requirements["constraints"],
+        "goal_status": requirements["goal_status"],
+        "state_evidence": evidence,
+        "document_budget": candidate.get("document_budget"),
         "next_action": candidate["next_action"],
         "workspace_attribution": candidate.get("workspace_attribution"),
     }
+    resume_warnings = [str(warning) for warning in requirements["warnings"]]
+    resume_warnings.extend(soft_warnings)
     return {
         "mode": mode,
         "reason": reason,
         "work_item": work_item,
         "candidates": [],
         "blockers": blockers,
+        "warnings": resume_warnings,
         "read_paths": resume_read_paths(project_root, candidate),
         "handoff_prompt": (
-            f"$project-lifecycle 继续 {candidate['work_id']}，先恢复规范和状态，再按当前阶段执行。"
+            f"$project-lifecycle 继续 {candidate['work_id']}，先恢复规范和状态；"
+            "以 requirements.md 中的目标、验收标准和约束为当前事实源，再按当前阶段执行。"
         ),
     }
 
@@ -1237,6 +1449,17 @@ def inspect_project(
         )
     resolve_relations(all_items)
     apply_rules_gate(all_items, result["rules"])
+    for item in all_items:
+        evidence = state_evidence(item, result["git"])
+        if evidence["code_sync"] == "stale":
+            warning = str(evidence["reconciliation"]["reason"])
+            if warning not in item["warnings"]:
+                item["warnings"].append(warning)
+            if item["phase"] == "completed" and item["state"] == "complete":
+                item["state"] = "needs_attention"
+                item["next_action"] = "先重新核对当前源码、验收证据和验证报告，再完成结算。"
+                evidence = state_evidence(item, result["git"])
+        item["state_evidence"] = evidence
     result["next_work_id"] = next_work_id(all_items)
 
     if work:
@@ -1314,6 +1537,24 @@ def render_resume(status: dict[str, object]) -> str:
             f"{work_item['phase_label']} | {STATE_LABELS.get(str(work_item['state']), work_item['state'])}"
         )
         lines.append(f"模式：{work_item['mode']}（{work_item['mode_label']}）")
+        lines.append(f"目标：{work_item.get('goal') or '缺失（先补齐 requirements.md，不要根据聊天摘要臆造）'}")
+        acceptance = work_item.get("acceptance_criteria", [])
+        lines.append("验收标准：" + ("；".join(str(value) for value in acceptance) or "缺失（先补齐 requirements.md）"))
+        constraints = work_item.get("constraints", [])
+        if constraints:
+            lines.append("约束：" + "；".join(str(value) for value in constraints))
+        evidence = work_item.get("state_evidence", {})
+        if evidence:
+            lines.append(
+                f"状态依据：{evidence.get('source')} | 置信度：{evidence.get('confidence')} | "
+                f"源码同步：{evidence.get('code_sync')} | 结算：{evidence.get('settlement_status')}"
+            )
+            lines.append(f"状态说明：{evidence.get('note')}")
+        budget = work_item.get("document_budget") or {}
+        if budget:
+            lines.append(
+                f"文档预算：{budget.get('total_bytes', 0)} bytes / {budget.get('file_count', 0)} 个核心文件"
+            )
         lines.append(f"下一步：{work_item['next_action']}")
     if resume["candidates"]:
         lines.append(
@@ -1323,6 +1564,7 @@ def render_resume(status: dict[str, object]) -> str:
                 for candidate in resume["candidates"]
             )
         )
+    lines.extend(f"恢复提示：{warning}" for warning in resume.get("warnings", []))
     lines.extend(f"阻塞：{blocker}" for blocker in resume["blockers"])
     lines.extend(f"建议读取：{path}" for path in resume["read_paths"])
     if resume["handoff_prompt"]:
@@ -1376,6 +1618,16 @@ def render_text(status: dict[str, object]) -> str:
             f"- {item['work_id']} · {item['name']} | {item['phase_label']} | {state_label}{archive_label}"
         )
         lines.append(f"  模式：{item['mode']}（{item['mode_label']}）")
+        evidence = item.get("state_evidence", {})
+        if evidence:
+            lines.append(
+                f"  代码核对：{evidence.get('code_sync')}；结算：{evidence.get('settlement_status')}"
+            )
+        budget = item.get("document_budget", {})
+        if budget:
+            lines.append(
+                f"  文档：{budget.get('total_bytes', 0)} bytes / {budget.get('file_count', 0)} 个核心文件"
+            )
         tasks = item["tasks"]
         if sum(tasks.values()):
             lines.append(

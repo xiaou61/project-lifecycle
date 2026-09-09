@@ -152,7 +152,7 @@ Agent 会主动给受管理需求分配不复用的中文名称和 `WORK-*` 编�
 
 多个对话可以通过不同 `WORK-*` 接力，但 Skill 不提供同一工作树的文件锁或自动合并。并行写入时为每个工作项使用独立分支和 Git Worktree；不能使用 Worktree 时，同一目录同一时刻只允许一个写入对话，切换前先运行 `checkpoint` 并完成 `workspace.md` 归因。详细问答见 [VitePress QA](docs/guide/qa.md)。
 
-更新历史命令：`updates` 查看 `.agent/history/updates.md`，`record` 按固定字段追加一条记录，`checkpoint` 检查本地 Git 工作区是否还有未提交改动。它们不会自动提交或推送。
+更新历史命令：`updates` 查看 `.agent/history/updates.md`，`record` 按固定字段追加一条记录，`checkpoint` 检查本地 Git 工作区是否还有未提交改动，`push-check` 用 `git ls-remote` 核对远端 HEAD 和历史记录。它们不会自动提交或推送。
 
 ```powershell
 & $lifecycle updates "F:\我的项目" --tail 10
@@ -160,6 +160,7 @@ Agent 会主动给受管理需求分配不复用的中文名称和 `WORK-*` 编�
   --change "调整会话超时处理" --decision "保留现有接口" --basis ".agent/changes/WORK-003-登录/design.md" `
   --verification "pytest tests/test_login.py -q：通过"
 & $lifecycle checkpoint "F:\我的项目" --json
+& $lifecycle push-check "F:\我的项目" --json
 ```
 
 每次实际修改后，Agent 还要在目标项目 `.agent/history/updates.md` 追加变更、决策、依据、验证和本地提交边界。切换独立工作项或完成沉淀前，先留下本地 commit 检查点；`git push`、远端分支、tag 和部署必须得到用户明确授权。

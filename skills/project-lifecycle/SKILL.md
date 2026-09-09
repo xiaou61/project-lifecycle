@@ -17,6 +17,7 @@ description: 管理需要跨会话追踪、多人协作或明显风险的开发�
 - 只按已确认范围实施。目标、验收、公共行为、接口、数据、安全、部署或架构发生实质变化时，回到最早受影响工件并使下游失效。
 - 未完成 `depends_on` 阻断实现和验收；`related_to` 只要求跨阶段前检查影响。
 - 规则、批准、测试结果和长期记忆必须有真实依据；不覆盖用户资料，不提交凭据。
+- 上下文压缩或换对话后，以 `resume --json` 返回的 `requirements.md` 目标、验收标准和约束恢复当前任务；聊天摘要和 `.agent/memory.md` 不能替代当前工作项事实。
 
 ## 风险路由
 
@@ -40,7 +41,7 @@ workflow: compact
 
 ## 用户入口
 
-本 Skill 对用户提供一个总入口和几个可组合动作：初始化、状态、恢复、校验、Git 历史视图、更新历史、记录更新和本地检查点检查。用户可以直接用自然语言表达这些动作，也可以调用 `scripts/project-lifecycle.ps1 <init|status|resume|validate|history|updates|record|checkpoint>`；不要要求普通用户直接运行 Python 文件。
+本 Skill 对用户提供一个总入口和几个可组合动作：初始化、状态、恢复、校验、Git 历史视图、更新历史、记录更新、本地检查点和远端推送核验。用户可以直接用自然语言表达这些动作，也可以调用 `scripts/project-lifecycle.ps1 <init|status|resume|validate|history|updates|record|checkpoint|push-check>`；不要要求普通用户直接运行 Python 文件。
 
 这些命令只是稳定的入口适配器，底层脚本属于 Skill 实现细节。`validate` 是普通校验，只有显式传入 `--strict` 才把兼容性警告视为失败。`lite`、`managed`、`strict` 是风险模式；`compact`、`full` 和需求深挖是兼容字段或参考协议，不拆成会互相抢触发的重复 Skill。
 
@@ -56,4 +57,4 @@ workflow: compact
 - `scripts/init_project.py`、`scripts/project_status.py`：Skill 内部实现，负责幂等初始化（含项目总索引和 HTML 目录）与只读状态汇总；用户和 Agent 通过 `scripts/project-lifecycle.ps1 init/status/resume` 调用，不从目标项目 `.agent/scripts/` 查找这些文件。
 - `scripts/project_validate.py`：Skill 内部的只读工件校验实现；通过 `scripts/project-lifecycle.ps1 validate` 调用，不要求普通用户直接运行 Python。
 - `scripts/project-lifecycle.ps1`：面向用户的命令适配器，隐藏底层 Python 实现并转发 `init`、`status`、`resume`、`validate`、`history`。
-- `scripts/update_history.py`：读取和追加 `.agent/history/updates.md`，并检查本地 Git 提交检查点。
+- `scripts/update_history.py`：读取和追加 `.agent/history/updates.md`，检查本地 Git 提交检查点，并按需核对远端推送记录。

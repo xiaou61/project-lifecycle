@@ -1,4 +1,4 @@
-# QA：30 个使用问题
+# QA：32 个使用问题
 
 这页把常见的“我该怎么用”直接对应到 `project-lifecycle` 的入口、工件和边界。示例默认使用 Windows PowerShell；`$lifecycle` 指向已安装 Skill 的统一命令入口：
 
@@ -176,6 +176,14 @@ git worktree add "..\我的项目-WORK-003" -b "work/WORK-003"
 
 自动化应读取 JSON 的 `schema_version`、`resume.mode`、`errors` 和 `warnings` 等字段，不要解析中文输出的位置或标点。
 
+### 18.1. 上下文压缩后，Agent 怎么找回当前目标？
+
+先运行 `resume --json`。选中的 `resume.work_item` 会从当前工作项的 `requirements.md` 带出 `goal`、`acceptance_criteria`、`constraints` 和 `goal_status`，并返回 `state_evidence` 与 `document_budget`。其中 `documented_state` 只代表工件推导；`code_sync` 只有在 `testing/report.md` 的 `verified_commit` 之后没有源码改动且当前工作区干净时才是 `verified`，否则会是 `stale`、`unknown` 或 `invalid`，不能把“代码可能已经完成、但 Markdown 没更新”误报成完成。恢复后按 `read_paths` 重新读取规则、需求和当前阶段工件，再核对 `tasks.md`、Git 差异和实际测试。聊天摘要只帮助定位线索，不能替代项目工件。若目标或验收标准缺失，输出 `resume.warnings` 并先补齐文档，不会猜测用户意图。
+
+### 18.2 Markdown 太多会拖慢恢复吗？
+
+会增加读取和上下文成本，所以状态脚本只统计核心文件并给软警告：单文件超过 20,000 bytes、总量超过 80,000 bytes 或核心文件超过 6 个。它不会自动压缩或删除；把长日志放到 `testing/logs/` 等证据文件，恢复时只读取当前阶段路径。
+
 ### 19. 验收标准为什么要写成 `AC-*`？
 
 `AC-*` 让需求、测试计划和验证报告可以逐项对应。例如 `AC-001` 是“登录成功”，测试报告必须写出命令、退出码、结果和证据位置。这样“测试通过”不再只是聊天中的一句话，而是可复查的证据链。
@@ -234,6 +242,16 @@ git worktree add "..\我的项目-WORK-003" -b "work/WORK-003"
 ```
 
 本地提交、远端分支、tag、部署都需要单独的用户授权；更新记录里必须如实写“待用户授权/未提交”或“未执行”。
+
+### 24.1 已经推送但忘了更新 `updates.md` 怎么办？
+
+推送后运行：
+
+```powershell
+& $lifecycle push-check "F:\我的项目" --json
+```
+
+它用 `git ls-remote` 读取真实远端提交。若远端已包含当前 `HEAD` 但历史缺记录，会返回非零并标记不一致；确认后运行 `--record-push` 追加本地核验记录。追加不会自动提交或再次推送，因此后续发布历史仍需单独授权。
 
 ### 25. `checkpoint` 检查什么？
 

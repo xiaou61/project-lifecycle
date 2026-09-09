@@ -2,6 +2,26 @@
 
 本文件记录 `project-lifecycle` Skill 仓库本身的维护变更；目标项目的逐轮记录写在各自的 `.agent/history/updates.md`。Git 提交仍是可回滚事实源。
 
+## 2026-09-09 · 文档预算、验证锚点与推送核验
+
+- 类型：maintenance
+- 变更：为状态恢复增加核心 Markdown 体积软警告；为验证报告增加 `verified_commit` 锚点状态；新增 `push-check` 与 `--record-push`，检测远端已推送但 `updates.md` 未记录的情况。
+- 决策：文档超限只提示，不自动压缩或删除；远端查询只在显式 `push-check` 时执行；`updates.md` 仍是人工时间线，Git 远端仍是推送事实源。
+- 依据：`skills/project-lifecycle/scripts/project_status.py`、`skills/project-lifecycle/scripts/update_history.py`、`skills/project-lifecycle/references/update-history.md`。
+- 验证：44 个单元测试通过；其余发布检查待本轮执行。
+- 本地提交：待用户授权。
+- 远端推送：未执行。
+
+## 2026-09-09 · 压缩后任务目标恢复包
+
+- 类型：maintenance
+- 变更：`resume --json` 从 `requirements.md` 提取 `goal`、`acceptance_criteria`、`constraints` 和 `goal_status`，文本恢复输出与接力提示同步带出；缺失目标或验收标准时返回明确警告。
+- 决策：对话历史可以被压缩，当前任务状态继续以项目工件为唯一事实源；恢复包新增 `state_evidence`，明确工件状态、已记录测试、Git 快照和未知的源码同步，避免把过时 Markdown 当成实时代码状态；不新增数据库、向量存储或后台服务，长期 `.agent/memory.md` 不承担当前任务目标。
+- 依据：`skills/project-lifecycle/scripts/project_status.py`、`skills/project-lifecycle/references/workflow.md`、`docs/guide/resume.md`。
+- 验证：待本轮验证。
+- 本地提交：待用户授权。
+- 远端推送：未执行。
+
 ## 2026-09-09 14:10:00 +0800 · 发布三档模式与秒级更新历史
 
 - 类型：maintenance

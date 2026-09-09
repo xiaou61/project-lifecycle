@@ -19,6 +19,36 @@ $lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-l
 | `ask_user` | 有多个候选，或存在审批、依赖、来源覆盖、Git 归因等阻塞 | 先选择工作项或处理阻塞 |
 | `out_of_scope` | 没有未完成工作项、编号已归档，或当前路径只是外层导航工作区 | 创建新工作项或切换到真实项目 |
 
+当返回 `work_item` 时，恢复包还会从该工作项的 `requirements.md` 原文提取当前任务事实：
+
+- `goal`：`## 目标` 中的目标正文；
+- `acceptance_criteria`：`## 验收标准` 中包含 `AC-*` 的列表行；
+- `constraints`：`## 约束与依赖` 中的列表行；
+- `goal_status`：`present` 或 `missing`；
+- `warnings`：目标或验收标准缺失等恢复风险。
+- `state_evidence`：说明状态来自工件、已记录测试和 Git 快照。`code_sync` 为 `verified`、`stale`、`unknown` 或 `invalid`；只有验证报告声明的 `verified_commit` 之后没有源码改动、当前工作区干净时才是 `verified`，因此报告本身可以在代码提交后再提交。
+- `document_budget`：核心 Markdown 的文件数和字节数软检查；超限只警告，不删除内容。
+
+示例：
+
+```json
+{
+  "resume": {
+    "mode": "auto_resume",
+    "work_item": {
+      "work_id": "WORK-003",
+      "goal": "登录成功后进入首页",
+      "acceptance_criteria": ["- AC-001：登录成功后进入首页"],
+      "constraints": ["- 不修改现有登录接口"],
+      "goal_status": "present"
+    },
+    "warnings": []
+  }
+}
+```
+
+这些字段是恢复提示，不是新的状态数据库。`documented_state` 只表示工件推导状态，不等于源码实时完成度；测试报告没有锚点、提交变化或工作区变脏时，`code_sync` 不会是 `verified`，并要求重新核对。上下文压缩后仍要按 `read_paths` 重新读取 `always.md`、`requirements.md` 和当前阶段工件，并核对 `tasks.md`、Git 差异和实际测试；`requirements.md` 缺少目标或验收标准时，Skill 只提示缺口，不从旧聊天、摘要或长期记忆中臆造内容。
+
 恢复结果还会给出：
 
 - 当前 `WORK-*`、中文名称、阶段、状态和下一步；

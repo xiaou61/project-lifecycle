@@ -51,3 +51,19 @@
 4. `git push`、创建远端分支、打 tag 或发布都必须得到用户明确授权；“保存”“提交”“继续”不等于远端推送授权。
 
 本地提交前后都不得覆盖或清理用户已有、未知归属或未授权的改动。凭据、密钥和令牌不得写入更新历史。
+
+## 推送后核验
+
+推送完成后，`updates.md` 可能没有被同一轮修改。不要把本地 `git log` 或旧的远端跟踪值当成远端事实，显式运行：
+
+```powershell
+& $lifecycle push-check "F:\我的项目" --json
+```
+
+该命令用 `git ls-remote` 查询当前分支的远端提交，并检查 `updates.md` 是否有对应的“远端推送”记录。远端已包含当前 HEAD 但历史缺记录时返回不一致且非零；确认结果后可追加一条本地核验记录：
+
+```powershell
+& $lifecycle push-check "F:\我的项目" --record-push --work WORK-003
+```
+
+`--record-push` 只追加本地文本，不会再次提交或推送。追加后 `updates.md` 会产生未提交改动，下一次要发布这条历史时仍需用户单独授权 commit/push。

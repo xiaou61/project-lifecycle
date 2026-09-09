@@ -50,7 +50,7 @@
    & $lifecycle resume <project-root> --json
    ```
 
-   `--resume` 返回 `auto_resume`、`ask_user` 或 `out_of_scope`，并给出阶段、阻塞、建议读取路径和接力提示。下游按 `schema_version` 和字段读取，不解析中文文本。
+   `--resume` 返回 `auto_resume`、`ask_user` 或 `out_of_scope`，并给出阶段、阻塞、建议读取路径和接力提示。选中的 `work_item` 还会从 `requirements.md` 带出 `goal`、`acceptance_criteria`、`constraints` 和 `goal_status`；缺失时返回恢复警告，不得根据聊天摘要臆造。`state_evidence` 明确区分工件推导状态、已记录测试、Git 快照和未知的源码同步情况；它不能证明代码已完成，恢复后仍需核对任务、差异和测试。下游按 `schema_version` 和字段读取，不解析中文文本。
 4. **定位和加载依据**：按用户点名的编号、中文名、内容唯一匹配、唯一活动项的顺序选择；先读需求，再按阶段读取已批准工件、规格、记忆和共享资料。
 5. **检查门槛并执行一个动作**：核对规范、批准、硬依赖、关联影响和工件一致性；然后讨论、写当前工件、改代码、验证，或停在真实确认点。
 6. **同步事实**：只按实际结果更新工件和任务状态；每次实际修改后追加 `.agent/history/updates.md`，记录变更、决策、依据、验证和本地提交/远端推送边界；需要接力或暴露阻塞时再输出状态。
@@ -123,6 +123,10 @@ $project-lifecycle 在当前项目继续 WORK-003，先恢复规范和状态，�
 ```
 
 没有持久化工作项的早期讨论不输出接力句，也不要每轮复述完整协议。
+
+上下文压缩只影响对话历史，不改变项目工件。恢复时以 `.agent/changes/<WORK-*>/requirements.md` 的目标、验收标准和约束为任务事实源，以 `read_paths` 为读取清单；但工作项 `state` 是工件投影，不是源码实时扫描结果。`state_evidence.code_sync` 只有在 `testing/report.md` 声明 `verified_commit`，且该提交之后只有 `.agent/` 工件变化、当前工作区干净时才为 `verified`；这样报告本身可以在代码提交之后再提交，不会产生自引用哈希问题。缺少锚点为 `unknown`，锚点之后出现源码改动或工作区变化为 `stale`，格式错误为 `invalid`。只要不是 `verified`，`requires_reconciliation` 就为 true，不能替用户宣布源码与 Markdown 已同步。`.agent/memory.md` 只保存跨任务长期知识，不能替代当前工作项目标。目标或验收标准缺失时先报告警告并补齐工件，不从摘要或模型记忆推断。
+
+核心工作项 Markdown 还会做体积软检查：单文件超过 20,000 bytes、总量超过 80,000 bytes 或核心文件超过 6 个时只产生警告，不自动删除或压缩内容；恢复时按当前阶段读取，详细日志放入测试证据文件。
 
 ## 多对话并发与 Git 隔离
 

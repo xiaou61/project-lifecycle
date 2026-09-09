@@ -4,6 +4,8 @@
 
 聊天适合推进当前动作，但会被上下文压缩、换对话和多人协作打断。项目工件保存的是可复查事实：批准状态、任务状态、测试证据、依赖和阻塞。
 
+`resume --json` 会额外返回当前 `requirements.md` 的 `goal`、`acceptance_criteria`、`constraints` 和 `goal_status`，以及 `state_evidence`、`document_budget` 作为压缩后恢复的最小任务包。它只是工件和已记录证据的结构化摘要：`documented_state` 不等于源码实时状态，`code_sync` 只有提交锚点通过才为 `verified`，否则要求重新核对。恢复时仍要读取 `read_paths` 中的原文并核对任务、Git 差异和测试。目标或验收缺失会提示警告，不会从聊天摘要或长期记忆臆造。
+
 ## 为什么“继续”不能自动批准
 
 “继续”“开始做”“执行 `WORK-*`”表达的是动作意图，不一定表示用户已经确认需求、方案或设计。把动作意图当批准会让 Agent 在范围未锁定时修改代码。

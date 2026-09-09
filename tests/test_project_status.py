@@ -254,6 +254,121 @@ class ProjectStatusTests(unittest.TestCase):
         self.assertIn("requirements.md", "\n".join(resume["read_paths"]))
         self.assertIn("WORK-011", resume["handoff_prompt"])
 
+    def test_resume_context_carries_goal_acceptance_and_constraints(self) -> None:
+        work = self.managed_work("WORK-011", "恢复登录")
+        requirements = work / "requirements.md"
+        requirements.write_text(
+            requirements.read_text(encoding="utf-8")
+            + "\n## 目标\n恢复登录后进入首页，并保留会话。\n"
+            + "\n## 验收标准\n- AC-001：登录成功后进入首页\n- AC-002：刷新后仍保留会话\n"
+            + "\n## 约束与依赖\n- 不修改现有登录接口\n- 必须兼容 Windows 客户端\n",
+            encoding="utf-8",
+        )
+
+        resume = project_status.inspect_project(self.project)["resume"]
+        work_item = resume["work_item"]
+        self.assertEqual(work_item["goal"], "恢复登录后进入首页，并保留会话。")
+        self.assertEqual(
+            work_item["acceptance_criteria"],
+            ["- AC-001：登录成功后进入首页", "- AC-002：刷新后仍保留会话"],
+        )
+        self.assertEqual(
+            work_item["constraints"],
+            ["- 不修改现有登录接口", "- 必须兼容 Windows 客户端"],
+        )
+        self.assertEqual(work_item["goal_status"], "present")
+        self.assertFalse(resume["warnings"])
+        self.assertIn("requirements.md 中的目标", resume["handoff_prompt"])
+        rendered = project_status.render_resume(project_status.inspect_project(self.project))
+        self.assertIn("目标：恢复登录后进入首页，并保留会话。", rendered)
+        self.assertIn("AC-001：登录成功后进入首页", rendered)
+        self.assertIn("约束：- 不修改现有登录接口", rendered)
+        self.assertEqual(work_item["state_evidence"]["code_sync"], "unknown")
+        self.assertTrue(work_item["state_evidence"]["requires_reconciliation"])
+        self.assertIn("源码同步：unknown", rendered)
+
+    def test_resume_context_warns_when_goal_or_acceptance_is_missing(self) -> None:
+        self.managed_work("WORK-011", "缺少恢复事实")
+
+        resume = project_status.inspect_project(self.project)["resume"]
+        self.assertEqual(resume["work_item"]["goal_status"], "missing")
+        self.assertEqual(resume["work_item"]["goal"], "")
+        self.assertEqual(resume["work_item"]["acceptance_criteria"], [])
+        self.assertTrue(any("目标" in warning for warning in resume["warnings"]))
+        self.assertTrue(any("验收标准" in warning for warning in resume["warnings"]))
+        self.assertIn("恢复提示：", project_status.render_resume(project_status.inspect_project(self.project)))
+
+    def test_document_budget_warns_without_blocking_work(self) -> None:
+        work = self.managed_work("WORK-017", "文档预算")
+        (work / "requirements.md").write_text(
+            (work / "requirements.md").read_text(encoding="utf-8")
+            + "\n"
+            + ("说明内容。" * 5000),
+            encoding="utf-8",
+        )
+
+        item = project_status.inspect_project(self.project)["work_items"][0]
+        budget = item["document_budget"]
+        self.assertEqual(budget["status"], "warning")
+        self.assertGreater(budget["total_bytes"], project_status.DOCUMENT_LIMITS["per_file_bytes"])
+        self.assertEqual(item["state"], "in_progress")
+        self.assertEqual(project_status.inspect_project(self.project)["resume"]["mode"], "auto_resume")
+        self.assertTrue(any("核心 Markdown" in warning for warning in project_status.inspect_project(self.project)["resume"]["warnings"]))
+
+    def test_verification_anchor_distinguishes_current_and_stale_snapshots(self) -> None:
+        work = self.managed_work("WORK-018", "验证锚点")
+        report = work / "testing" / "report.md"
+        report.parent.mkdir()
+        report.write_text(
+            "---\nstatus: passed\nverified_commit: abcdef1234567\nverified_at: 2026-09-09 15:00:00 +0800\n---\n",
+            encoding="utf-8",
+        )
+
+        clean = project_status.verification_anchor(
+            work,
+            {"head": "abcdef1234567890", "status": "clean"},
+        )
+        self.assertEqual(clean["status"], "verified")
+
+        changed = project_status.verification_anchor(
+            work,
+            {"head": "1234567890abcdef", "status": "clean"},
+        )
+        self.assertEqual(changed["status"], "stale")
+
+        dirty = project_status.verification_anchor(
+            work,
+            {"head": "abcdef1234567890", "status": "dirty"},
+        )
+        self.assertEqual(dirty["status"], "stale")
+
+    def test_document_only_report_commit_can_remain_verified(self) -> None:
+        source = self.project / "src" / "login.py"
+        source.parent.mkdir(parents=True)
+        source.write_text("VALUE = 1\n", encoding="utf-8")
+        subprocess.run(["git", "init", "-b", "main"], cwd=self.project, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=self.project, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=self.project, check=True)
+        subprocess.run(["git", "add", "src"], cwd=self.project, check=True)
+        subprocess.run(["git", "commit", "-m", "code"], cwd=self.project, capture_output=True, check=True)
+        code_commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=self.project, capture_output=True, text=True, check=True
+        ).stdout.strip()
+
+        work = self.managed_work("WORK-019", "报告提交", task_body="### TASK-001 | done | 完成")
+        report = work / "testing" / "report.md"
+        report.parent.mkdir()
+        report.write_text(
+            f"---\nstatus: passed\nverified_commit: {code_commit}\n---\n",
+            encoding="utf-8",
+        )
+        subprocess.run(["git", "add", ".agent"], cwd=self.project, check=True)
+        subprocess.run(["git", "commit", "-m", "record verification"], cwd=self.project, capture_output=True, check=True)
+
+        item = project_status.inspect_project(self.project)["work_items"][0]
+        self.assertEqual(item["state"], "complete")
+        self.assertEqual(item["state_evidence"]["code_sync"], "verified")
+
     def test_resume_context_requires_selection_for_multiple_active_work_items(self) -> None:
         self.managed_work("WORK-011", "恢复登录")
         self.managed_work("WORK-012", "恢复权限")
@@ -356,7 +471,7 @@ class ProjectStatusTests(unittest.TestCase):
 
     def test_status_json_has_stable_metadata(self) -> None:
         status = project_status.inspect_project(self.project)
-        self.assertEqual(status["schema_version"], "1")
+        self.assertEqual(status["schema_version"], "2")
         self.assertRegex(status["generated_at"], r"^20\d\d-")
 
     def test_strict_validator_reports_duplicate_identifier(self) -> None:
@@ -699,6 +814,50 @@ class InitializationTests(unittest.TestCase):
             self.assertEqual(len(entries), 2)
             self.assertTrue(entries[0].startswith("## 2026-09-08 ·"))
             self.assertTrue(entries[1].startswith("## 2026-09-09 14:32:07 +0800 ·"))
+
+    def test_push_check_detects_missing_history_and_can_record_remote_commit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            project = Path(temp)
+            remote = project.parent / f"remote-{project.name}.git"
+            subprocess.run(
+                [sys.executable, "-X", "utf8", str(INIT_SCRIPT), str(project)],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True,
+            )
+            def git(*args: str) -> subprocess.CompletedProcess[str]:
+                return subprocess.run(
+                    ["git", "-C", str(project), *args],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    check=True,
+                )
+
+            subprocess.run(["git", "init", "--bare", str(remote)], capture_output=True, check=True)
+            git("init", "-b", "main")
+            git("config", "user.name", "Test")
+            git("config", "user.email", "test@example.com")
+            git("add", ".")
+            git("commit", "-m", "base")
+            git("remote", "add", "origin", str(remote))
+            git("push", "-u", "origin", "main")
+
+            before = update_history.push_status(project)
+            self.assertEqual(before["status"], "up_to_date")
+            self.assertEqual(before["history_status"], "missing")
+            self.assertFalse(before["consistent"])
+
+            result = update_history.push_check(project, as_json=True, record=True, work="maintenance")
+            self.assertEqual(result, 0)
+            after = update_history.push_status(project)
+            self.assertEqual(after["history_status"], "recorded")
+            self.assertTrue(after["consistent"])
+            self.assertIn(
+                f"远端 HEAD={after['remote_commit']}",
+                (project / ".agent" / "history" / "updates.md").read_text(encoding="utf-8"),
+            )
 
     def test_existing_project_is_preserved_and_repeatable(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
