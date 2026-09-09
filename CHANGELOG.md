@@ -8,9 +8,10 @@
 - 变更：为状态恢复增加核心 Markdown 体积软警告；为验证报告增加 `verified_commit` 锚点状态；新增 `push-check` 与 `--record-push`，检测远端已推送但 `updates.md` 未记录的情况。
 - 决策：文档超限只提示，不自动压缩或删除；远端查询只在显式 `push-check` 时执行；`updates.md` 仍是人工时间线，Git 远端仍是推送事实源。
 - 依据：`skills/project-lifecycle/scripts/project_status.py`、`skills/project-lifecycle/scripts/update_history.py`、`skills/project-lifecycle/references/update-history.md`。
-- 验证：44 个单元测试通过；其余发布检查待本轮执行。
-- 本地提交：待用户授权。
-- 远端推送：未执行。
+- 验证：44 个单元测试通过；Python 编译、Skill 校验、VitePress 构建和 `git diff --check` 通过；GitHub `origin/main` 已核对。
+- 本地提交：`2e2896b501f32b6c0818ad5f3eb98f49172f56ff`。
+- 远端推送：已推送 `origin/main`。
+- 部署：`remote-45`，release `/opt/project-lifecycle-docs/releases/20260909163357/dist`，服务 `project-lifecycle-docs.service` 已验证为 active。
 
 ## 2026-09-09 · 压缩后任务目标恢复包
 
