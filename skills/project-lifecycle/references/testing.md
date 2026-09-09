@@ -40,6 +40,12 @@ Run the narrowest checks that provide credible evidence for the affected behavio
 
 Distinguish `passed`, `failed`, and `not run`. Do not infer success from code inspection when execution is required, and do not hide unavailable infrastructure, credentials, flaky results, or environmental limitations. A partial or failed report is still useful evidence; it is not completion. `passed` is test evidence and does not by itself mean user business acceptance or release.
 
+### 冒烟测试是可选项
+
+默认不安排额外的冒烟测试。普通任务只执行验收矩阵中能证明本次变更的最窄可信检查，不因为使用了 `full`、`compact` 或 `validate` 就自动增加一轮通用冒烟流程。
+
+只有以下情况才执行冒烟测试：用户明确要求；项目常驻规则明确要求；或已批准的测试计划把它列为验收项。执行时在测试计划和验证报告中写明范围、入口、预期结果和证据位置。部署任务中的健康检查或页面探测属于部署验证，不应倒推为所有开发任务的默认冒烟测试。
+
 如果要把报告作为完成结算依据，在 frontmatter 中增加 `evidence: required`，并在“验证结果”或“检查证据”章节提供结构化矩阵：
 
 ```markdown

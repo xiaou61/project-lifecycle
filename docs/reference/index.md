@@ -26,8 +26,8 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 | 初始化器 | `skills/project-lifecycle/scripts/init_project.py` | 幂等创建目标项目的 `.agent/` 和入口模板 | 单元测试 |
 | 状态汇总与恢复 | `skills/project-lifecycle/scripts/project_status.py` | 推导阶段、依赖、Git 归因和 `--resume` JSON | 单元测试 + JSON 解析 |
 | 严格校验器 | `skills/project-lifecycle/scripts/project_validate.py` | 校验结构、重复 ID、来源、证据和归因 | `--strict` |
-| 用户命令适配器 | `skills/project-lifecycle/scripts/project-lifecycle.ps1` | 用 `init/status/resume/validate/history` 隐藏底层 Python 实现 | PowerShell 命令冒烟检查 |
-| 更新历史命令 | `skills/project-lifecycle/scripts/update_history.py` | 查看、追加更新记录和检查本地提交检查点 | 命令冒烟检查 |
+| 用户命令适配器 | `skills/project-lifecycle/scripts/project-lifecycle.ps1` | 用 `init/status/resume/validate/history` 隐藏底层 Python 实现 | PowerShell 入口检查 |
+| 更新历史命令 | `skills/project-lifecycle/scripts/update_history.py` | 查看、追加更新记录和检查本地提交检查点 | 命令行为检查 |
 | 回归测试 | `tests/test_project_status.py` | 固化生命周期和边界行为 | 维护者发布检查 |
 
 ### 面向用户的文档
@@ -39,6 +39,7 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 | 开始使用 | `docs/guide/getting-started.md` | 安装、初始化和第一次工作 | [开始使用](/guide/getting-started) |
 | 全流程 | `docs/guide/full-workflow.md` | 需求到完成的阶段说明 | [全流程教程](/guide/full-workflow) |
 | 恢复与接力 | `docs/guide/resume.md` | 跨会话恢复、多个工作项和 Git 归因 | [恢复与接力](/guide/resume) |
+| QA 问答 | `docs/guide/qa.md` | 30 个从安装到并发协作、验收和历史记录的实操问题 | [QA 问答](/guide/qa) |
 | 需求与验收 | `docs/guide/requirements.md` | 事实、决定、来源覆盖和验收标准 | [需求、来源与验收](/guide/requirements) |
 | 需求深挖访谈 | `docs/guide/requirements-interview.md`、`skills/project-lifecycle/references/requirements-interview.md` | 决策树、逐轮提问、停止条件和 PRD/Task 门槛 | [需求深挖访谈](/guide/requirements-interview) |
 | 任务拆分规则 | `skills/project-lifecycle/references/tasks.md` | 纵向切片、真实阻塞关系和 expand-contract 重构 | [全流程教程](/guide/full-workflow) |

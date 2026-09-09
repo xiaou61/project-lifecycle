@@ -145,6 +145,8 @@ Agent 会主动给受管理需求分配不复用的中文名称和 `WORK-*` 编�
 
 状态查询返回当前阶段、工件状态、任务计数、依赖、关联、阻塞原因和下一步。`resume` 额外输出唯一可恢复工作项、建议读取路径和可复制接力句；JSON 顶层有稳定的 `schema_version` 和 `generated_at`，`git` 概览会标出脏工作区和归因状态。需要检查重复 `REQ-*`/`AC-*`/`TASK-*`、正式来源引用、结构化测试证据和项目规则时，使用 `project-lifecycle.ps1 validate`。外层工作区只返回导航提示，不承载 `WORK-*` 状态。
 
+多个对话可以通过不同 `WORK-*` 接力，但 Skill 不提供同一工作树的文件锁或自动合并。并行写入时为每个工作项使用独立分支和 Git Worktree；不能使用 Worktree 时，同一目录同一时刻只允许一个写入对话，切换前先运行 `checkpoint` 并完成 `workspace.md` 归因。详细问答见 [VitePress QA](docs/guide/qa.md)。
+
 更新历史命令：`updates` 查看 `.agent/history/updates.md`，`record` 按固定字段追加一条记录，`checkpoint` 检查本地 Git 工作区是否还有未提交改动。它们不会自动提交或推送。
 
 ```powershell
@@ -168,7 +170,9 @@ python -X utf8 skills/project-lifecycle/scripts/project_validate.py "F:\我的�
 git diff --check
 ```
 
-版本按兼容性使用 `PATCH`、`MINOR`、`MAJOR`；在 `v1.0.0` 前使用 `v0.MINOR.PATCH`。不兼容的 `.agent/` 结构、状态语义或初始化行为必须在 Release 中说明迁移和回滚方式。
+用户任务默认不增加通用冒烟测试；只按验收矩阵执行最窄可信检查。冒烟测试只有在用户、项目常驻规则或已批准测试计划明确要求时才运行，并记录到测试计划和验证报告。
+
+当前首个发布基线为 `v0.0.1`。后续版本按兼容性使用 `PATCH`、`MINOR`、`MAJOR`；在 `v1.0.0` 前使用 `v0.MINOR.PATCH`。不兼容的 `.agent/` 结构、状态语义或初始化行为必须在 GitHub Release 中说明迁移和回滚方式。
 
 最小发布流程：
 
@@ -177,6 +181,8 @@ git tag -a vX.Y.Z -m "vX.Y.Z"
 git push origin main
 git push origin vX.Y.Z
 ```
+
+后续正常发布顺序是：从 `main` 创建功能或修复分支，完成测试和变更记录，合并到 `main`，创建不可移动的版本 tag，依次推送 `main` 和 tag，再在 GitHub 创建对应 Release。`v0.0.1` 只作为当前基线，不重复覆盖或移动。
 
 公开 tag 不移动、不覆盖。升级前先阅读 Release 说明；初始化器不是迁移器，存在不兼容结构时在独立分支手工迁移并重新验证。
 

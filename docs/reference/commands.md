@@ -108,6 +108,18 @@ npm run docs:serve
 
 `docs:serve` 是维护者使用的本地预览服务；普通用户只需访问已部署的教程地址。
 
+## GitHub 版本发布
+
+当前基线是 `v0.0.1`。后续版本沿用标准 GitHub 流程：功能或修复分支 -> 回归检查 -> 合并 `main` -> 创建不可移动的版本 tag -> 推送 `main` 和 tag -> 创建 GitHub Release。示例：
+
+```powershell
+git tag -a v0.0.2 -m "v0.0.2"
+git push origin main
+git push origin v0.0.2
+```
+
+版本号按兼容性递增；不兼容的 `.agent/` 结构、状态语义或初始化行为要在 Release 中写明迁移和回滚方式。创建 tag 前先完成测试、Skill 校验、更新历史和 `git diff --check`；公开 tag 不移动、不覆盖。
+
 ## 稳定 JSON
 
 状态和严格校验 JSON 都带 `schema_version` 与 `generated_at`。集成脚本应按 `resume.mode`、`git.status`、`source_coverage.status`、`test_evidence.status` 和 `errors`/`warnings` 字段处理，不要解析文本输出。
