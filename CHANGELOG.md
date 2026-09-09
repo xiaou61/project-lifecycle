@@ -2,6 +2,17 @@
 
 本文件记录 `project-lifecycle` Skill 仓库本身的维护变更；目标项目的逐轮记录写在各自的 `.agent/history/updates.md`。Git 提交仍是可回滚事实源。
 
+## 2026-09-09 14:10:00 +0800 · 发布三档模式与秒级更新历史
+
+- 类型：maintenance
+- 变更：提交 `976cf4b` 已推送到 GitHub `main`；VitePress 构建产物已部署到 `remote-45`。
+- 决策：服务器使用独立 release 目录 `/opt/project-lifecycle-docs/releases/20260909135408/dist`，`current` 指向该目录并保留旧 release 供回滚。
+- 依据：GitHub `origin/main`、远端 `project-lifecycle-docs.service` 和本地构建产物。
+- 验证：远端服务 `active`；首页和 `/guide/qa` 返回 200；远端与本地 `index.html`、`guide/qa.html` SHA-256 一致。
+- 本地提交：`976cf4b`。
+- 远端推送：已推送 `origin/main`。
+- 部署：已部署到 `remote-45`，监听 `4175`，入口为 `http://45.207.197.87:4175/`。
+
 ## 2026-09-09 13:47:43 +0800 · 更新历史时间精度
 
 - 类型：maintenance
