@@ -10,7 +10,7 @@
 - 依据：`skills/project-lifecycle/scripts/project_status.py`、`skills/project-lifecycle/scripts/update_history.py`、`skills/project-lifecycle/references/update-history.md`。
 - 验证：44 个单元测试通过；Python 编译、Skill 校验、VitePress 构建和 `git diff --check` 通过；GitHub `origin/main` 已核对。
 - 本地提交：实现提交 `2e2896b501f32b6c0818ad5f3eb98f49172f56ff`，发布记录提交 `a55ed6a872fab5bd049966378209ceb235fd09af`。
-- 远端推送：`origin/main` 已核对到 `a55ed6a872fab5bd049966378209ceb235fd09af`。
+- 远端推送：实现、发布记录和元数据修订均已推送到 `origin/main` 并完成核对。
 - 部署：`remote-45`，最新 release `/opt/project-lifecycle-docs/releases/20260909163928/dist`，服务 `project-lifecycle-docs.service` 已验证为 active。
 
 ## 2026-09-09 · 压缩后任务目标恢复包
