@@ -37,6 +37,8 @@ STATE_LABELS = {
 }
 WORK_ID_PATTERN = re.compile(r"WORK-\d+", re.IGNORECASE)
 WORKFLOW_MODES = {"full", "compact"}
+LIFECYCLE_MODES = {"lite", "managed", "strict"}
+MODE_LABELS = {"lite": "轻量", "managed": "受管理", "strict": "严格"}
 STATUS_SCHEMA_VERSION = "1"
 
 
@@ -342,10 +344,30 @@ def work_identity(work_dir: Path) -> dict[str, object]:
     name = fields.get("work")
     if not name:
         name = re.sub(r"^(?:\d{4}-\d{2}-\d{2}-)?WORK-\d+-", "", work_dir.name, flags=re.IGNORECASE)
+    workflow = (requirements_fields.get("workflow") or "full").strip().lower()
+    explicit_mode = (requirements_fields.get("mode") or "").strip().lower()
+    if explicit_mode in LIFECYCLE_MODES:
+        mode = explicit_mode
+        mode_source = "requirements.md"
+        mode_valid = True
+    elif explicit_mode:
+        mode = "strict" if workflow == "full" else "managed"
+        mode_source = "workflow 兼容推导"
+        mode_valid = False
+    else:
+        mode = "strict" if workflow == "full" else "managed"
+        mode_source = "workflow 兼容推导"
+        mode_valid = True
     return {
         "work_id": work_id,
         "name": name or work_dir.name,
-        "workflow": (requirements_fields.get("workflow") or "full").strip().lower(),
+        "workflow": workflow,
+        "mode": mode,
+        "mode_label": MODE_LABELS[mode],
+        "mode_reason": requirements_fields.get("mode_reason", "").strip(),
+        "mode_source": mode_source,
+        "mode_valid": mode_valid,
+        "mode_raw": explicit_mode,
         "depends_on_ids": parse_id_list(requirements_fields.get("depends_on")),
         "related_to_ids": parse_id_list(requirements_fields.get("related_to")),
     }
@@ -425,6 +447,17 @@ def inspect_work(work_dir: Path, archived: bool = False) -> dict[str, object]:
     if workflow not in WORKFLOW_MODES:
         warnings.append(f"工作项 workflow 必须为 full 或 compact，当前为 {workflow}。")
         workflow = "full"
+    if not identity.get("mode_valid", True):
+        warnings.append(
+            f"工作项 mode 必须为 lite、managed 或 strict，当前为 {identity.get('mode_raw')}。"
+        )
+    if identity.get("mode_source") == "requirements.md" and not identity.get("mode_reason"):
+        warnings.append("工作项没有记录 mode_reason；后续接力时建议补充一次模式判断依据。")
+    expected_workflow = {"managed": "compact", "strict": "full"}.get(str(identity.get("mode")))
+    if expected_workflow and workflow != expected_workflow:
+        warnings.append(
+            f"工作项 mode={identity['mode']} 应与 workflow={expected_workflow} 配套，当前为 {workflow}。"
+        )
 
     identity_paths = {
         **{name: work_dir / f"{name}.md" for name in ARTIFACTS},
@@ -1008,6 +1041,9 @@ def resume_context(
         "phase": candidate["phase"],
         "phase_label": candidate["phase_label"],
         "state": candidate["state"],
+        "mode": candidate["mode"],
+        "mode_label": candidate["mode_label"],
+        "mode_reason": candidate.get("mode_reason", ""),
         "next_action": candidate["next_action"],
         "workspace_attribution": candidate.get("workspace_attribution"),
     }
@@ -1277,6 +1313,7 @@ def render_resume(status: dict[str, object]) -> str:
             f"工作项：{work_item['work_id']} · {work_item['name']} | "
             f"{work_item['phase_label']} | {STATE_LABELS.get(str(work_item['state']), work_item['state'])}"
         )
+        lines.append(f"模式：{work_item['mode']}（{work_item['mode_label']}）")
         lines.append(f"下一步：{work_item['next_action']}")
     if resume["candidates"]:
         lines.append(
@@ -1338,6 +1375,7 @@ def render_text(status: dict[str, object]) -> str:
         lines.append(
             f"- {item['work_id']} · {item['name']} | {item['phase_label']} | {state_label}{archive_label}"
         )
+        lines.append(f"  模式：{item['mode']}（{item['mode_label']}）")
         tasks = item["tasks"]
         if sum(tasks.values()):
             lines.append(

@@ -2,6 +2,26 @@
 
 本文件记录 `project-lifecycle` Skill 仓库本身的维护变更；目标项目的逐轮记录写在各自的 `.agent/history/updates.md`。Git 提交仍是可回滚事实源。
 
+## 2026-09-09 13:47:43 +0800 · 更新历史时间精度
+
+- 类型：maintenance
+- 变更：`updates --record` 生成的更新标题精确到秒并带本地时区；列表解析继续兼容旧的纯日期标题。
+- 决策：采用人类可读的 `YYYY-MM-DD HH:mm:ss ±HHMM`，不改写已有历史，也不引入独立时间服务。
+- 依据：`skills/project-lifecycle/scripts/update_history.py`、`skills/project-lifecycle/references/update-history.md`。
+- 验证：38 个单元测试通过；Python 脚本编译通过；Skill 校验通过；VitePress 构建通过；`git diff --check` 通过。
+- 本地提交：待用户授权。
+- 远端推送：未执行。
+
+## 2026-09-09 · 三档风险模式
+
+- 类型：maintenance
+- 变更：增加 `lite`、`managed`、`strict` 三档风险路由；旧 `workflow: compact/full` 工件继续兼容推导；普通 `validate` 不再自动升级为严格校验。
+- 决策：模式在开始时判断，风险上升只允许升级；严格模式增加必要工件和批准门槛，但不机械增加测试；冒烟测试仍仅按用户、项目规则或已批准计划执行。
+- 依据：`skills/project-lifecycle/SKILL.md`、`skills/project-lifecycle/references/workflow.md`、`skills/project-lifecycle/references/testing.md`。
+- 验证：37 个单元测试通过；Python 脚本编译通过；Skill 校验通过；VitePress 构建通过；`git diff --check` 通过。
+- 本地提交：待用户授权。
+- 远端推送：未执行。
+
 ## 2026-09-08 · 生命周期入口与更新记录
 
 - 类型：maintenance

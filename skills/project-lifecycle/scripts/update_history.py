@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import date
+from datetime import datetime
 import json
 import subprocess
 import sys
@@ -26,7 +26,8 @@ def history_path(target: Path) -> Path:
 
 
 def history_entries(text: str) -> list[str]:
-    return ["## " + chunk for chunk in re.split(r"\n## (?=\d{4}-\d{2}-\d{2} · )", text)[1:]]
+    heading = r"\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2}:\d{2}(?: [+-]\d{4})?)? · "
+    return ["## " + chunk for chunk in re.split(rf"\n## (?={heading})", text)[1:]]
 
 
 def list_history(path: Path, tail: int | None, as_json: bool) -> int:
@@ -44,8 +45,9 @@ def append_record(args: argparse.Namespace, path: Path) -> int:
     text = path.read_text(encoding="utf-8-sig")
     if "当前暂无更新记录。" in text:
         text = text.replace("当前暂无更新记录。", "", 1).rstrip()
+    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %z")
     record = f"""
-## {date.today().isoformat()} · {args.work} · {args.title}
+## {timestamp} · {args.work} · {args.title}
 
 - 类型：{args.type}
 - 变更：{args.change}

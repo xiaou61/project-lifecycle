@@ -2,6 +2,8 @@
 
 这套 Skill 管理的是需要跨会话追踪、多人协作或有明显风险的开发工作。单文件、低风险、边界清楚的小修复不需要为了形式创建工作项。
 
+开始前先选模式：简单小修复用 `lite`；普通多步骤功能用 `managed`；公共接口、数据、安全、部署或架构变更用 `strict`。模式只会在风险上升时升级，不会用来绕过必要门槛。
+
 ## 1. 安装 Skill
 
 在 Codex 中运行：
@@ -62,6 +64,14 @@ $lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-l
 ```
 
 每个需要持久追踪的需求都会得到一个稳定的中文名称和 `WORK-*` 编号。编号用于定位，不代表任何阶段已经批准。
+
+需要持久追踪时，在 `requirements.md` 的 frontmatter 记录选择依据，例如：
+
+```yaml
+mode: managed
+mode_reason: 需要跨对话继续，并涉及多个实现步骤
+workflow: compact
+```
 
 ## 5. 查看状态
 

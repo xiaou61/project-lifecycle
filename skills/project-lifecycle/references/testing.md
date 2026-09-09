@@ -1,6 +1,8 @@
 # Testing And Verification
 
-Use this reference after implementation to plan and record verification against the approved upstream boundary and acceptance criteria. `full` mode also uses the approved design; `compact` mode does not require a design.
+Use this reference after implementation to plan and record verification against the approved upstream boundary and acceptance criteria. `strict`/`full` mode also uses the approved design; `managed`/`compact` mode does not require a separate design.
+
+验证强度由本次改动和验收标准决定，不由 `strict` 标签机械放大。`strict` 主要增加工件、审批和证据门槛；仍然只运行能够证明本次行为的最窄可信检查，除非用户或已批准计划要求扩大范围。
 
 ## Test Plan
 

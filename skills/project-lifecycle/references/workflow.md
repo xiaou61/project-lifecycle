@@ -7,8 +7,19 @@
 - 用户用自然语言即可；低风险、边界清楚的孤立改动走短路径。
 - `WORK-*` 是稳定定位键，不是代码命令，也不代表批准。
 - `.agent/` 工件是事实源；聊天、时间戳和记忆不能代替状态。
+- 开始时选择一次风险模式：`lite` 只走短路径，`managed` 使用 `workflow: compact`，`strict` 使用 `workflow: full`；风险上升只能升级，不能降级绕过门槛。
 - `.agent/INDEX.md` 只做模块/资料导航，`.agent/html/` 只放理解材料；外层 `PROJECT-INDEX.md` 只导航多仓库。
 - 换会话、上下文压缩或用户说“继续”时，先恢复规范和状态；用户明确批准后才能跨阶段门槛。
+
+## 风险模式
+
+| 模式 | 适用范围 | 必要记录 | 允许的验证 |
+| --- | --- | --- | --- |
+| `lite` | 单文件、低风险、边界清楚的小修复 | 聊天和更新历史（若有项目历史） | 能证明本次改动的最窄检查 |
+| `managed` | 需要跨会话或多步骤，但不改变公共边界的普通功能 | `requirements.md`、`tasks.md`、`testing/`；`workflow: compact` | 按验收矩阵执行，不因模式自动增加测试 |
+| `strict` | 公共接口、数据、迁移、安全、部署、架构或跨模块高风险变更 | `workflow: full` 的完整阶段工件 | 最窄可信检查；严格校验是工件门槛，不等于更多测试 |
+
+`requirements.md` 可以记录 `mode` 和 `mode_reason`。旧工件没有 `mode` 时，状态查询按 `workflow: compact -> managed`、`workflow: full -> strict` 兼容推导。显式 `mode` 非法或缺少理由只产生警告；`validate --strict` 才会把这些兼容性警告视为失败。
 
 ## 用户如何触发
 
@@ -51,7 +62,7 @@ $lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-l
 & $lifecycle validate <project-root> --json
 ```
 
-它检查结构、标识符、来源引用、测试证据和 Git 归因；`--strict` 将兼容性警告视为失败。
+它检查结构、标识符、来源引用、测试证据和 Git 归因。普通 `validate` 保留警告并允许继续查看结果；`--strict` 将兼容性警告视为失败。两者都不会自动运行冒烟测试。
 
 ## 工作区归因与多仓库边界
 
@@ -74,7 +85,7 @@ base_commit: <当前基准 commit>
 
 ## 阶段门槛
 
-`requirements.md` 的 `workflow: compact` 允许省略 proposal/design，只保留批准需求、任务计划和验证报告；不得用它绕过安全、迁移、公共接口或架构所需的设计。
+`requirements.md` 的 `workflow: compact` 允许省略 proposal/design，只保留批准需求、任务计划和验证报告；不得用它绕过安全、迁移、公共接口或架构所需的设计。`managed` 只是记录和阶段的精简，不是安全例外；一旦风险上升就升级到 `strict`。
 
 | 当前事实 | 当前阶段 | 允许的动作 |
 | --- | --- | --- |

@@ -20,9 +20,9 @@
 
 Project Lifecycle 只需要项目内工件和一个只读 Python 检查器。运行时数据库、Hook 拦截、工作树编排、Dashboard 和多 Agent 调度属于更大平台的能力，不是当前 Skill 完成可恢复开发流程的必要条件。先保持文件事实源和最小验证面，出现真实规模问题再单独引入。
 
-## 严格校验和普通状态有什么区别
+## 三档模式和严格校验有什么区别
 
-用户通过 `project-lifecycle.ps1 status/resume` 查询状态和恢复上下文；适配器内部的 `project_status.py` 回答“现在到哪一步、下一步是什么”，`project_validate.py --strict` 回答“工件结构和证据是否合格”。前者必须兼容旧工件，后者可以把旧格式警告为失败，适合发布前或交接前使用。
+`lite`、`managed`、`strict` 是工作风险路由：分别对应短路径、精简持久追踪和完整阶段。`project-lifecycle.ps1 status/resume` 只查询状态和恢复上下文；`validate` 检查工件、来源、证据和归因并保留警告；`validate --strict` 才把兼容性警告视为失败。严格模式主要增加记录和批准门槛，不自动增加测试数量。
 
 ## `passed` 是不是业务验收通过
 

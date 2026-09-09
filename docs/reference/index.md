@@ -12,10 +12,10 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 
 | 模块 | 主要位置 | 负责什么 | 改完检查 |
 | --- | --- | --- | --- |
-| 入口与风险路由 | `skills/project-lifecycle/SKILL.md` | 何时触发 Skill、短路径和不可绕过的底线 | `quick_validate.py` |
+| 入口与风险路由 | `skills/project-lifecycle/SKILL.md` | `lite`、`managed`、`strict` 三档模式和不可绕过的底线 | `quick_validate.py` |
 | 全流程协议 | `skills/project-lifecycle/references/workflow.md` | 恢复顺序、审批门槛、漂移、依赖和完成语义 | `tests/test_project_status.py` |
 | 规则与边界 | `references/rules.md`、`relationships.md`、`specs.md`、`memory.md`、`update-history.md` | 规则优先级、关系、稳定事实、长期记忆和更新记录边界 | 状态检查 + 严格校验 |
-| 阶段工件规范 | `references/requirements.md`、`proposal.md`、`design.md`、`tasks.md`、`testing.md` | 需求、方案、设计、任务和验证报告怎么写 | 严格校验器 |
+| 阶段工件规范 | `references/requirements.md`、`proposal.md`、`design.md`、`tasks.md`、`testing.md` | 需求、方案、设计、任务和验证报告怎么写 | 工件校验器 |
 | Git 历史视图 | `references/core-history.md` | 核心组件的历史证据和生成约定 | `generate_core_history.py` |
 | Codex 界面元数据 | `skills/project-lifecycle/agents/openai.yaml` | UI 显示名称、简述和默认入口 | Skill 校验 |
 
@@ -25,7 +25,7 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 | --- | --- | --- | --- |
 | 初始化器 | `skills/project-lifecycle/scripts/init_project.py` | 幂等创建目标项目的 `.agent/` 和入口模板 | 单元测试 |
 | 状态汇总与恢复 | `skills/project-lifecycle/scripts/project_status.py` | 推导阶段、依赖、Git 归因和 `--resume` JSON | 单元测试 + JSON 解析 |
-| 严格校验器 | `skills/project-lifecycle/scripts/project_validate.py` | 校验结构、重复 ID、来源、证据和归因 | `--strict` |
+| 校验器 | `skills/project-lifecycle/scripts/project_validate.py` | 普通校验和可选 `--strict` 的结构、来源、证据、归因检查 | `--strict` |
 | 用户命令适配器 | `skills/project-lifecycle/scripts/project-lifecycle.ps1` | 用 `init/status/resume/validate/history` 隐藏底层 Python 实现 | PowerShell 入口检查 |
 | 更新历史命令 | `skills/project-lifecycle/scripts/update_history.py` | 查看、追加更新记录和检查本地提交检查点 | 命令行为检查 |
 | 回归测试 | `tests/test_project_status.py` | 固化生命周期和边界行为 | 维护者发布检查 |

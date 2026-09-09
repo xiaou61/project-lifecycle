@@ -8,11 +8,13 @@ Skill 运行时入口是 `skills/project-lifecycle/SKILL.md`。详细协议按�
 
 | 工作类型 | 路径 | 必要资料 |
 | --- | --- | --- |
-| 单文件、低风险、边界清楚的小修复 | 确认目标 -> 修改 -> 窄验证 | 聊天记录和实际验证 |
-| 需要跨会话追踪的普通功能 | `workflow: compact` | `requirements.md`、`tasks.md`、`testing/` |
-| 跨模块、公共接口、数据、迁移、安全、部署或架构调整 | `workflow: full` | 需求 -> 方案 -> 设计 -> 任务 -> 实现 -> 验证 |
+| 单文件、低风险、边界清楚的小修复 | `lite`：确认目标 -> 修改 -> 窄验证 | 聊天记录和实际验证 |
+| 需要跨会话追踪的普通功能 | `managed`（`workflow: compact`） | `requirements.md`、`tasks.md`、`testing/` |
+| 跨模块、公共接口、数据、迁移、安全、部署或架构调整 | `strict`（`workflow: full`） | 需求 -> 方案 -> 设计 -> 任务 -> 实现 -> 验证 |
 
 不要为了形式创建空白工件。详细的风险路由、恢复顺序、阶段门槛、关系、漂移和完成语义，以 [`references/workflow.md`](skills/project-lifecycle/references/workflow.md) 为唯一来源。
+
+模式在开始时判断一次，风险上升时只能升级。`managed` 不绕过安全、迁移、公共接口或架构设计；`strict` 也不代表必须执行更多测试，只代表需要更完整的工件和证据。
 
 ## 不变的边界
 
@@ -79,7 +81,7 @@ skills/project-lifecycle/
   scripts/update_history.py        更新历史与本地检查点命令实现
   scripts/init_project.py           幂等初始化器
   scripts/project_status.py         只读状态汇总器
-  scripts/project_validate.py       严格校验器
+  scripts/project_validate.py       工件校验器（可选严格模式）
   scripts/generate_core_history.py  Git 历史生成器
 ```
 
@@ -132,8 +134,11 @@ Agent 会主动给受管理需求分配不复用的中文名称和 `WORK-*` 编�
 # 只看可恢复上下文、阻塞、建议读取路径和接力提示
 & "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" resume "F:\我的项目"
 
-# 发布前严格检查工件和证据
+# 发布前检查工件和证据
 & "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" validate "F:\我的项目"
+
+# 将兼容性警告也视为失败
+& "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" validate "F:\我的项目" --strict
 
 # 按编号或中文名称查询
 & "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" status "F:\我的项目" --work WORK-003

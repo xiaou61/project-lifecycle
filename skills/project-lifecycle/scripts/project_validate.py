@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""严格校验 .agent 生命周期工件的结构、引用和证据。"""
+"""校验 .agent 生命周期工件的结构、引用和证据。"""
 
 from __future__ import annotations
 
@@ -217,7 +217,7 @@ def main() -> int:
     try:
         result = validate_project(args.target, include_archive=args.include_archive, strict=args.strict)
     except (RuntimeError, OSError) as error:
-        print(f"严格校验失败：{error}", file=sys.stderr)
+        print(f"工件校验失败：{error}", file=sys.stderr)
         return 2
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))

@@ -14,6 +14,7 @@ SKILL_ROOT = ROOT / "skills" / "project-lifecycle"
 STATUS_SCRIPT = SKILL_ROOT / "scripts" / "project_status.py"
 INIT_SCRIPT = SKILL_ROOT / "scripts" / "init_project.py"
 UPDATE_SCRIPT = SKILL_ROOT / "scripts" / "update_history.py"
+LIFECYCLE_PS1 = SKILL_ROOT / "scripts" / "project-lifecycle.ps1"
 
 
 def load_status_module():
@@ -62,6 +63,8 @@ def artifact(
     work: str = "login",
     work_id: str | None = None,
     workflow: str | None = None,
+    mode: str | None = None,
+    mode_reason: str | None = None,
     depends_on: tuple[str, ...] = (),
     related_to: tuple[str, ...] = (),
     source_coverage: bool = False,
@@ -70,6 +73,8 @@ def artifact(
     identity = f"work_id: {work_id}\n" if work_id else ""
     relations = ""
     workflow_field = f"workflow: {workflow}\n" if kind == "requirements" and workflow else ""
+    mode_field = f"mode: {mode}\n" if kind == "requirements" and mode else ""
+    mode_reason_field = f"mode_reason: {mode_reason}\n" if kind == "requirements" and mode_reason else ""
     source_coverage_field = "source_coverage: required\n" if kind == "requirements" and source_coverage else ""
     if kind == "requirements":
         relations = (
@@ -77,7 +82,7 @@ def artifact(
             f"related_to: [{', '.join(related_to)}]\n"
         )
     path.write_text(
-        f"---\n{identity}work: {work}\nartifact: {kind}\nstatus: {status}\n{workflow_field}{source_coverage_field}"
+        f"---\n{identity}work: {work}\nartifact: {kind}\nstatus: {status}\n{workflow_field}{mode_field}{mode_reason_field}{source_coverage_field}"
         f"{relations}updated: 2026-08-19\n---\n\n{body}\n",
         encoding="utf-8",
     )
@@ -119,6 +124,8 @@ class ProjectStatusTests(unittest.TestCase):
         *,
         requirements_status: str = "approved",
         workflow: str = "full",
+        mode: str | None = None,
+        mode_reason: str | None = None,
         task_body: str = "### TASK-001 | pending | 实现需求",
         depends_on: tuple[str, ...] = (),
         related_to: tuple[str, ...] = (),
@@ -136,6 +143,8 @@ class ProjectStatusTests(unittest.TestCase):
                 work=name,
                 work_id=work_id,
                 workflow=workflow,
+                mode=mode,
+                mode_reason=mode_reason,
                 depends_on=depends_on,
                 related_to=related_to,
                 source_coverage=source_coverage,
@@ -373,6 +382,86 @@ class ProjectStatusTests(unittest.TestCase):
         self.assertEqual(item["phase"], "implementation")
         self.assertEqual(item["state"], "in_progress")
 
+    def test_lifecycle_mode_compatibility_defaults_from_workflow(self) -> None:
+        compact = self.managed_work("WORK-004", "兼容受管理", workflow="compact")
+        full = self.managed_work("WORK-005", "兼容严格", workflow="full")
+
+        items = {
+            item["work_id"]: item
+            for item in project_status.inspect_project(self.project)["work_items"]
+        }
+        self.assertEqual(items["WORK-004"]["mode"], "managed")
+        self.assertEqual(items["WORK-004"]["mode_source"], "workflow 兼容推导")
+        self.assertEqual(items["WORK-005"]["mode"], "strict")
+        self.assertEqual(items["WORK-005"]["mode_source"], "workflow 兼容推导")
+
+    def test_explicit_lifecycle_mode_and_reason_are_reported(self) -> None:
+        self.managed_work(
+            "WORK-006",
+            "轻量记录",
+            mode="lite",
+            mode_reason="单文件且不涉及公共行为",
+        )
+
+        item = project_status.inspect_project(self.project)["work_items"][0]
+        self.assertEqual(item["mode"], "lite")
+        self.assertEqual(item["mode_label"], "轻量")
+        self.assertEqual(item["mode_reason"], "单文件且不涉及公共行为")
+        self.assertEqual(item["mode_source"], "requirements.md")
+        self.assertTrue(item["mode_valid"])
+
+    def test_invalid_mode_and_missing_reason_are_warnings(self) -> None:
+        self.managed_work("WORK-007", "非法模式", mode="fast")
+        invalid = project_status.inspect_project(self.project)["work_items"][0]
+        self.assertFalse(invalid["mode_valid"])
+        self.assertTrue(any("mode 必须为 lite、managed 或 strict" in warning for warning in invalid["warnings"]))
+
+        self.temp.cleanup()
+        self.temp = tempfile.TemporaryDirectory()
+        self.project = Path(self.temp.name)
+        self.managed_work("WORK-008", "缺少理由", mode="managed")
+        missing_reason = project_status.inspect_project(self.project)["work_items"][0]
+        self.assertTrue(any("mode_reason" in warning for warning in missing_reason["warnings"]))
+
+    def test_status_and_resume_render_lifecycle_mode(self) -> None:
+        self.managed_work("WORK-009", "输出模式", mode="managed", mode_reason="跨对话任务")
+        status = project_status.inspect_project(self.project)
+        self.assertIn("模式：managed（受管理）", project_status.render_text(status))
+        self.assertIn("模式：managed（受管理）", project_status.render_resume(status))
+
+    def test_validate_entry_does_not_force_strict_mode(self) -> None:
+        script = LIFECYCLE_PS1.read_text(encoding="utf-8-sig")
+        self.assertNotIn('$Command -eq "validate" -and $forwardedArgs -notcontains "--strict"', script)
+        self.assertIn("validate", script)
+
+    def test_strict_validation_is_opt_in_for_compatibility_warnings(self) -> None:
+        self.confirm_rules()
+        work = self.project / ".agent" / "changes" / "WORK-010-可选严格校验"
+        artifact(
+            work / "requirements.md",
+            "requirements",
+            "approved",
+            "## 目标\n目标\n\n## 验收标准\n- AC-001：目标可验证\n",
+            work="可选严格校验",
+            work_id="WORK-010",
+            mode="managed",
+            workflow="compact",
+        )
+        artifact(
+            work / "tasks.md",
+            "tasks",
+            "approved",
+            "### TASK-001 | pending | 实现目标",
+            work="可选严格校验",
+            work_id="WORK-010",
+        )
+
+        normal = project_validate.validate_project(self.project)
+        strict = project_validate.validate_project(self.project, strict=True)
+        self.assertTrue(normal["valid"])
+        self.assertFalse(strict["valid"])
+        self.assertTrue(any("mode_reason" in warning["message"] for warning in normal["warnings"]))
+
     def test_finished_tasks_move_to_verification(self) -> None:
         work = self.approve_through_tasks("### TASK-001 | done | 实现登录")
         (work / "testing").mkdir()
@@ -563,6 +652,10 @@ class InitializationTests(unittest.TestCase):
             )
             self.assertEqual(record.returncode, 0, record.stderr)
             history = (project / ".agent" / "history" / "updates.md").read_text(encoding="utf-8")
+            self.assertRegex(
+                history,
+                r"## 20\d{2}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{4} · WORK-001 · 记录一次变更",
+            )
             self.assertIn("WORK-001 · 记录一次变更", history)
             self.assertIn("本地提交：待用户授权/未提交", history)
             listed = subprocess.run(
@@ -574,6 +667,38 @@ class InitializationTests(unittest.TestCase):
             )
             self.assertEqual(listed.returncode, 0, listed.stderr)
             self.assertEqual(len(json.loads(listed.stdout)["entries"]), 1)
+
+    def test_history_list_keeps_legacy_date_entries_with_second_precision_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            project = Path(temp)
+            subprocess.run(
+                [sys.executable, "-X", "utf8", str(INIT_SCRIPT), str(project)],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True,
+            )
+            history = project / ".agent" / "history" / "updates.md"
+            history.write_text(
+                history.read_text(encoding="utf-8").replace(
+                    "当前暂无更新记录。",
+                    "## 2026-09-08 · maintenance · 旧记录\n\n- 类型：maintenance\n"
+                    "\n## 2026-09-09 14:32:07 +0800 · maintenance · 新记录\n\n- 类型：maintenance\n",
+                ),
+                encoding="utf-8",
+            )
+            listed = subprocess.run(
+                [sys.executable, "-X", "utf8", str(UPDATE_SCRIPT), str(project), "--list", "--json"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=False,
+            )
+            self.assertEqual(listed.returncode, 0, listed.stderr)
+            entries = json.loads(listed.stdout)["entries"]
+            self.assertEqual(len(entries), 2)
+            self.assertTrue(entries[0].startswith("## 2026-09-08 ·"))
+            self.assertTrue(entries[1].startswith("## 2026-09-09 14:32:07 +0800 ·"))
 
     def test_existing_project_is_preserved_and_repeatable(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

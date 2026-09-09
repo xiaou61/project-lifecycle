@@ -23,7 +23,7 @@ $project-lifecycle 把这个需求问透，确认后再生成 PRD 和 Task。
   <div class="flow-arrow" aria-hidden="true">→</div>
   <div class="flow-node record"><span>4</span><strong>同步 PRD</strong><small>立即记录决定，保留阻塞问题</small></div>
   <div class="flow-arrow" aria-hidden="true">→</div>
-  <div class="flow-node confirm"><span>5</span><strong>最终确认</strong><small>确认后才进入 compact 或 full 流程</small></div>
+  <div class="flow-node confirm"><span>5</span><strong>最终确认</strong><small>确认后才进入 lite、managed 或 strict 流程</small></div>
 </div>
 
 对应的可编辑 draw.io 源文件：[需求深挖访谈架构图](https://github.com/xiaou61/project-lifecycle/blob/main/output/project-lifecycle-requirements-interview.drawio)。
@@ -66,8 +66,8 @@ $project-lifecycle 把这个需求问透，确认后再生成 PRD 和 Task。
 
 | 流程 | 访谈确认后的动作 |
 | --- | --- |
-| `compact` | 生成 `tasks.md` 草稿，等待你确认任务计划 |
-| `full` | 先生成并确认 `proposal.md`，再完成 `design.md`，最后拆 `tasks.md` |
+| `managed`（`compact`） | 生成 `tasks.md` 草稿，等待你确认任务计划 |
+| `strict`（`full`） | 先生成并确认 `proposal.md`，再完成 `design.md`，最后拆 `tasks.md` |
 
 “访谈结束”“继续”“开始做”都不等于批准任务，也不会绕过方案、设计或安全门槛。后续如果新增目标、接口、数据、安全、部署或架构要求，会回到最早受影响阶段。
 

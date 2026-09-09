@@ -16,7 +16,15 @@ Use this reference while clarifying and recording what the user needs. Requireme
 
 ## Requirements Artifact
 
-在 `requirements.md` 的 frontmatter 中可选写 `workflow: compact`。`full`（默认）使用完整阶段；`compact` 适用于需要持久追踪但不需要独立 proposal/design 的普通功能，只要求已批准的需求、简短任务计划和验证资料。流程选择是当前工作项的约束，必须在需求确认时明确；不要为小修复创建工作项只是为了填写这个字段。
+在 `requirements.md` 的 frontmatter 中记录风险模式和兼容工作流：
+
+```yaml
+mode: managed
+mode_reason: 需要跨会话继续，但不改变公共接口或数据边界
+workflow: compact
+```
+
+`lite` 适用于单文件、低风险、边界清楚的小修复，通常不创建完整工作项；`managed` 适用于需要持久追踪的普通功能，使用 `workflow: compact`；`strict` 适用于跨模块、公共接口、数据、迁移、安全、部署或架构工作，使用 `workflow: full`。模式在需求确认时选择，风险上升只能升级，不能用较低模式绕过设计或安全门槛。旧工件没有 `mode` 时按 `compact -> managed`、`full -> strict` 兼容推导；显式 `mode` 必须是 `lite`、`managed` 或 `strict`，并在存在工作项时提供 `mode_reason`。
 
 如果需求来自用户提供的 PRD、附件、Issue、外部链接或其他正式资料，在 frontmatter 中写 `source_coverage: required`，并增加一张来源覆盖表：
 

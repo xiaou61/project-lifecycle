@@ -38,9 +38,6 @@ $forwardedArgs = @($CommandArgs)
 if ($Command -eq "resume" -and $forwardedArgs -notcontains "--resume") {
     $forwardedArgs += "--resume"
 }
-if ($Command -eq "validate" -and $forwardedArgs -notcontains "--strict") {
-    $forwardedArgs += "--strict"
-}
 if ($Command -eq "updates") { $forwardedArgs += "--list" }
 if ($Command -eq "record") { $forwardedArgs += "--record" }
 if ($Command -eq "checkpoint") { $forwardedArgs += "--check" }

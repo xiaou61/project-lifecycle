@@ -31,6 +31,9 @@ $lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-l
 # 检查结构、重复标识符、来源引用、测试证据和 Git 归因
 & $lifecycle validate "F:\我的项目" --json
 
+# 发布或交接时把兼容性警告也视为失败
+& $lifecycle validate "F:\我的项目" --strict --json
+
 # 包含归档资料
 & $lifecycle status "F:\我的项目" --include-archive
 ```
@@ -42,10 +45,11 @@ $lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-l
 | `init` | 初始化目标项目资料工作区 | 项目接入 |
 | `status` | 查看阶段、依赖、阻塞和 Git 归因 | 状态恢复 |
 | `resume` | 输出可恢复上下文和接力提示 | 跨会话接力 |
-| `validate` | 严格检查工件、来源、证据和归因 | 发布前质量门槛 |
+| `validate` | 检查工件、来源、证据和归因，保留兼容性警告 | 日常交接检查 |
+| `validate --strict` | 在上述检查基础上把警告视为失败 | 发布前质量门槛 |
 | `history` | 生成核心组件历史视图 | 可追溯性 |
 
-这借鉴了 Superpowers 的组合方式：每个动作有清晰边界，但仍由一个生命周期 Skill 统一处理事实、批准和漂移。`compact`、`full`、需求深挖和 HTML 理解材料是模式或按需参考，不是重复安装的 Skill。
+这借鉴了 Superpowers 的组合方式：每个动作有清晰边界，但仍由一个生命周期 Skill 统一处理事实、批准和漂移。用户侧风险模式是 `lite`、`managed`、`strict`；`compact`、`full` 是写入工件的兼容工作流字段，需求深挖和 HTML 理解材料按需读取，不是重复安装的 Skill。
 
 ## 核心历史
 
@@ -61,7 +65,7 @@ $lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-l
 
 ## 更新历史与提交边界
 
-初始化后，目标项目会有 `.agent/history/updates.md`。每次实际修改后追加本轮的变更、决策、依据、验证和提交状态；详细字段见 [更新历史规则](https://github.com/xiaou61/project-lifecycle/blob/main/skills/project-lifecycle/references/update-history.md)。
+初始化后，目标项目会有 `.agent/history/updates.md`。每次实际修改后追加本轮的变更、决策、依据、验证和提交状态；新记录标题精确到秒并带本地时区，例如 `2026-09-09 14:32:07 +0800`。详细字段见 [更新历史规则](https://github.com/xiaou61/project-lifecycle/blob/main/skills/project-lifecycle/references/update-history.md)。
 
 本地 commit 只是恢复和回滚检查点。切换工作项或完成沉淀前应先完成本地检查点；`git push`、远端分支、tag 和部署不会由 Skill 自动执行，必须由用户明确授权。
 
