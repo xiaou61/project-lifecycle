@@ -2,6 +2,16 @@
 
 本文件记录 `project-lifecycle` Skill 仓库本身的维护变更；目标项目的逐轮记录写在各自的 `.agent/history/updates.md`。Git 提交仍是可回滚事实源。
 
+## 2026-09-10 · 忽略 playwright 工作目录
+
+- 类型：maintenance
+- 变更：在 `.gitignore` 增加 `/.playwright-cli/`，与既有 `/output/playwright/` 规则同类；此前该目录里 59 个 Playwright 会话日志和快照一直以未跟踪状态出现在 `git status` 中。
+- 决策：只加忽略规则，不删除本地文件、不改目录内容，也不把会话产物纳入版本管理；这是仓库级元数据维护，不影响 Skill 运行时行为、`.agent/` 结构和初始化行为，因此不单独发行新版本，随 `main` 提交即可。
+- 依据：`.gitignore`、`git check-ignore -v .playwright-cli` 输出。
+- 验证：`git check-ignore -v` 命中 `.gitignore:4`；`git status --short` 不再列出该目录；本地 59 个文件保持原样。
+- 本地提交：本轮维护提交。
+- 远端推送：随本轮提交推送 `origin/main`。
+
 ## v0.0.2 · 2026-09-09 · 用户入口文档同步与结构性修复
 
 - 类型：release
