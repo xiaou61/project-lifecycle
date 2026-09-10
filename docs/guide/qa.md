@@ -1,6 +1,6 @@
-# QA：32 个使用问题
+# QA：33 个使用问题
 
-这页把常见的“我该怎么用”直接对应到 `project-lifecycle` 的入口、工件和边界。示例默认使用 Windows PowerShell；`$lifecycle` 指向已安装 Skill 的统一命令入口：
+这页把常见的“我该怎么用”直接对应到 `project-lifecycle` 的入口、工件和边界，共 33 个问题（其中 `18.1`、`18.2`、`24.1` 是对 18 和 24 的追问）。示例默认使用 Windows PowerShell；`$lifecycle` 指向已安装 Skill 的统一命令入口：
 
 ```powershell
 $lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
@@ -180,7 +180,7 @@ git worktree add "..\我的项目-WORK-003" -b "work/WORK-003"
 
 先运行 `resume --json`。选中的 `resume.work_item` 会从当前工作项的 `requirements.md` 带出 `goal`、`acceptance_criteria`、`constraints` 和 `goal_status`，并返回 `state_evidence` 与 `document_budget`。其中 `documented_state` 只代表工件推导；`code_sync` 只有在 `testing/report.md` 的 `verified_commit` 之后没有源码改动且当前工作区干净时才是 `verified`，否则会是 `stale`、`unknown` 或 `invalid`，不能把“代码可能已经完成、但 Markdown 没更新”误报成完成。恢复后按 `read_paths` 重新读取规则、需求和当前阶段工件，再核对 `tasks.md`、Git 差异和实际测试。聊天摘要只帮助定位线索，不能替代项目工件。若目标或验收标准缺失，输出 `resume.warnings` 并先补齐文档，不会猜测用户意图。
 
-### 18.2 Markdown 太多会拖慢恢复吗？
+### 18.2. Markdown 太多会拖慢恢复吗？
 
 会增加读取和上下文成本，所以状态脚本只统计核心文件并给软警告：单文件超过 20,000 bytes、总量超过 80,000 bytes 或核心文件超过 6 个。它不会自动压缩或删除；把长日志放到 `testing/logs/` 等证据文件，恢复时只读取当前阶段路径。
 

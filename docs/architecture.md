@@ -23,6 +23,6 @@
 
 Superpowers 的做法是把开发方法拆成多个可组合 Skills，并把每个 Skill 的脚本留在包内，详见 [obra/superpowers](https://github.com/obra/superpowers)。我们借鉴它的“阶段可组合、实现内聚”原则，但保留一个 `project-lifecycle` 总 Skill：需求、批准、依赖、漂移和事实恢复必须共享同一套边界，拆成多个同名近似 Skills 反而会造成重复触发和状态分叉。
 
-用户侧看到的是稳定动作入口：`init`、`status`、`resume`、`validate`、`history`；Agent 也可以直接用自然语言触发它们。PowerShell 适配器会在后台调用内部脚本，普通用户不需要直接使用 Python。
+用户侧看到的是稳定动作入口：`init`、`status`、`resume`、`validate`、`history`、`updates`、`record`、`checkpoint`、`push-check`；Agent 也可以直接用自然语言触发它们。PowerShell 适配器会在后台调用内部脚本，普通用户不需要直接使用 Python。
 
 工作风险先路由到三档模式：`lite` 不创建完整工作项，`managed` 使用 `workflow: compact`，`strict` 使用 `workflow: full`。模式只影响必要的记录与阶段门槛，不把严格模式误解为无条件扩大测试范围。

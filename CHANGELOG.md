@@ -2,6 +2,17 @@
 
 本文件记录 `project-lifecycle` Skill 仓库本身的维护变更；目标项目的逐轮记录写在各自的 `.agent/history/updates.md`。Git 提交仍是可回滚事实源。
 
+## v0.0.2 · 2026-09-09 · 用户入口文档同步与结构性修复
+
+- 类型：release
+- 变更：修正 `skills/project-lifecycle/SKILL.md`、`docs/reference/index.md`、`docs/architecture.md`、`docs/reference/commands.md` 中过时的用户命令清单，补全 `updates`、`record`、`checkpoint`、`push-check`；在 `references/workflow.md` 的“用户如何触发”表补上更新历史、记录更新、本地检查点和推送核验四类动作；QA 计数按实际标题改正为 33（`18.1`、`18.2`、`24.1` 为追问），并统一 `18.2` 的小节标题格式；把版本基线元数据从 `v0.0.1` 更新到 `v0.0.2`；按真实 Git 提交回填本文件早前仍写“待用户授权/未执行”的本地提交与远端推送字段。
+- 决策：本轮只同步文档与元数据、不改脚本行为，因此按 `PATCH` 发布为 `v0.0.2`；`quick_validate.py` 保持为 Codex `skill-creator` 的外部工具并显式标注来源，不复制进仓库；`v0.0.1` 既已发布即不移动、不覆盖；本文件把未提交的维护记录并入发布条目，不保留指向尚未存在提交的悬空记录。
+- 依据：`skills/project-lifecycle/scripts/project-lifecycle.ps1` 的 `ValidateSet`、`skills/project-lifecycle/references/workflow.md`、`docs/guide/qa.md`、`docs/reference/commands.md`、`README.md` 的版本与发布流程。
+- 验证：44 个单元测试通过；Python 脚本编译通过；Skill 校验（`skill-creator/scripts/quick_validate.py`）通过；VitePress 构建通过；`git diff --check` 通过。tag 创建后以 `git ls-remote` 核对本次提交与 `v0.0.2` 均已到达 GitHub。
+- 本地提交：本轮发布提交。
+- 远端推送：随本次发布推送 `main` 和 `v0.0.2`。
+- 部署：未执行；教程站仍为上一版 release，需要时另行授权部署。
+
 ## 2026-09-09 · 文档预算、验证锚点与推送核验
 
 - 类型：maintenance
@@ -19,9 +30,9 @@
 - 变更：`resume --json` 从 `requirements.md` 提取 `goal`、`acceptance_criteria`、`constraints` 和 `goal_status`，文本恢复输出与接力提示同步带出；缺失目标或验收标准时返回明确警告。
 - 决策：对话历史可以被压缩，当前任务状态继续以项目工件为唯一事实源；恢复包新增 `state_evidence`，明确工件状态、已记录测试、Git 快照和未知的源码同步，避免把过时 Markdown 当成实时代码状态；不新增数据库、向量存储或后台服务，长期 `.agent/memory.md` 不承担当前任务目标。
 - 依据：`skills/project-lifecycle/scripts/project_status.py`、`skills/project-lifecycle/references/workflow.md`、`docs/guide/resume.md`。
-- 验证：待本轮验证。
-- 本地提交：待用户授权。
-- 远端推送：未执行。
+- 验证：未单独留档；本轮实现随 `2e2896b` 一并回归。
+- 本地提交：实现提交 `2e2896b`（与“文档预算、验证锚点与推送核验”同批）。
+- 远端推送：随 `2e2896b` 推送到 `origin/main`。
 
 ## 2026-09-09 14:10:00 +0800 · 发布三档模式与秒级更新历史
 
@@ -41,8 +52,8 @@
 - 决策：采用人类可读的 `YYYY-MM-DD HH:mm:ss ±HHMM`，不改写已有历史，也不引入独立时间服务。
 - 依据：`skills/project-lifecycle/scripts/update_history.py`、`skills/project-lifecycle/references/update-history.md`。
 - 验证：38 个单元测试通过；Python 脚本编译通过；Skill 校验通过；VitePress 构建通过；`git diff --check` 通过。
-- 本地提交：待用户授权。
-- 远端推送：未执行。
+- 本地提交：随后续实现提交 `976cf4b` 落地。
+- 远端推送：随 `976cf4b` 推送到 `origin/main`。
 
 ## 2026-09-09 · 三档风险模式
 
@@ -51,8 +62,8 @@
 - 决策：模式在开始时判断，风险上升只允许升级；严格模式增加必要工件和批准门槛，但不机械增加测试；冒烟测试仍仅按用户、项目规则或已批准计划执行。
 - 依据：`skills/project-lifecycle/SKILL.md`、`skills/project-lifecycle/references/workflow.md`、`skills/project-lifecycle/references/testing.md`。
 - 验证：37 个单元测试通过；Python 脚本编译通过；Skill 校验通过；VitePress 构建通过；`git diff --check` 通过。
-- 本地提交：待用户授权。
-- 远端推送：未执行。
+- 本地提交：实现提交 `976cf4b`。
+- 远端推送：已推送到 `origin/main`。
 
 ## 2026-09-08 · 生命周期入口与更新记录
 
@@ -71,8 +82,8 @@
 - 决策：命令复用现有 `project-lifecycle.ps1`，只读检查和文本追加不自动提交；本地 commit 与远端 push 继续分离。
 - 依据：`skills/project-lifecycle/references/update-history.md`、`skills/project-lifecycle/scripts/update_history.py`、`tests/test_project_status.py`。
 - 验证：31 个单元测试通过；Skill 校验通过；Python 脚本编译通过；VitePress 构建通过。
-- 本地提交：随本轮发布提交完成。
-- 远端推送：用户已明确要求，随本轮提交执行。
+- 本地提交：实现提交 `54ccabc`。
+- 远端推送：已推送到 `origin/main`。
 
 ## 2026-09-09 · 并发边界与使用 QA
 

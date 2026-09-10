@@ -48,6 +48,9 @@ $lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-l
 | `validate` | 检查工件、来源、证据和归因，保留兼容性警告 | 日常交接检查 |
 | `validate --strict` | 在上述检查基础上把警告视为失败 | 发布前质量门槛 |
 | `history` | 生成核心组件历史视图 | 可追溯性 |
+| `updates` | 查看 `.agent/history/updates.md` 的最近记录 | 每轮变化时间线 |
+| `record` | 按固定字段追加一条结构化更新记录 | 变更留痕 |
+| `checkpoint` | 检查本地工作区是否还有未提交改动 | 本地提交检查点 |
 | `push-check` | 用 `git ls-remote` 核对远端提交和更新历史 | 推送后核验 |
 
 这借鉴了 Superpowers 的组合方式：每个动作有清晰边界，但仍由一个生命周期 Skill 统一处理事实、批准和漂移。用户侧风险模式是 `lite`、`managed`、`strict`；`compact`、`full` 是写入工件的兼容工作流字段，需求深挖和 HTML 理解材料按需读取，不是重复安装的 Skill。
@@ -121,7 +124,7 @@ npm run docs:serve
 
 ## GitHub 版本发布
 
-当前基线是 `v0.0.1`。后续版本沿用标准 GitHub 流程：功能或修复分支 -> 回归检查 -> 合并 `main` -> 创建不可移动的版本 tag -> 推送 `main` 和 tag -> 创建 GitHub Release。示例：
+当前基线是 `v0.0.2`（`v0.0.1` 是首个发布基线）。后续版本沿用标准 GitHub 流程：在 `main` 上完成回归检查 -> 创建不可移动的版本 tag -> 推送 `main` 和 tag -> 创建 GitHub Release。示例：
 
 ```powershell
 git tag -a v0.0.2 -m "v0.0.2"

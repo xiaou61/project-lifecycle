@@ -12,7 +12,7 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 
 | 模块 | 主要位置 | 负责什么 | 改完检查 |
 | --- | --- | --- | --- |
-| 入口与风险路由 | `skills/project-lifecycle/SKILL.md` | `lite`、`managed`、`strict` 三档模式和不可绕过的底线 | `quick_validate.py` |
+| 入口与风险路由 | `skills/project-lifecycle/SKILL.md` | `lite`、`managed`、`strict` 三档模式和不可绕过的底线 | 单元测试 + 严格校验 |
 | 全流程协议 | `skills/project-lifecycle/references/workflow.md` | 恢复顺序、审批门槛、漂移、依赖和完成语义 | `tests/test_project_status.py` |
 | 规则与边界 | `references/rules.md`、`relationships.md`、`specs.md`、`memory.md`、`update-history.md` | 规则优先级、关系、稳定事实、长期记忆和更新记录边界 | 状态检查 + 严格校验 |
 | 阶段工件规范 | `references/requirements.md`、`proposal.md`、`design.md`、`tasks.md`、`testing.md` | 需求、方案、设计、任务和验证报告怎么写 | 工件校验器 |
@@ -26,7 +26,7 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 | 初始化器 | `skills/project-lifecycle/scripts/init_project.py` | 幂等创建目标项目的 `.agent/` 和入口模板 | 单元测试 |
 | 状态汇总与恢复 | `skills/project-lifecycle/scripts/project_status.py` | 推导阶段、依赖、Git 归因和 `--resume` JSON | 单元测试 + JSON 解析 |
 | 校验器 | `skills/project-lifecycle/scripts/project_validate.py` | 普通校验和可选 `--strict` 的结构、来源、证据、归因检查 | `--strict` |
-| 用户命令适配器 | `skills/project-lifecycle/scripts/project-lifecycle.ps1` | 用 `init/status/resume/validate/history` 隐藏底层 Python 实现 | PowerShell 入口检查 |
+| 用户命令适配器 | `skills/project-lifecycle/scripts/project-lifecycle.ps1` | 用 `init/status/resume/validate/history/updates/record/checkpoint/push-check` 隐藏底层 Python 实现 | PowerShell 入口检查 |
 | 更新历史命令 | `skills/project-lifecycle/scripts/update_history.py` | 查看、追加更新记录和检查本地提交检查点 | 命令行为检查 |
 | 回归测试 | `tests/test_project_status.py` | 固化生命周期和边界行为 | 维护者发布检查 |
 
@@ -39,7 +39,7 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 | 开始使用 | `docs/guide/getting-started.md` | 安装、初始化和第一次工作 | [开始使用](/guide/getting-started) |
 | 全流程 | `docs/guide/full-workflow.md` | 需求到完成的阶段说明 | [全流程教程](/guide/full-workflow) |
 | 恢复与接力 | `docs/guide/resume.md` | 跨会话恢复、多个工作项和 Git 归因 | [恢复与接力](/guide/resume) |
-| QA 问答 | `docs/guide/qa.md` | 32 个从安装到并发协作、验收和历史记录的实操问题 | [QA 问答](/guide/qa) |
+| QA 问答 | `docs/guide/qa.md` | 33 个从安装到并发协作、验收和历史记录的实操问题 | [QA 问答](/guide/qa) |
 | 需求与验收 | `docs/guide/requirements.md` | 事实、决定、来源覆盖和验收标准 | [需求、来源与验收](/guide/requirements) |
 | 需求深挖访谈 | `docs/guide/requirements-interview.md`、`skills/project-lifecycle/references/requirements-interview.md` | 决策树、逐轮提问、停止条件和 PRD/Task 门槛 | [需求深挖访谈](/guide/requirements-interview) |
 | 任务拆分规则 | `skills/project-lifecycle/references/tasks.md` | 纵向切片、真实阻塞关系和 expand-contract 重构 | [全流程教程](/guide/full-workflow) |
@@ -80,8 +80,11 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 
 ## 常用验证
 
+`quick_validate.py` 属于 Codex 的 `skill-creator` 工具，不在本仓库内；其余命令在仓库根目录运行。
+
 ```powershell
 python -m unittest discover -s tests -p "test_*.py" -v
+python -m compileall -q skills/project-lifecycle/scripts
 python -X utf8 "C:\Users\Lenovo\.codex\skills\.system\skill-creator\scripts\quick_validate.py" "skills/project-lifecycle"
 npm run docs:build
 git diff --check

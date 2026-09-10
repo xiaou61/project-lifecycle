@@ -41,7 +41,7 @@ workflow: compact
 
 ## 用户入口
 
-本 Skill 对用户提供一个总入口和几个可组合动作：初始化、状态、恢复、校验、Git 历史视图、更新历史、记录更新、本地检查点和远端推送核验。用户可以直接用自然语言表达这些动作，也可以调用 `scripts/project-lifecycle.ps1 <init|status|resume|validate|history|updates|record|checkpoint|push-check>`；不要要求普通用户直接运行 Python 文件。
+本 Skill 对用户提供一个总入口和几个可组合动作：初始化、状态、恢复、校验、Git 历史视图、更新历史、记录更新、本地检查点和远端推送核验。用户可以直接用自然语言表达这些动作，也可以调用 `scripts/project-lifecycle.ps1 <init|status|resume|validate|history|updates|record|checkpoint|push-check>`；不要要求普通用户直接运行 Python 文件，入口与动作的对应关系见 `references/workflow.md` 的“用户如何触发”。
 
 这些命令只是稳定的入口适配器，底层脚本属于 Skill 实现细节。`validate` 是普通校验，只有显式传入 `--strict` 才把兼容性警告视为失败。`lite`、`managed`、`strict` 是风险模式；`compact`、`full` 和需求深挖是兼容字段或参考协议，不拆成会互相抢触发的重复 Skill。
 
@@ -56,5 +56,5 @@ workflow: compact
 - `references/update-history.md`：更新日志字段、本地提交检查点和远端推送边界。
 - `scripts/init_project.py`、`scripts/project_status.py`：Skill 内部实现，负责幂等初始化（含项目总索引和 HTML 目录）与只读状态汇总；用户和 Agent 通过 `scripts/project-lifecycle.ps1 init/status/resume` 调用，不从目标项目 `.agent/scripts/` 查找这些文件。
 - `scripts/project_validate.py`：Skill 内部的只读工件校验实现；通过 `scripts/project-lifecycle.ps1 validate` 调用，不要求普通用户直接运行 Python。
-- `scripts/project-lifecycle.ps1`：面向用户的命令适配器，隐藏底层 Python 实现并转发 `init`、`status`、`resume`、`validate`、`history`。
-- `scripts/update_history.py`：读取和追加 `.agent/history/updates.md`，检查本地 Git 提交检查点，并按需核对远端推送记录。
+- `scripts/project-lifecycle.ps1`：面向用户的命令适配器，隐藏底层 Python 实现并转发 `init`、`status`、`resume`、`validate`、`history`、`updates`、`record`、`checkpoint`、`push-check`。
+- `scripts/update_history.py`：更新历史的内部实现，负责读取、追加 `.agent/history/updates.md`，检查本地 Git 检查点，并按需核对远端推送记录；不要从目标项目 `.agent/scripts/` 查找这些文件。
