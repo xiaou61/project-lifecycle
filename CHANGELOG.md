@@ -9,9 +9,10 @@
 - 决策：本轮只同步文档与元数据、不改脚本行为，因此按 `PATCH` 发布为 `v0.0.2`；`quick_validate.py` 保持为 Codex `skill-creator` 的外部工具并显式标注来源，不复制进仓库；`v0.0.1` 既已发布即不移动、不覆盖；本文件把未提交的维护记录并入发布条目，不保留指向尚未存在提交的悬空记录。
 - 依据：`skills/project-lifecycle/scripts/project-lifecycle.ps1` 的 `ValidateSet`、`skills/project-lifecycle/references/workflow.md`、`docs/guide/qa.md`、`docs/reference/commands.md`、`README.md` 的版本与发布流程。
 - 验证：44 个单元测试通过；Python 脚本编译通过；Skill 校验（`skill-creator/scripts/quick_validate.py`）通过；VitePress 构建通过；`git diff --check` 通过。tag 创建后以 `git ls-remote` 核对本次提交与 `v0.0.2` 均已到达 GitHub。
-- 本地提交：本轮发布提交。
-- 远端推送：随本次发布推送 `main` 和 `v0.0.2`。
-- 部署：未执行；教程站仍为上一版 release，需要时另行授权部署。
+- 本地提交：发布提交 `2701c27`。
+- 远端推送：已推送 `main` 和 `v0.0.2`，用 `git ls-remote` 核对 `refs/heads/main`、`refs/tags/v0.0.2` 和 `v0.0.2^{}` 均指向 `2701c27`。
+- GitHub Release：[v0.0.2](https://github.com/xiaou61/project-lifecycle/releases/tag/v0.0.2)，`v0.0.1` 未移动。
+- 部署：`remote-45`，新 release `/opt/project-lifecycle-docs/releases/20260910103002/dist`，`current` 已切换，`project-lifecycle-docs.service` 重启后为 active；`/`、`/guide/qa`、`/reference/commands`、`/reference/`、`/architecture` 均返回 200，5 个关键页面 SHA-256 与本地构建一致；上一个 release `20260909163928` 保留可回滚。
 
 ## 2026-09-09 · 文档预算、验证锚点与推送核验
 
