@@ -45,6 +45,7 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 | 任务拆分规则 | `skills/project-lifecycle/references/tasks.md` | 纵向切片、真实阻塞关系和 expand-contract 重构 | [全流程教程](/guide/full-workflow) |
 | 命令参考 | `docs/reference/commands.md` | 可复制的初始化、状态、恢复和校验命令 | [命令参考](/reference/commands) |
 | 边界与常见问题 | `docs/reference/boundaries.md` | 为什么这样设计，以及不负责什么 | [边界与常见问题](/reference/boundaries) |
+| 设计决策记录 | `wiki/` | Skill 自身的“当初为什么这么设计”、被否掉的备选和改动影响 | [设计 wiki](https://github.com/xiaou61/project-lifecycle/tree/main/wiki) |
 
 ### 可视化与构建
 

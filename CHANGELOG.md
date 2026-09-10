@@ -2,6 +2,16 @@
 
 本文件记录 `project-lifecycle` Skill 仓库本身的维护变更；目标项目的逐轮记录写在各自的 `.agent/history/updates.md`。Git 提交仍是可回滚事实源。
 
+## 2026-09-10 · 建立设计 wiki
+
+- 类型：docs
+- 变更：新增 `wiki/` 目录和入口导航，收录 4 篇设计决策记录：`D-001` 保留单一 Skill 而非拆分、`D-002` 风险三档路由、`D-003` 状态从工件推导而非状态文件、`D-004` 不提供文件锁而用 Worktree 隔离；在 `docs/reference/index.md` 的维护地图增加一行入口。
+- 决策：本仓库此前没有承载“当初为什么这么设计”的位置 —— 目标项目有 `.agent/notes/`，设计理由在本仓库只散落在本文件“决策”字段和 commit message 里；wiki 只收录从代码和现有文档推不出来的内容（被否掉的备选、取舍代价、改动影响），不复制 `docs/` 已讲清的内容；每篇写明“什么情况下该重审”作为失效条件；这是文档增量且不改脚本行为，不单独发行新版本。
+- 依据：`docs/architecture.md` 对单一 Skill 的说明、`skills/project-lifecycle/references/workflow.md`、`skills/project-lifecycle/references/update-history.md` 对 `.agent/notes/` 的定位、`project_status.py` 的 `state_evidence` 实现。
+- 验证：wiki 内相对链接目标存在；Markdown 表格列数一致；44 个单元测试通过；Python 编译通过；Skill 校验通过；VitePress 构建通过；`git diff --check` 通过。
+- 本地提交：本轮文档提交。
+- 远端推送：随本轮提交推送 `origin/main`。
+
 ## 2026-09-10 · 忽略 playwright 工作目录
 
 - 类型：maintenance
