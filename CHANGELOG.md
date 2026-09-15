@@ -2,6 +2,16 @@
 
 本文件记录 `project-lifecycle` Skill 仓库本身的维护变更；目标项目的逐轮记录写在各自的 `.agent/history/updates.md`。Git 提交仍是可回滚事实源。
 
+## 2026-09-15 · Python 3.9 兼容、版本守卫、CI 门与决策说明规范
+
+- 类型：maintenance
+- 变更：修复命令适配器在 Python 3.9 下完全不可用的问题——`init_project.py` 补显式编码声明（3.9 的 tokenizer 在无声明且单行超过 512 字节含非 ASCII 时误判编码），并把 4 处 `Path.write_text(..., newline="\n")`（Python 3.10+ 才有 `newline`）改为语义等价的 `write_bytes((...).encode("utf-8"))`；`project-lifecycle.ps1` 增加最低版本守卫，低于 3.9 时报出解析到的版本，而不是让源码编码的 SyntaxError 冒出来；新增 `.github/workflows/ci.yml`，在 Python 3.9/3.11/3.13 上执行编译与单元测试，并单独构建 VitePress 站点；新增 `references/notes.md` 定义 `.agent/notes/` 的取舍范围、写作结构、命名和失效规则，并接入 `SKILL.md`、`README.md` 与 `rules.md`；`project_validate.py` 新增归档死链检查，把仍指向归档前路径的引用作为警告报告；`proposal.md` 要求先写备选方案最强的一面并记录所选方案的代价；把 `README.md` 和 5 个 docs 页面里 18 处硬编码的 `$env:USERPROFILE\.codex\skills\...` 入口路径统一为按宿主解析的 `$lifecycle` 占位符（其中一处还写死了本机用户名）。
+- 决策：选择支持 Python 3.9，而不是把下限提高到 3.10——阻碍只有 5 处等价改写，而适配器在本机回退到的正是 3.9，提高下限会让 `init` 在只装 3.9 的机器上继续失败；`write_bytes(text.encode("utf-8"))` 与 `write_text(..., newline="\n")` 输出逐字节相同，不引入行为变化。版本守卫不用 `$LASTEXITCODE` 判定，避免空值被当成失败。归档死链检查只做子串匹配并按警告报告，因为它分不清仍然有效的链接和叙述历史位置的行文；`.agent/history/updates.md` 是追加式时间线，明确豁免不回改。CI 不加 `git diff --check`：`actions/checkout` 默认浅克隆，`HEAD~1` 和 merge-base 都不可用，配 `|| true` 等于不检查。本次是向后兼容的新增（新警告、新守卫、兼容性修复），按 `PATCH` 记为 `v0.0.3`。
+- 依据：`tests/test_project_status.py` 的多版本实测结果、`docs/reference/index.md` 的维护者检查清单、`wiki/D-005-python-版本下限.md`、`wiki/README.md` 的决策记录门槛、`references/workflow.md` 的入口约定。
+- 验证：45 个单元测试在 Python 3.9.13、3.11.5、3.14.0 上全部通过（修复前 3.9 为 3 failures + 2 errors）；`python -m compileall` 通过；`skill-creator/quick_validate.py` 报告 Skill is valid；VitePress 构建通过；`git diff --check` 无错误；Skill 内 Markdown 相对链接全部可解析；`project-lifecycle.ps1` 在临时项目上完成 init/status/validate 端到端验证，版本守卫对 3.8 拒绝、3.9 及以上通过。
+- 本地提交：待用户授权。
+- 远端推送：未执行；tag 和推送需要用户明确授权。
+
 ## 2026-09-10 · 建立设计 wiki
 
 - 类型：docs

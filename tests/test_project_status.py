@@ -577,6 +577,26 @@ class ProjectStatusTests(unittest.TestCase):
         self.assertFalse(strict["valid"])
         self.assertTrue(any("mode_reason" in warning["message"] for warning in normal["warnings"]))
 
+    def test_archive_move_reports_stale_references(self) -> None:
+        self.confirm_rules()
+        workspace = self.project / ".agent"
+        archived = workspace / "changes" / "archive" / "2026-09-01-WORK-011-登录"
+        archived.mkdir(parents=True)
+        (archived / "requirements.md").write_text("# 登录需求\n", encoding="utf-8")
+        (workspace / "INDEX.md").write_text(
+            "| 需求 | `.agent/changes/WORK-011-登录/requirements.md` |\n", encoding="utf-8"
+        )
+        history = workspace / "history"
+        history.mkdir(parents=True, exist_ok=True)
+        (history / "updates.md").write_text(
+            "## 2026-09-01 · WORK-011 · 归档\n\n- 变更：`.agent/changes/WORK-011-登录/` 移入归档。\n",
+            encoding="utf-8",
+        )
+
+        messages = [warning["message"] for warning in project_validate.validate_project(self.project)["warnings"]]
+        self.assertTrue(any("归档前路径" in message and "INDEX.md" in message for message in messages))
+        self.assertFalse(any("history" in message for message in messages), messages)
+
     def test_finished_tasks_move_to_verification(self) -> None:
         work = self.approve_through_tasks("### TASK-001 | done | 实现登录")
         (work / "testing").mkdir()

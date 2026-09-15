@@ -86,7 +86,7 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 ```powershell
 python -m unittest discover -s tests -p "test_*.py" -v
 python -m compileall -q skills/project-lifecycle/scripts
-python -X utf8 "C:\Users\Lenovo\.codex\skills\.system\skill-creator\scripts\quick_validate.py" "skills/project-lifecycle"
+python -X utf8 "<Skill 发现目录>\.system\skill-creator\scripts\quick_validate.py" "skills/project-lifecycle"
 npm run docs:build
 git diff --check
 ```

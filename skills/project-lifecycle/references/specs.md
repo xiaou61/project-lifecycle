@@ -40,7 +40,7 @@ Do not put temporary brainstorming, an unapproved proposal, task checkboxes, cha
 3. After approval, record the approach in `proposal.md`, implementation detail in `design.md`, and execution order in `tasks.md`.
 4. Implement and verify against the approved artifacts.
 5. If the delivered behavior changes a stable contract, update the affected spec from the verified result. Preserve the change documents as the rationale and evidence.
-6. Optionally move the completed change directory to `.agent/changes/archive/YYYY-MM-DD-<WORK-id>-<Chinese-name>/`. Archive only after verification; keep the files intact so Git can show the complete decision trail.
+6. Optionally move the completed change directory to `.agent/changes/archive/YYYY-MM-DD-<WORK-id>-<Chinese-name>/`. Archive only after verification; keep the files intact so Git can show the complete decision trail. Renaming the directory breaks every reference to its old path: before considering the archive done, update the live references in `.agent/INDEX.md`, `specs/`, `memory.md`, `rules/always.md`, `notes/` and other work items. `project-lifecycle.ps1 validate` reports these as warnings (failures under `--strict`); `.agent/history/updates.md` is exempt because it is an append-only timeline and must not be rewritten.
 
 Do not update a stable spec before implementation just to make a failing or unauthorized change look compliant. If implementation reveals that the spec or approved requirements were wrong, stop, return the earliest affected artifact to `draft`, and obtain approval.
 

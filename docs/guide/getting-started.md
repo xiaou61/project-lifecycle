@@ -14,12 +14,18 @@
 
 也可以把仓库 checkout 到 Codex 支持的 Skill 发现目录。安装后无需把某台机器的绝对路径写进项目规则。
 
+下面示例用 `$lifecycle` 代表已安装 Skill 里的命令适配器，`<已安装 Skill 目录>` 指当前宿主的 Skill 发现目录（例如 Codex 的 `$env:USERPROFILE\.codex\skills`）。它需要 Python 3.9 或更高版本，版本过低时适配器会直接报出所需版本：
+
+```powershell
+$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
+```
+
 ## 2. 初始化项目资料
 
 初始化只增加 `.agent/` 资料目录和入口模板，不移动源码、不创建空白工作项，也不会替你猜测项目规则：
 
 ```powershell
-$lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
 & $lifecycle init "F:\我的项目"
 ```
 
@@ -78,21 +84,21 @@ workflow: compact
 查询当前活动工作项：
 
 ```powershell
-$lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
 & $lifecycle status "F:\我的项目"
 ```
 
 查询指定工作项：
 
 ```powershell
-$lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
 & $lifecycle status "F:\我的项目" --work WORK-003
 ```
 
 准备换对话或恢复工作时，使用恢复输出：
 
 ```powershell
-$lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
 & $lifecycle resume "F:\我的项目"
 ```
 

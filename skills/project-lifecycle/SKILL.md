@@ -52,7 +52,7 @@ workflow: compact
 - `references/tasks.md`：任务拆分、阻塞关系和可独立验证的纵向切片规则。
 - `references/requirements.md`、`proposal.md`、`design.md`、`tasks.md`、`testing.md`：阶段工件规则。
 - `references/html.md`：项目理解型 HTML 的用户同意、保存位置和事实边界。
-- `references/rules.md`、`relationships.md`、`specs.md`、`memory.md`、`core-history.md`：边界、关系和长期资料。
+- `references/rules.md`、`relationships.md`、`specs.md`、`memory.md`、`notes.md`、`core-history.md`：边界、关系、长期资料和决策理由。
 - `references/update-history.md`：更新日志字段、本地提交检查点和远端推送边界。
 - `scripts/init_project.py`、`scripts/project_status.py`：Skill 内部实现，负责幂等初始化（含项目总索引和 HTML 目录）与只读状态汇总；用户和 Agent 通过 `scripts/project-lifecycle.ps1 init/status/resume` 调用，不从目标项目 `.agent/scripts/` 查找这些文件。
 - `scripts/project_validate.py`：Skill 内部的只读工件校验实现；通过 `scripts/project-lifecycle.ps1 validate` 调用，不要求普通用户直接运行 Python。

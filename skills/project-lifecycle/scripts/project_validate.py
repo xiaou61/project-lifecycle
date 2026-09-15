@@ -26,6 +26,9 @@ SEVERE_WARNING_MARKERS = (
     "workspace.md",
     "归因",
 )
+ARCHIVE_DATE_PREFIX = re.compile(r"^\d{4}-\d{2}-\d{2}-(.+)$")
+# 归档前的历史记录不回改：updates.md 是追加式时间线，改写它会伪造当时的事实。
+ARCHIVE_LINK_EXEMPT_DIRS = ("history",)
 
 
 def issue(work_id: str | None, message: str) -> dict[str, str | None]:
@@ -151,6 +154,46 @@ def validate_item(
     return errors, warnings
 
 
+def validate_archive_references(status: dict[str, object]) -> list[dict[str, str | None]]:
+    """归档把 changes/<名称> 改成 changes/archive/<日期>-<名称>，旧路径引用会变成死链。
+
+    ponytail: 只做子串匹配，无法区分“仍然有效的链接”和“叙述归档前位置的历史文字”，
+    因此按警告报告；发布或交接前的 validate --strict 会把警告视为失败。
+    """
+    workspace = Path(str(status["workspace"]))
+    archive = workspace / "changes" / "archive"
+    if not archive.is_dir():
+        return []
+    stale_to_current: dict[str, str] = {}
+    for path in sorted(archive.iterdir()):
+        if not path.is_dir() or path.name.startswith("."):
+            continue
+        match = ARCHIVE_DATE_PREFIX.match(path.name)
+        original = match.group(1) if match else path.name
+        stale_to_current[f"changes/{original}"] = f"changes/archive/{path.name}"
+    if not stale_to_current:
+        return []
+
+    found: list[dict[str, str | None]] = []
+    for document in sorted(workspace.rglob("*.md")):
+        if archive in document.parents:
+            continue
+        relative = document.relative_to(workspace)
+        if relative.parts[0] in ARCHIVE_LINK_EXEMPT_DIRS:
+            continue
+        text = document.read_text(encoding="utf-8-sig")
+        for stale, current in stale_to_current.items():
+            if stale in text:
+                found.append(
+                    issue(
+                        None,
+                        f"{relative} 仍引用归档前路径 `{stale}`；请改为 `{current}`，"
+                        "或在原地标明这是归档前的历史位置。",
+                    )
+                )
+    return found
+
+
 def validate_project(start: Path, *, include_archive: bool = False, strict: bool = False) -> dict[str, object]:
     status = project_status.inspect_project(start, include_archive=include_archive)
     result: dict[str, object] = {
@@ -176,6 +219,7 @@ def validate_project(start: Path, *, include_archive: bool = False, strict: bool
     result["warnings"].extend(issue(None, str(warning)) for warning in status["warnings"])
     if not status["rules"]["ready"] or not status["rules"]["configured"]:
         result["errors"].append(issue(None, "项目常驻规范未确认或无效。"))
+    result["warnings"].extend(validate_archive_references(status))
 
     for item in status["work_items"]:
         errors, warnings = validate_item(item, status["git"])

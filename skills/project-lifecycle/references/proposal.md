@@ -26,7 +26,7 @@ Use these sections when relevant:
 ## 待决定事项
 ```
 
-The recommended approach should explain the essential mechanism, affected ownership areas, and why it best satisfies the requirements. Record only genuine alternatives, including the status quo when it was a credible option. State what each alternative buys and why it was not selected.
+The recommended approach should explain the essential mechanism, affected ownership areas, and why it best satisfies the requirements. Record only genuine alternatives, including the status quo when it was a credible option. State the strongest case for each alternative before explaining why it was not selected, and record what the chosen approach gives up; an option dismissed only as "worse" invites the next reader to propose it again.
 
 Keep detailed class names, schemas, payloads, and file-by-file changes for the design unless they are necessary to establish feasibility. Do not present estimates as facts without evidence.
 

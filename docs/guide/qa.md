@@ -3,7 +3,7 @@
 这页把常见的“我该怎么用”直接对应到 `project-lifecycle` 的入口、工件和边界，共 33 个问题（其中 `18.1`、`18.2`、`24.1` 是对 18 和 24 的追问）。示例默认使用 Windows PowerShell；`$lifecycle` 指向已安装 Skill 的统一命令入口：
 
 ```powershell
-$lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
 ```
 
 ## 认识这套 Skill

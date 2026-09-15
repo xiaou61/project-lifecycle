@@ -187,7 +187,7 @@ def main() -> int:
                 return 1
             return 0
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(generated, encoding="utf-8", newline="\n")
+        output_path.write_bytes(generated.encode("utf-8"))
         return 0
     except (OSError, RuntimeError) as error:
         print(f"生成核心组件历史失败: {error}", file=sys.stderr)

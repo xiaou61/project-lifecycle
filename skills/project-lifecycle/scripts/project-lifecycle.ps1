@@ -23,6 +23,11 @@ else {
     throw "未找到 Python 运行时。请让 Agent 使用已安装 Skill 的命令入口，或由维护者配置 Python；用户不需要直接运行 Python。"
 }
 
+$pythonVersion = & $pythonCommand @pythonPrefix -c "import sys; print('%d.%d' % sys.version_info[:2])" 2>$null
+if (-not $pythonVersion -or [version]$pythonVersion -lt [version]"3.9") {
+    throw "需要 Python 3.9 或更高版本；当前解析到 $pythonCommand $pythonVersion。请让 Agent 使用已安装 Skill 的命令入口，或由维护者配置受支持的 Python。"
+}
+
 $scriptName = switch ($Command) {
     "init" { "init_project.py" }
     "status" { "project_status.py" }

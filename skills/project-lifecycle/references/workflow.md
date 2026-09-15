@@ -46,10 +46,10 @@
 
 1. **确定项目**：多仓库先读外层 `PROJECT-INDEX.md` 和项目映射，再读目标项目的 `AGENTS.override.md`、`AGENTS.md` 和说明；需要定位模块时再读项目 `.agent/INDEX.md`。
 2. **恢复规范**：读 `.agent/rules/always.md`。文件缺失、草案、无效或冲突时先查仓库并提出草案；可以继续只读讨论和不依赖未知规则的设计/验证，但实现、部署、迁移和数据变更必须等待确认。
-3. **查询状态**：通过已安装 Skill 的统一命令入口运行。不要把底层 Python 文件相对当前项目解析，也不要从目标项目的 `.agent/scripts/` 查找状态或校验脚本：
+3. **查询状态**：通过已安装 Skill 的统一命令入口运行。不要把底层 Python 文件相对当前项目解析，也不要从目标项目的 `.agent/scripts/` 查找状态或校验脚本。`$lifecycle` 指向已安装 Skill 目录下的脚本适配器，由 Agent 按当前宿主的 Skill 安装位置解析（例如 Codex 的 `$env:USERPROFILE\.codex\skills\`、ZCode 的 `$env:USERPROFILE\.agents\skills\`），不要把某一个宿主的绝对路径写进项目规则；适配器需要 Python 3.9 或更高版本：
 
    ```powershell
-   $lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+   $lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
    & $lifecycle status <project-root> --json
    & $lifecycle resume <project-root> --json
    ```
@@ -62,7 +62,7 @@
 发布或交接前可运行：
 
 ```powershell
-$lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
 & $lifecycle validate <project-root> --json
 ```
 
@@ -99,7 +99,7 @@ base_commit: <当前基准 commit>
 | 设计已批准，任务缺失/`draft`/`stale` | 实施计划 | 拆可独立验证的纵向切片并等待确认 |
 | 任务已批准且有未完成任务 | 开发实现 | 无硬依赖和规范阻塞时改代码并同步任务 |
 | 任务完成但没有通过验证报告 | 测试验收 | 记录证据、缺口和风险 |
-| 上游一致、任务完成、验证通过 | 完成沉淀 | 核对规格、记忆并可选归档 |
+| 上游一致、任务完成、验证通过 | 完成沉淀 | 核对规格、记忆并可选归档（归档前按 [specs.md](specs.md) 修正旧路径引用） |
 
 如果后期工件存在但更早阶段缺失、未批准或失效，回到最早受影响阶段。用户可以明确合并或豁免门槛，但决定必须写入受影响工件，不能从催促语气推断。
 

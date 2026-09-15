@@ -7,7 +7,7 @@
 在新对话或上下文压缩后先运行：
 
 ```powershell
-$lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
 & $lifecycle resume "F:\我的项目" --json
 ```
 
@@ -64,7 +64,7 @@ JSON 顶层还带 `schema_version` 和 `generated_at`。脚本集成应读取字
 如果同时有多个未完成工作项，不能按目录时间、Git 最近修改时间或最近聊天猜测。先列候选，再明确指定：
 
 ```powershell
-$lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
 & $lifecycle resume "F:\我的项目" --work WORK-003
 ```
 

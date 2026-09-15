@@ -74,6 +74,7 @@ skills/project-lifecycle/
   references/relationships.md      依赖和关联
   references/specs.md               稳定规格的写入边界
   references/memory.md              长期记忆的证据和失效规则
+  references/notes.md               决策说明的写作结构、命名和失效规则
   references/core-history.md        Git 核心组件历史视图
   references/update-history.md      更新日志字段、本地检查点和推送边界
   references/html.md                项目理解型 HTML 的同意与保存边界
@@ -99,10 +100,16 @@ skills/project-lifecycle/
 
 也可以把仓库 checkout 到 Codex 支持的 Skill 发现目录。以当前 Codex 文档和 `$skill-installer` 输出为准，不要把某台机器的绝对路径写进项目规则。
 
+下面所有示例用 `$lifecycle` 代表已安装 Skill 里的命令适配器。它需要 Python 3.9 或更高版本；`<已安装 Skill 目录>` 指当前宿主的 Skill 发现目录（例如 Codex 的 `$env:USERPROFILE\.codex\skills`），按本机实际位置解析即可：
+
+```powershell
+$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
+```
+
 ### 初始化项目
 
 ```powershell
-& "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" init "F:\我的项目"
+& $lifecycle init "F:\我的项目"
 ```
 
 初始化器是幂等的：缺少时创建资料目录、入口模板和历史脚本，保留已有 `AGENTS.md`、`.agent/`、源代码、测试和 Git 历史。它不会安装 Skill、猜测项目规则、移动旧目录、修改产品文件或创建空白工作项。
@@ -129,23 +136,23 @@ Agent 会主动给受管理需求分配不复用的中文名称和 `WORK-*` 编�
 
 ```powershell
 # 当前非归档工作项
-& "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" status "F:\我的项目"
+& $lifecycle status "F:\我的项目"
 
 # 只看可恢复上下文、阻塞、建议读取路径和接力提示
-& "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" resume "F:\我的项目"
+& $lifecycle resume "F:\我的项目"
 
 # 发布前检查工件和证据
-& "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" validate "F:\我的项目"
+& $lifecycle validate "F:\我的项目"
 
 # 将兼容性警告也视为失败
-& "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" validate "F:\我的项目" --strict
+& $lifecycle validate "F:\我的项目" --strict
 
 # 按编号或中文名称查询
-& "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" status "F:\我的项目" --work WORK-003
-& "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" status "F:\我的项目" --work "用户登录"
+& $lifecycle status "F:\我的项目" --work WORK-003
+& $lifecycle status "F:\我的项目" --work "用户登录"
 
 # 包含归档资料
-& "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1" status "F:\我的项目" --include-archive
+& $lifecycle status "F:\我的项目" --include-archive
 ```
 
 状态查询返回当前阶段、工件状态、任务计数、依赖、关联、阻塞原因和下一步。`resume` 额外输出唯一可恢复工作项、建议读取路径和可复制接力句；JSON 顶层有稳定的 `schema_version` 和 `generated_at`，`git` 概览会标出脏工作区和归因状态。需要检查重复 `REQ-*`/`AC-*`/`TASK-*`、正式来源引用、结构化测试证据和项目规则时，使用 `project-lifecycle.ps1 validate`。外层工作区只返回导航提示，不承载 `WORK-*` 状态。

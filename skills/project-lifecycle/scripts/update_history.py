@@ -57,7 +57,7 @@ def append_record(args: argparse.Namespace, path: Path) -> int:
 - 本地提交：{args.local_commit}
 - 远端推送：{args.remote_push}
 """
-    path.write_text(text.rstrip() + "\n" + record, encoding="utf-8", newline="\n")
+    path.write_bytes((text.rstrip() + "\n" + record).encode("utf-8"))
     print(f"已追加更新记录：{path}")
     return 0
 
@@ -189,7 +189,7 @@ def append_push_verification(path: Path, payload: dict[str, object], work: str) 
 - 本地提交：{payload['local_commit']}
 - 远端推送：已验证；远端 HEAD={commit}
 """
-    path.write_text(text.rstrip() + "\n" + record, encoding="utf-8", newline="\n")
+    path.write_bytes((text.rstrip() + "\n" + record).encode("utf-8"))
 
 
 def push_check(root: Path, as_json: bool, record: bool, work: str) -> int:

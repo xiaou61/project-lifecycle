@@ -3,7 +3,7 @@
 这些是给用户和自动化调用的稳定入口。底层 Python 文件属于 Skill 实现细节，普通用户不需要直接运行 Python。
 
 ```powershell
-$lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-lifecycle.ps1"
+$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
 ```
 
 ## 初始化
@@ -101,7 +101,7 @@ $lifecycle = "$env:USERPROFILE\.codex\skills\project-lifecycle\scripts\project-l
 ```powershell
 python -m unittest discover -s tests -p "test_*.py" -v
 python -m compileall -q skills/project-lifecycle/scripts
-python "$env:USERPROFILE\.codex\skills\.system\skill-creator\scripts\quick_validate.py" "skills/project-lifecycle"
+python "<Skill 发现目录>\.system\skill-creator\scripts\quick_validate.py" "skills/project-lifecycle"
 git diff --check
 ```
 

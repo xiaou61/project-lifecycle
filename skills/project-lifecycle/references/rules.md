@@ -16,7 +16,7 @@
 
 ### 工作项约束
 
-`.agent/changes/<WORK编号>-<中文名称>/requirements.md` 保存本次目标、范围、验收和特殊约束。下游 proposal、design、tasks 只能在已批准范围内收敛。一次变更的取舍放在工作项；跨变更决策放 `.agent/notes/`；稳定共享协议放 `.agent/specs/` 或 `.agent/references/`；长期可检索知识放 `.agent/memory.md`。
+`.agent/changes/<WORK编号>-<中文名称>/requirements.md` 保存本次目标、范围、验收和特殊约束。下游 proposal、design、tasks 只能在已批准范围内收敛。一次变更的取舍放在工作项；跨变更决策放 `.agent/notes/`（写法见 [notes.md](notes.md)）；稳定共享协议放 `.agent/specs/` 或 `.agent/references/`；长期可检索知识放 `.agent/memory.md`。
 
 ## 优先级与冲突
 

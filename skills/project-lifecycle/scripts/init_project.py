@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# 显式声明编码：Python 3.9 的 tokenizer 在无声明时，遇到单行超过 512 字节的非 ASCII 内容会误判编码并报 SyntaxError。
 """在目标项目中初始化 .agent 生命周期工作区和项目级 AGENTS.md。"""
 
 from __future__ import annotations
@@ -151,7 +153,7 @@ def create_text_if_missing(path: Path, content: str) -> str:
         if not path.is_file():
             raise RuntimeError(f"目标路径已存在但不是文件：{path}")
         return "保留"
-    path.write_text(content, encoding="utf-8", newline="\n")
+    path.write_bytes(content.encode("utf-8"))
     return "创建"
 
 
