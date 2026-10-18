@@ -38,14 +38,17 @@
 & $lifecycle record "F:\我的项目" --work WORK-003 --title "修复登录超时" --type implementation `
   --change "调整会话超时处理" --decision "保留现有接口" --basis ".agent/changes/WORK-003-登录/design.md" `
   --verification "pytest tests/test_login.py -q：通过"
+& $lifecycle approve "F:\我的项目" --work WORK-003 --artifact requirements --by "张三" --role "产品"
 & $lifecycle checkpoint "F:\我的项目" --json
 ```
 
 `updates` 和 `checkpoint` 默认只读；`record` 只追加文本，不创建 Git 提交或远端变更。`checkpoint` 返回非零表示工作区仍有未提交改动，便于脚本在切换工作项前阻断。
 
+`approve` 是唯一会写签署字段的命令：它把工件 `status` 置为 `approved`、写入 `approved_by`/`approved_at`/`approver_role`（`--artifact test-report` 时写 `accepted_by`/`accepted_at`），并向本文件追加一条 decision 记录，记录里的时间和 frontmatter 的 `approved_at` 由同一次执行盖同一个时间戳。它不运行测试、不提交 Git、不推送。签署字段不得由 Agent 手写，理由和边界见 [workflow.md](workflow.md) 的“签署”。
+
 本地提交是可恢复的检查点，不等于发布：
 
-1. 在切换到下一个独立工作项，或把当前工作项标记为完成沉淀前，先写完更新历史并确认当前 Git 改动已归因。
+1. 在切换到下一个独立工作项，或把当前工作项标记为完成沉淀前，先写完更新历史，并确认当前 Git 改动确属本次工作项（不认识的文件不要动）。
 2. 用户明确要求“本地提交/保存这一轮”后，只暂存当前工作项归属的文件并创建本地 commit；提交信息应能定位 `WORK-*` 或维护事项。
 3. 没有本地提交授权时，保留改动并在历史中写明“待用户授权”，不要假装已经保存为检查点。
 4. `git push`、创建远端分支、打 tag 或发布都必须得到用户明确授权；“保存”“提交”“继续”不等于远端推送授权。

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet("init", "status", "resume", "validate", "history", "updates", "record", "checkpoint", "push-check")]
+    [ValidateSet("init", "status", "brief", "resume", "validate", "history", "updates", "record", "approve", "archive", "checkpoint", "push-check")]
     [string]$Command,
 
     [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
@@ -31,11 +31,14 @@ if (-not $pythonVersion -or [version]$pythonVersion -lt [version]"3.9") {
 $scriptName = switch ($Command) {
     "init" { "init_project.py" }
     "status" { "project_status.py" }
+    "brief" { "project_status.py" }
     "resume" { "project_status.py" }
     "validate" { "project_validate.py" }
     "history" { "generate_core_history.py" }
     "updates" { "update_history.py" }
     "record" { "update_history.py" }
+    "approve" { "update_history.py" }
+    "archive" { "update_history.py" }
     "checkpoint" { "update_history.py" }
     "push-check" { "update_history.py" }
 }
@@ -44,8 +47,13 @@ $forwardedArgs = @($CommandArgs)
 if ($Command -eq "resume" -and $forwardedArgs -notcontains "--resume") {
     $forwardedArgs += "--resume"
 }
+if ($Command -eq "brief" -and $forwardedArgs -notcontains "--brief") {
+    $forwardedArgs += "--brief"
+}
 if ($Command -eq "updates") { $forwardedArgs += "--list" }
 if ($Command -eq "record") { $forwardedArgs += "--record" }
+if ($Command -eq "approve") { $forwardedArgs += "--approve" }
+if ($Command -eq "archive") { $forwardedArgs += "--archive" }
 if ($Command -eq "checkpoint") { $forwardedArgs += "--check" }
 if ($Command -eq "push-check") { $forwardedArgs += "--push-check" }
 

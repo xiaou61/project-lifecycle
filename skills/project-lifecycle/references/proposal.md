@@ -30,6 +30,6 @@ The recommended approach should explain the essential mechanism, affected owners
 
 Keep detailed class names, schemas, payloads, and file-by-file changes for the design unless they are necessary to establish feasibility. Do not present estimates as facts without evidence.
 
-Map the proposal to requirement and acceptance identifiers so omissions are visible. Keep the proposal at `status: draft` until the user explicitly approves the selected approach and any material open decisions.
+Map the proposal to requirement and acceptance identifiers so omissions are visible. Keep the proposal at `status: draft` until the user explicitly approves the selected approach and any material open decisions. Approval is recorded with `project-lifecycle.ps1 approve --artifact proposal`, which stamps `approved_by` and `approved_at`; only that command writes the signer fields (see the “签署” section in [workflow.md](workflow.md)).
 
 Do not add product scope in the proposal. When the recommended approach requires behavior absent from the requirements, revise and reapprove the requirements first. A materially changed approved proposal makes the current design, task plan, and verification artifacts `stale`.

@@ -1,0 +1,22 @@
+{
+  "name": "project-lifecycle-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "project-lifecycle 工件查看器：读取 .agent/ 状态并可视化工作项、审批与文件",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && electron .",
+    "pack": "npm run build && electron-packager . project-lifecycle-viewer --platform=win32 --arch=x64 --out=release --overwrite --prune=true --extra-resource=../skills --ignore=\"^/\\.smoke\" --ignore=\"^/release\" --ignore=\"^/src\" --ignore=\"^/tsconfig\\.json\"",
+    "smoke": "npm run build && electron . --smoke"
+  },
+  "dependencies": {
+    "marked": "^15.0.0"
+  },
+  "devDependencies": {
+    "@electron/packager": "^18.3.6",
+    "@types/node": "^24.0.0",
+    "electron": "^38.0.0",
+    "typescript": "^5.7.0"
+  }
+}

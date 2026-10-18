@@ -23,8 +23,7 @@ SEVERE_WARNING_MARKERS = (
     "中文名称",
     "下游工件",
     "来源覆盖",
-    "workspace.md",
-    "归因",
+    "没有任何一个能被解析",
 )
 ARCHIVE_DATE_PREFIX = re.compile(r"^\d{4}-\d{2}-\d{2}-(.+)$")
 # 归档前的历史记录不回改：updates.md 是追加式时间线，改写它会伪造当时的事实。
@@ -133,6 +132,32 @@ def validate_item(
             errors.append(issue(work_id, message))
         else:
             warnings.append(issue(work_id, message))
+    # 整理项（文档体积、任务格式）不阻断恢复，但发布或交接前要能看见；
+    # 其中"任务一个都没解析出来"属解析失败，仍按错误处理。
+    for warning in item.get("hygiene", []):
+        message = str(warning)
+        target = errors if any(marker in message for marker in SEVERE_WARNING_MARKERS) else warnings
+        target.append(issue(work_id, message))
+
+    approval = item.get("approval", {})
+    if approval.get("status") == "invalid":
+        errors.append(
+            issue(
+                work_id,
+                "已批准工件的签署时间戳格式无效："
+                + "、".join(f"{name}.md" for name in approval["invalid"])
+                + "；请让用户重新运行 approve 盖章。",
+            )
+        )
+    elif approval.get("unsigned"):
+        warnings.append(
+            issue(
+                work_id,
+                "已批准工件缺少签署记录："
+                + "、".join(f"{name}.md" for name in approval["unsigned"])
+                + "；旧工件保留原样，发布或交接前请用 approve 补签。",
+            )
+        )
 
     source = item.get("source_coverage", {})
     if source.get("status") in {"incomplete", "invalid"}:
@@ -148,9 +173,8 @@ def validate_item(
     if item["artifacts"]["test_report"] in {"partial", "failed", "stale"}:
         errors.append(issue(work_id, f"验证报告状态为 {item['artifacts']['test_report']}，不能作为完成证据。"))
 
-    attribution = item.get("workspace_attribution", {})
-    if git["status"] == "dirty" and attribution.get("status") != "complete":
-        errors.append(issue(work_id, "Git 工作区改动尚未完成该工作项的 workspace.md 归因。"))
+    # 工作区归因检查已移除（2026-10-10）：机制停用，
+    # 说明见 project_status.workspace_attribution_status。
     return errors, warnings
 
 

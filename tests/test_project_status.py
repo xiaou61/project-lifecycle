@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import json
 import subprocess
@@ -342,6 +343,27 @@ class ProjectStatusTests(unittest.TestCase):
         )
         self.assertEqual(dirty["status"], "stale")
 
+        # 只知道"脏"、取不到路径清单时按保守口径；能取到路径且全是 .agent/ 工件时不误判。
+        dirty_docs_only = project_status.verification_anchor(
+            work,
+            {
+                "head": "abcdef1234567890",
+                "status": "dirty",
+                "entries": [{"index": "M", "worktree": " ", "path": ".agent/history/updates.md"}],
+            },
+        )
+        self.assertEqual(dirty_docs_only["status"], "verified")
+
+        dirty_with_source = project_status.verification_anchor(
+            work,
+            {
+                "head": "abcdef1234567890",
+                "status": "dirty",
+                "entries": [{"index": "M", "worktree": " ", "path": "src/app.ts"}],
+            },
+        )
+        self.assertEqual(dirty_with_source["status"], "drift")
+
     def test_document_only_report_commit_can_remain_verified(self) -> None:
         source = self.project / "src" / "login.py"
         source.parent.mkdir(parents=True)
@@ -377,7 +399,8 @@ class ProjectStatusTests(unittest.TestCase):
         self.assertEqual(resume["mode"], "ask_user")
         self.assertEqual({item["work_id"] for item in resume["candidates"]}, {"WORK-011", "WORK-012"})
 
-    def test_dirty_git_workspace_requires_attribution_before_resume(self) -> None:
+    def test_dirty_git_workspace_does_not_block_resume(self) -> None:
+        """归因机制已于 2026-10-10 停用：未提交改动不再阻止自动恢复。"""
         self.managed_work("WORK-013", "恢复归因")
         result = subprocess.run(
             ["git", "init"],
@@ -391,11 +414,11 @@ class ProjectStatusTests(unittest.TestCase):
 
         status = project_status.inspect_project(self.project)
         self.assertEqual(status["git"]["status"], "dirty")
-        self.assertEqual(status["git"]["attribution"], "unclassified")
-        self.assertEqual(status["resume"]["mode"], "ask_user")
-        self.assertTrue(any("归因" in blocker for blocker in status["resume"]["blockers"]))
+        self.assertEqual(status["work_items"][0]["workspace_attribution"]["status"], "not_required")
+        self.assertEqual(status["resume"]["mode"], "auto_resume")
 
-    def test_workspace_attribution_completes_resume(self) -> None:
+    def test_legacy_workspace_attribution_is_ignored(self) -> None:
+        """旧项目里的 workspace.md 不再被校验，也不再阻止恢复。"""
         self.managed_work("WORK-014", "归因完成")
         (self.project / "src").mkdir()
         (self.project / "src" / "login.py").write_text("VALUE = 1\n", encoding="utf-8")
@@ -418,33 +441,8 @@ class ProjectStatusTests(unittest.TestCase):
             encoding="utf-8",
         )
         status = project_status.inspect_project(self.project)
-        self.assertEqual(status["work_items"][0]["workspace_attribution"]["status"], "complete")
+        self.assertEqual(status["work_items"][0]["workspace_attribution"]["status"], "not_required")
         self.assertEqual(status["resume"]["mode"], "auto_resume")
-
-    def test_unknown_workspace_attribution_still_blocks_resume(self) -> None:
-        self.managed_work("WORK-014", "未知归因")
-        (self.project / "src").mkdir()
-        (self.project / "src" / "login.py").write_text("VALUE = 1\n", encoding="utf-8")
-        subprocess.run(["git", "init"], cwd=self.project, capture_output=True, check=True)
-        subprocess.run(["git", "add", "."], cwd=self.project, capture_output=True, check=True)
-        subprocess.run(
-            ["git", "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "base"],
-            cwd=self.project,
-            capture_output=True,
-            check=True,
-        )
-        (self.project / "src" / "login.py").write_text("VALUE = 2\n", encoding="utf-8")
-        status = project_status.inspect_project(self.project)
-        work = self.project / ".agent" / "changes" / "WORK-014-未知归因"
-        (work / "workspace.md").write_text(
-            f"---\nbase_commit: {status['git']['head']}\n---\n\n## 工作区归因\n\n"
-            "| 路径 | 归属 | 说明 |\n| --- | --- | --- |\n"
-            "| src/login.py | unknown | 等待确认 |\n",
-            encoding="utf-8",
-        )
-        status = project_status.inspect_project(self.project)
-        self.assertEqual(status["work_items"][0]["workspace_attribution"]["status"], "incomplete")
-        self.assertEqual(status["resume"]["mode"], "ask_user")
 
     def test_structured_evidence_covers_all_acceptance_criteria(self) -> None:
         work = self.managed_work("WORK-015", "证据矩阵", task_body="### TASK-001 | done | 完成")
@@ -656,7 +654,12 @@ class ProjectStatusTests(unittest.TestCase):
         item = status["work_items"][0]
         self.assertEqual(item["work_id"], "WORK-003")
         self.assertEqual(item["name"], "用户登录")
-        self.assertEqual(item["tasks"], {"pending": 1, "in_progress": 0, "done": 1, "blocked": 0})
+        self.assertEqual(
+            {key: item["tasks"][key] for key in ("pending", "in_progress", "done", "blocked")},
+            {"pending": 1, "in_progress": 0, "done": 1, "blocked": 0},
+        )
+        self.assertEqual(item["tasks"]["total"], 2)
+        self.assertTrue(item["tasks"]["state_known"])
         self.assertIn("WORK-003 · 用户登录", project_status.render_text(status))
 
         by_id = project_status.inspect_project(self.project, work="work-003")
@@ -953,6 +956,252 @@ class InitializationTests(unittest.TestCase):
             self.assertFalse(status["rules"]["configured"])
             self.assertTrue(status["rules"]["confirmation_required"])
             self.assertTrue(any("用户确认" in warning for warning in status["rules"]["warnings"]))
+
+
+class ApprovalSigningTests(unittest.TestCase):
+    """签署：字段只能由 approve 入口盖章，缺失和格式错误分开报告。"""
+
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.project = Path(self.temp.name)
+        rules = self.project / ".agent" / "rules" / "always.md"
+        rules.parent.mkdir(parents=True, exist_ok=True)
+        rules.write_text(
+            "---\nartifact: project_rules\nstatus: active\nconfigured: true\n---\n\n"
+            "# 项目常驻规范\n\n## MUST：所有任务\n\n- 运行测试\n",
+            encoding="utf-8",
+        )
+        history = self.project / ".agent" / "history" / "updates.md"
+        history.parent.mkdir(parents=True, exist_ok=True)
+        history.write_text(
+            "---\nartifact: update-history\nstatus: active\n---\n\n## 记录\n", encoding="utf-8"
+        )
+        self.work = self.project / ".agent" / "changes" / "WORK-001-登录超时"
+        artifact(
+            self.work / "requirements.md",
+            "requirements",
+            "approved",
+            "## 目标\n修复登录超时。\n\n## 验收标准\n- AC-001 会话超时后重新登录成功。\n",
+            work="登录超时",
+            work_id="WORK-001",
+        )
+
+    def tearDown(self) -> None:
+        self.temp.cleanup()
+
+    def approve_args(self, **overrides: object) -> argparse.Namespace:
+        values: dict[str, object] = {
+            "work": "WORK-001",
+            "artifact": "requirements",
+            "by": "张三",
+            "role": "产品",
+            "json": True,
+        }
+        values.update(overrides)
+        return argparse.Namespace(**values)
+
+    def test_approve_stamps_signer_and_appends_history(self) -> None:
+        self.assertEqual(0, update_history.approve(self.approve_args(), self.project))
+        fields = project_status.frontmatter_fields(
+            (self.work / "requirements.md").read_text(encoding="utf-8-sig")
+        )
+        self.assertEqual("approved", fields["status"])
+        self.assertEqual("张三", fields["approved_by"])
+        self.assertEqual("产品", fields["approver_role"])
+        self.assertTrue(project_status.APPROVED_AT_PATTERN.match(fields["approved_at"]))
+        entry = (self.project / ".agent" / "history" / "updates.md").read_text(encoding="utf-8")
+        self.assertIn("签署 .agent/changes/WORK-001-登录超时/requirements.md", entry)
+        self.assertIn("审批人 张三（产品）", entry)
+        self.assertIn(fields["approved_at"], entry)
+
+    def test_approve_records_business_acceptance_only_for_passed_report(self) -> None:
+        report = self.work / "testing" / "report.md"
+        artifact(report, "test-report", "partial", work="登录超时", work_id="WORK-001")
+        with self.assertRaises(RuntimeError):
+            update_history.approve(self.approve_args(artifact="test-report", by="李四"), self.project)
+        report.write_text(
+            report.read_text(encoding="utf-8").replace("status: partial", "status: passed"),
+            encoding="utf-8",
+        )
+        self.assertEqual(
+            0, update_history.approve(self.approve_args(artifact="test-report", by="李四"), self.project)
+        )
+        fields = project_status.frontmatter_fields(report.read_text(encoding="utf-8-sig"))
+        self.assertEqual("passed", fields["status"])
+        self.assertEqual("李四", fields["accepted_by"])
+        self.assertTrue(project_status.APPROVED_AT_PATTERN.match(fields["accepted_at"]))
+
+    def test_approve_unknown_work_item_is_rejected(self) -> None:
+        with self.assertRaises(RuntimeError):
+            update_history.approve(self.approve_args(work="WORK-999"), self.project)
+
+    def test_unsigned_approval_is_a_compatibility_warning(self) -> None:
+        item = project_status.inspect_project(self.project)["work_items"][0]
+        self.assertEqual("incomplete", item["approval"]["status"])
+        self.assertEqual(["requirements"], item["approval"]["unsigned"])
+        normal = project_validate.validate_project(self.project)
+        self.assertTrue(any("缺少签署记录" in warning["message"] for warning in normal["warnings"]))
+        self.assertTrue(normal["valid"])
+        self.assertFalse(project_validate.validate_project(self.project, strict=True)["valid"])
+
+    def test_signed_artifact_has_no_approval_warning(self) -> None:
+        update_history.approve(self.approve_args(), self.project)
+        item = project_status.inspect_project(self.project)["work_items"][0]
+        self.assertEqual("complete", item["approval"]["status"])
+        self.assertEqual("张三", item["approval"]["artifacts"]["requirements"]["approved_by"])
+        messages = [
+            warning["message"]
+            for warning in project_validate.validate_project(self.project)["warnings"]
+        ]
+        self.assertFalse(any("签署" in message for message in messages))
+
+    def test_invalid_signature_timestamp_is_an_error(self) -> None:
+        path = self.work / "requirements.md"
+        text = path.read_text(encoding="utf-8-sig").replace(
+            "status: approved", "status: approved\napproved_by: 张三\napproved_at: 昨天下午"
+        )
+        path.write_bytes(text.encode("utf-8"))
+        item = project_status.inspect_project(self.project)["work_items"][0]
+        self.assertEqual("invalid", item["approval"]["status"])
+        result = project_validate.validate_project(self.project)
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("时间戳格式无效" in error["message"] for error in result["errors"]))
+
+    def test_stamp_preserves_bom_crlf_and_other_keys(self) -> None:
+        path = self.work / "requirements.md"
+        path.write_bytes(
+            b"\xef\xbb\xbf"
+            + (
+                "---\r\nwork_id: WORK-001\r\nwork: 登录超时\r\nstatus: draft\r\n"
+                "updated: 2026-08-19\r\n---\r\n\r\n# 需求\r\n"
+            ).encode("utf-8")
+        )
+        text, bom, newline = update_history.load_artifact(path)
+        stamped = update_history.stamp_frontmatter(
+            text, {"status": "approved", "approved_by": "张三", "approver_role": ""}, newline
+        )
+        update_history.save_artifact(path, stamped, bom)
+        raw = path.read_bytes()
+        self.assertTrue(raw.startswith(b"\xef\xbb\xbf"))
+        self.assertNotIn(b"\n", raw.replace(b"\r\n", b""))
+        fields = project_status.frontmatter_fields(raw.decode("utf-8-sig"))
+        self.assertEqual("approved", fields["status"])
+        self.assertEqual("2026-08-19", fields["updated"])
+        self.assertEqual("WORK-001", fields["work_id"])
+        self.assertEqual("张三", fields["approved_by"])
+
+
+class TraceabilityTests(unittest.TestCase):
+    """需求追踪：真实工件里的四种定义写法、区间语法、同行依赖、旧版标记。"""
+
+    def test_expand_trace_ids_handles_ranges_and_plain_ids(self) -> None:
+        values = project_status.expand_trace_ids("`REQ-001`、`REQ-004`、`AC-001~AC-003`")
+        self.assertEqual(["AC-001", "AC-002", "AC-003", "REQ-001", "REQ-004"], sorted(values))
+        # 区间第二段省略前缀也要认
+        self.assertEqual(
+            ["AC-006", "AC-007", "AC-008", "AC-009"],
+            project_status.expand_trace_ids("AC-006~009"),
+        )
+        # 前缀过滤
+        self.assertEqual(["REQ-002"], project_status.expand_trace_ids("`REQ-002`、`TASK-003`", ("REQ",)))
+        # 笔误写成超长区间时按 100 截断，不撑爆节点数
+        self.assertEqual(100, len(project_status.expand_trace_ids("AC-001~AC-999")))
+
+    def test_trace_definitions_accepts_all_four_writing_styles(self) -> None:
+        text = (
+            "- **REQ-001 结果上传**：支持两种入口。\n"
+            "- **AC-001** 一个真实仓库能端到端跑通：验证对象为 demo。\n"
+            "- **AC-002**：粘贴一份合法 JSON，平台正确解析。\n"
+            "- REQ-002：建立自动化的模块接缝检查，覆盖全部 36 个模块。\n"
+        )
+        found = {item["id"]: item["title"] for item in project_status.trace_definitions(text)}
+        self.assertEqual("结果上传", found["REQ-001"])
+        self.assertEqual("一个真实仓库能端到端跑通", found["AC-001"])
+        self.assertEqual("粘贴一份合法 JSON，平台正确解析", found["AC-002"])
+        self.assertEqual("建立自动化的模块接缝检查，覆盖全部 36 个模块", found["REQ-002"])
+
+    def make_work(self, tasks_body: str, requirements_body: str = "") -> Path:
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        work = Path(temp.name) / ".agent" / "changes" / "WORK-001-演示"
+        work.mkdir(parents=True)
+        (work / "requirements.md").write_text(
+            "---\nwork_id: WORK-001\nwork: 演示\nstatus: approved\n---\n\n"
+            "## 功能需求\n\n"
+            "- **REQ-001 结果上传**：支持两种入口。\n"
+            "- **REQ-002 结果展示**：展示接口清单。\n\n"
+            "## 验收标准\n\n"
+            "- **AC-001**：合法 JSON 可上传并展示。\n"
+            "- **AC-002**：失败结果显示修复建议。\n" + requirements_body,
+            encoding="utf-8",
+        )
+        (work / "tasks.md").write_text(
+            "---\nwork_id: WORK-001\nwork: 演示\nstatus: approved\n---\n\n"
+            "# 演示实施任务\n\n" + tasks_body,
+            encoding="utf-8",
+        )
+        return work
+
+    def trace_of(self, work: Path) -> dict[str, object]:
+        coverage = project_status.source_coverage_status(work / "requirements.md")
+        evidence = project_status.testing_evidence_status(
+            work / "testing" / "report.md",
+            project_status.requirement_acceptance_ids(work / "requirements.md"),
+        )
+        return project_status.traceability_status(work, evidence, coverage)
+
+    def test_traceability_reads_mapping_and_dependencies(self) -> None:
+        work = self.make_work(
+            "### TASK-001 | done | 项目骨架\n\n- 对应：基础设施\n- 依赖：无\n\n"
+            "### TASK-002 | done | 上传 API\n\n- 对应：旧版 `REQ-001`、`AC-001~AC-002`\n- 依赖：`TASK-001`\n\n"
+            "### TASK-003 | pending | 前端\n\n- 对应：`REQ-002`；依赖：`TASK-002`、`TASK-003`\n"
+        )
+        trace = self.trace_of(work)
+        self.assertEqual(["REQ-001", "REQ-002"], [item["id"] for item in trace["requirements"]])
+        self.assertEqual(["AC-001", "AC-002"], [item["id"] for item in trace["acceptance"]])
+        tasks = {task["id"]: task for task in trace["tasks"]}
+        # 没有写 id 的任务算未映射，不是错误
+        self.assertEqual([], tasks["TASK-001"]["maps_to"])
+        self.assertEqual(["TASK-001"], trace["unmapped_tasks"])
+        self.assertEqual(["REQ-001", "AC-001", "AC-002"], tasks["TASK-002"]["maps_to"])
+        self.assertEqual(["REQ-001", "AC-001", "AC-002"], tasks["TASK-002"]["legacy"])
+        self.assertEqual(["TASK-001"], tasks["TASK-002"]["depends_on"])
+        # 同行写法和独立写法都要取到依赖；自引用要被剔除
+        self.assertEqual(["REQ-002"], tasks["TASK-003"]["maps_to"])
+        self.assertEqual(["TASK-002"], tasks["TASK-003"]["depends_on"])
+        self.assertEqual([], tasks["TASK-003"]["legacy"])
+
+    def test_traceability_reports_undefined_refs_and_evidence_gaps(self) -> None:
+        work = self.make_work("### TASK-001 | done | 上传\n\n- 对应：`REQ-009`\n- 依赖：无\n")
+        trace = self.trace_of(work)
+        # 引用了不存在的需求要报出来，而不是静默丢掉
+        self.assertEqual(["REQ-009"], trace["undefined_refs"])
+        # 报告不存在时所有验收标准都没有结构化证据
+        self.assertEqual(["AC-001", "AC-002"], trace["acceptance_without_evidence"])
+        self.assertEqual([], trace["requirement_acceptance_links"])
+
+    def test_requirement_acceptance_links_come_only_from_coverage_table(self) -> None:
+        work = self.make_work(
+            "### TASK-001 | done | 上传\n\n- 对应：`REQ-001`\n",
+            requirements_body=(
+                "\nsource_coverage: required\n\n## 来源覆盖\n\n"
+                "| 来源 | 锚点 | REQ | AC | 状态 |\n| --- | --- | --- | --- | --- |\n"
+                "| PRD.md | 第 1 节 | REQ-001、REQ-002 | AC-001 | verified |\n"
+            ),
+        )
+        # frontmatter 里没有 source_coverage: required 时不该产出直连边
+        self.assertEqual([], self.trace_of(work)["requirement_acceptance_links"])
+
+        path = work / "requirements.md"
+        text = path.read_text(encoding="utf-8").replace(
+            "status: approved", "status: approved\nsource_coverage: required"
+        )
+        path.write_text(text, encoding="utf-8")
+        trace = self.trace_of(work)
+        self.assertEqual(
+            [["REQ-001", "AC-001"], ["REQ-002", "AC-001"]],
+            trace["requirement_acceptance_links"],
+        )
 
 
 if __name__ == "__main__":

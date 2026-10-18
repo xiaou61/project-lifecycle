@@ -135,7 +135,11 @@ Agent 会主动给受管理需求分配不复用的中文名称和 `WORK-*` 编�
 ### 查询状态
 
 ```powershell
-# 当前非归档工作项
+# 每轮默认：只输出活动工作项、真阻塞和下一步（约 2–3 KB）
+& $lifecycle brief "F:\我的项目"
+& $lifecycle brief "F:\我的项目" --json
+
+# 完整清单：阶段、签署、依赖、预算与全部提示
 & $lifecycle status "F:\我的项目"
 
 # 只看可恢复上下文、阻塞、建议读取路径和接力提示
@@ -153,6 +157,10 @@ Agent 会主动给受管理需求分配不复用的中文名称和 `WORK-*` 编�
 
 # 包含归档资料
 & $lifecycle status "F:\我的项目" --include-archive
+
+# 归档已完成的工作项（全部或指定一个）
+& $lifecycle archive "F:\我的项目"
+& $lifecycle archive "F:\我的项目" --work WORK-003
 ```
 
 状态查询返回当前阶段、工件状态、任务计数、依赖、关联、阻塞原因和下一步。`resume` 额外输出唯一可恢复工作项、建议读取路径和可复制接力句；JSON 顶层有稳定的 `schema_version` 和 `generated_at`，`git` 概览会标出脏工作区和归因状态。需要检查重复 `REQ-*`/`AC-*`/`TASK-*`、正式来源引用、结构化测试证据和项目规则时，使用 `project-lifecycle.ps1 validate`。外层工作区只返回导航提示，不承载 `WORK-*` 状态。
@@ -161,16 +169,34 @@ Agent 会主动给受管理需求分配不复用的中文名称和 `WORK-*` 编�
 
 更新历史命令：`updates` 查看 `.agent/history/updates.md`，`record` 按固定字段追加一条记录，`checkpoint` 检查本地 Git 工作区是否还有未提交改动，`push-check` 用 `git ls-remote` 核对远端 HEAD 和历史记录。它们不会自动提交或推送。
 
+审批签署命令：`approve` 把用户确认盖章成带审批人和脚本时间戳的记录。它同时把工件 `status` 置为 `approved`、写入 `approved_by`/`approved_at`/`approver_role`（`--artifact test-report` 时写 `accepted_by`/`accepted_at`）并追加一条决策记录。签署字段只能由这个入口写入，Agent 不得自行填写；缺少签署时 `validate` 报告警告，`validate --strict` 视为失败。
+
 ```powershell
 & $lifecycle updates "F:\我的项目" --tail 10
 & $lifecycle record "F:\我的项目" --work WORK-003 --title "修复登录超时" --type implementation `
   --change "调整会话超时处理" --decision "保留现有接口" --basis ".agent/changes/WORK-003-登录/design.md" `
   --verification "pytest tests/test_login.py -q：通过"
+& $lifecycle approve "F:\我的项目" --work WORK-003 --artifact requirements --by "张三" --role "产品"
+& $lifecycle approve "F:\我的项目" --work WORK-003 --artifact all --by "张三" --role "产品"
 & $lifecycle checkpoint "F:\我的项目" --json
 & $lifecycle push-check "F:\我的项目" --json
 ```
 
 每次实际修改后，Agent 还要在目标项目 `.agent/history/updates.md` 追加变更、决策、依据、验证和本地提交边界。切换独立工作项或完成沉淀前，先留下本地 commit 检查点；`git push`、远端分支、tag 和部署必须得到用户明确授权。
+
+## 工件查看器
+
+[`desktop/`](desktop/README.md) 是一个 Electron + TypeScript 的只读界面，两个视图：**工作区**（各项目的阻塞/待补签/证据缺口汇总，点卡片进入项目）与**项目**（五个页签：**总览**（七道阶段门槛条 + 需求追踪图（REQ/AC/TASK 三条带，悬停亮线、点击看关系、缺口标黄）+ 工作项依赖/关联图）、**阅读**（工件状态、审批签署、Git 日期与 Markdown 正文）、**校验**、**历史**、**数据**（原始 JSON，点字段跳转））。它不替代 `status` 命令，也不写任何工件——状态与追踪关系都由 `project_status.py` 推导，界面只是渲染那份 JSON。
+
+```powershell
+cd desktop
+npm install
+npm start                                                    # 开发运行
+npm run smoke -- "F:\我的项目"                                # 数据桥 + 界面交互自检
+npm run pack                                                 # 打包 Windows exe
+```
+
+exe 内置一份 Skill 脚本副本，目标机器需要 Python 3.9+；详见 [desktop/README.md](desktop/README.md)。
 
 ## 开发与发布
 

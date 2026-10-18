@@ -28,16 +28,18 @@
 | “我有个想法”“想加功能” | 讨论范围、约束和验收 | 稳定后创建 `requirements.md` |
 | “把需求问透”“先访谈再出 PRD/Task” | 进入 `requirements-interview.md` 的逐轮模式 | 持续更新需求，最终确认后进入流程 |
 | “把刚才内容整理成需求” | 综合上下文和仓库事实，只问真实缺口 | 更新 `requirements.md` |
-| “这版需求确认” | 明确批准需求 | `requirements.md` 为 `approved` |
+| “这版需求确认” | 明确批准需求，并让用户签署 | `requirements.md` 为 `approved` 且带签署 |
 | “给个方案”“需求确认了，继续” | 推荐方案并说明取舍 | `proposal.md` |
 | “方案可以，做设计” | 批准方案并完成设计 | `design.md` |
 | “设计没问题，拆任务” | 批准设计并拆执行计划 | `tasks.md` |
 | “按计划开始做”“实施 WORK-003” | 恢复状态，门槛满足后实现 | 源码、测试和任务状态 |
 | “测试一下”“验收 WORK-003” | 按验收标准做真实验证 | 测试计划和报告 |
+| “我验收通过”“业务验收” | 在已通过的验证报告上登记业务验收 | `testing/report.md` 的 `accepted_by` |
 | “当前状态”“查询 WORK-003” | 从工件推导阶段、关系和下一步 | 默认不修改工件 |
 | “这一轮改了什么”“看更新历史” | 读取 `.agent/history/updates.md` 最近记录 | 默认不修改历史 |
 | “记一下这轮改动”“补一条更新记录” | 按固定字段追加一条更新记录 | `.agent/history/updates.md` |
 | “存一下”“留个检查点” | 检查本地工作区并交付提交边界 | 本地 commit（需用户授权） |
+| “归档一下”“清一下列表” | 把已完成的 `WORK-*` 移进 `changes/archive/` | 目录迁移，文件内容不变 |
 | “推送后核对一下” | 用 `git ls-remote` 核对远端提交与历史记录 | 可选追加本地核验记录 |
 
 显式写 `$project-lifecycle` 总能请求本 Skill；孤立小修复不必强行创建工作项。
@@ -50,9 +52,12 @@
 
    ```powershell
    $lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
-   & $lifecycle status <project-root> --json
-   & $lifecycle resume <project-root> --json
+   & $lifecycle brief <project-root> --json      # 每轮默认：只含活动工作项、阻塞、下一步
+   & $lifecycle status <project-root> --json     # 完整清单、签署、依赖、预算、全部警告
+   & $lifecycle resume <project-root> --work WORK-003 --json
    ```
+
+   默认用 `brief`：完整 `status` 在 16 个工作项的项目上约 225 KB，只为一次上下文切换不值得。`brief` 保留每项的 `warnings`（真阻塞）与 `hygiene`（文档体积、任务格式等整理项）分开的两组提示。
 
    `--resume` 返回 `auto_resume`、`ask_user` 或 `out_of_scope`，并给出阶段、阻塞、建议读取路径和接力提示。选中的 `work_item` 还会从 `requirements.md` 带出 `goal`、`acceptance_criteria`、`constraints` 和 `goal_status`；缺失时返回恢复警告，不得根据聊天摘要臆造。`state_evidence` 明确区分工件推导状态、已记录测试、Git 快照和未知的源码同步情况；它不能证明代码已完成，恢复后仍需核对任务、差异和测试。下游按 `schema_version` 和字段读取，不解析中文文本。
 4. **定位和加载依据**：按用户点名的编号、中文名、内容唯一匹配、唯一活动项的顺序选择；先读需求，再按阶段读取已批准工件、规格、记忆和共享资料。
@@ -66,24 +71,13 @@ $lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecyc
 & $lifecycle validate <project-root> --json
 ```
 
-它检查结构、标识符、来源引用、测试证据和 Git 归因。普通 `validate` 保留警告并允许继续查看结果；`--strict` 将兼容性警告视为失败。两者都不会自动运行冒烟测试。
+它检查结构、标识符、来源引用和测试证据。普通 `validate` 保留警告并允许继续查看结果；`--strict` 将兼容性警告视为失败。两者都不会自动运行冒烟测试。
 
-## 工作区归因与多仓库边界
+## 工作区与多仓库边界
 
-恢复前必须查看状态输出中的 Git 概览。存在 staged、unstaged 或 untracked 改动时，在当前工作项下创建/更新 `workspace.md`，记录 `base_commit` 和每条路径的 `current_work`、`user_existing` 或 `unknown` 归属；所有路径已归类、基准未变且没有未知归属后，恢复探针才可自动继续。不得因为聊天或任务文件说“完成”就覆盖、清理或提交未授权改动。
+恢复前查看状态输出中的 Git 概览。**未提交改动不阻塞恢复**——工作区归因表（`workspace.md`）机制已于 2026-10-10 按用户要求停用：它要求每个工作项都登记工作区里的**全部**未提交路径，成本是"工作项数 × 改动路径数"份重复登记，而且只是一张很快过期的快照。未提交的改动由 Git 自己记录，status / resume 不再要求任何登记文件。
 
-```markdown
----
-base_commit: <当前基准 commit>
----
-
-## 工作区归因
-
-| 路径 | 归属 | 说明 |
-| --- | --- | --- |
-| src/login.ts | current_work | TASK-001 的实现 |
-| README.md | user_existing | 用户原有未提交修改 |
-```
+提交时仍遵守一条纪律：**只提交当前工作项归属的文件，用户已有与未知归属的改动保持原样**；不得因为聊天或任务文件说“完成”就覆盖、清理或提交未授权改动。存在并发写入时，优先用 `git worktree` 隔离，或遵守"同一目录同一时刻只允许一个写入对话"。
 
 外层 `.agent/` 不承载项目状态；进入开发、验证或恢复 `WORK-*` 时必须切换到真实项目目录。初始化器创建项目内 `.agent/INDEX.md` 和 `.agent/html/`：索引登记源码、配置、测试、规格、工作项和理解材料的位置，不记录阶段或任务状态；HTML 只用于解释架构、流程、状态机、数据流或交互，不是运行时依赖或验收证据。
 
@@ -101,6 +95,10 @@ base_commit: <当前基准 commit>
 | 任务完成但没有通过验证报告 | 测试验收 | 记录证据、缺口和风险 |
 | 上游一致、任务完成、验证通过 | 完成沉淀 | 核对规格、记忆并可选归档（归档前按 [specs.md](specs.md) 修正旧路径引用） |
 
+`strict` 工作项在实现阶段还会收到一条不阻断的提示：`tasks.md` 缺少 `## 评审焦点`。它提醒的是"规格暗示、却没有任务测试覆盖的失败模式"，格式与归属规则见 [tasks.md](tasks.md)。工作项已 `passed` 后不再提示——回头补历史计划不会改变已发生的事。
+
+本表里的“已批准”指工件 `status: approved` 且带签署记录；只有 `status` 没有签署时按“未完成签署”处理，先补签再跨门槛。
+
 如果后期工件存在但更早阶段缺失、未批准或失效，回到最早受影响阶段。用户可以明确合并或豁免门槛，但决定必须写入受影响工件，不能从催促语气推断。
 
 ## 探索、实施与漂移
@@ -115,7 +113,7 @@ base_commit: <当前基准 commit>
 $project-lifecycle 在当前项目继续 WORK-003，先恢复规范和状态，再按当前阶段执行。
 ```
 
-收到后必须重新执行本文件的固定顺序，把编号当定位键而非审批；多个活动项要求用户选择。任务已批准、项目事实已配置、硬依赖完成、工作区已归因且无漂移时可直接实施，否则停在最早缺失门槛并说明原因。编号不存在时报告可用工作项，不得臆造。
+收到后必须重新执行本文件的固定顺序，把编号当定位键而非审批；多个活动项要求用户选择。任务已批准、项目事实已配置、硬依赖完成且无漂移时可直接实施，否则停在最早缺失门槛并说明原因。编号不存在时报告可用工作项，不得臆造。
 
 状态输出在有助于接力或暴露阻塞时使用：
 
@@ -150,9 +148,52 @@ git worktree add "..\项目-WORK-003" -b "work/WORK-003"
 
 明确指向当前工件的“这版需求确认”“方案就这么定”“设计没问题，按它拆任务”“任务计划确认，开始做”可以批准；“继续”“开始做”“执行 `WORK-*`”只表达动作意图，除非同句明确批准。
 
+### 签署
+
+批准和签署是两件事：批准是门槛判断，签署是“谁在什么时候批的”这条审计事实。只有已经存在阶段门槛的工件需要签署，`lite` 短路径、`testing/plan.md` 和 `.agent/specs/` 不签（稳定规格的改动由工作项的需求和设计授权）。
+
+| 工件 | 签署字段 | 签署人 |
+| --- | --- | --- |
+| `requirements.md` | `approved_by`、`approved_at`、`approver_role` | 需求方或业务负责人 |
+| `proposal.md`、`design.md`、`tasks.md` | 同上 | 技术负责人 |
+| `testing/report.md` | `accepted_by`、`accepted_at` | 验收人；只登记业务验收，不改报告状态 |
+
+签署只走命令入口，时间戳由脚本盖：
+
+```powershell
+$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
+& $lifecycle approve "F:\我的项目" --work WORK-003 --artifact all --by "张三" --role "产品"
+& $lifecycle approve "F:\我的项目" --work WORK-003 --artifact design --by "张三" --role "技术"
+& $lifecycle approve "F:\我的项目" --work WORK-003 --artifact test-report --by "李四"
+```
+
+`--artifact all` 一次签完工作项里已存在的 `requirements/proposal/design/tasks`，只追加一条 decision 记录。用户说的“这一版可以，继续”通常就是一个整版确认，不必为每个文件各跑一次、各留一条历史。业务验收仍要单独 `--artifact test-report`，且报告必须已是 `passed`。
+
+`approve` 会同时把 `status` 置为 `approved`、写入签署字段，并向 `.agent/history/updates.md` 追加一条 decision 记录。它只做这三件事，不运行测试、不提交 Git、不推送。
+
+规则：
+
+- `approved_by`、`approved_at`、`approver_role`、`accepted_by`、`accepted_at` 只能由 `approve` 写入。Agent 不得凭自己的判断填写这些字段——那等于让模型替用户签字。
+- `--by` 必须是用户本人给出的姓名或项目名单中的姓名，不得编造；用户没有说明时先问一次，不要默认填“用户”或 Agent 自己的名字。
+- 用户明确批准时，Agent 可以代跑 `approve` 并回显写入的姓名和时间；用户也可以自己运行同一条命令。用户没批准就不要跑。
+- 报告登记业务验收要求 `testing/report.md` 已经是 `passed`；`partial`、`failed` 或 `stale` 的报告拒绝登记。
+- 工件缺签署时，状态输出会给出警告并阻断自动恢复；`validate` 按警告报告（旧工件保留原样），`validate --strict` 视为失败。签署时间戳格式错误一律是错误。
+- 已批准工件被实质修改后要回到 `draft` 并重新签署；旧签署记录不删，作为时间线保留。
+
 ## 现有项目与小改动
 
 现有项目没有 `.agent/` 时先读规则和文档；用户要求持久追踪或高风险管理时，说明初始化只增加项目资料、不改源码，再运行初始化器。单文件、低风险、边界清楚的小修复走短路径；新项目、跨模块、公共接口、迁移、安全和架构调整使用完整工作项。
+
+## 归档
+
+完成沉淀之后，工作项默认还留在活动列表里，每次状态查询都要为它输出签署、依赖和警告。归档把它移进 `.agent/changes/archive/YYYY-MM-DD-<名称>/`，是保持活动列表可读的正常收尾动作，不是可选项：
+
+```powershell
+& $lifecycle archive "F:\我的项目"            # 归档全部"完成沉淀 + 已完成"的工作项
+& $lifecycle archive "F:\我的项目" --work WORK-003 --json
+```
+
+`archive` 只移动目录、不改文件内容；阶段不是完成沉淀或状态不是已完成的工作项会被跳过。归档后运行 `validate` 检查指向旧路径的引用（`changes/<名>` 会变成 `changes/archive/<日期>-<名>`），`updates.md` 作为追加式时间线豁免、不回改。已归档工作项只用于查阅，不能自动恢复。
 
 不要创建 `.agent/current.md`、`state.json` 或手工状态索引；状态必须来自项目工件和查询器。
 
@@ -162,5 +203,5 @@ git worktree add "..\项目-WORK-003" -b "work/WORK-003"
 
 - 实际改动完成后，先追加更新历史，再报告本轮结果；没有运行的验证写“未运行”，不能写成通过。
 - 切换到下一个独立工作项或进入“完成沉淀”前，必须确认当前记录已写入，并且当前改动已经本地提交，或明确记录“待用户授权本地提交”并停在检查点门槛。
-- 用户要求本地保存时，只提交已归因的当前工作项文件；用户已有和未知改动保持原样。
+- 用户要求本地保存时，只提交当前工作项归属的文件；用户已有和未知改动保持原样。
 - 不因“保存”“提交”“继续”推断远端授权；`git push`、远端分支、tag 和部署必须由用户明确要求。

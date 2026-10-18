@@ -26,9 +26,9 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 | 初始化器 | `skills/project-lifecycle/scripts/init_project.py` | 幂等创建目标项目的 `.agent/` 和入口模板 | 单元测试 |
 | 状态汇总与恢复 | `skills/project-lifecycle/scripts/project_status.py` | 推导阶段、依赖、Git 归因和 `--resume` JSON | 单元测试 + JSON 解析 |
 | 校验器 | `skills/project-lifecycle/scripts/project_validate.py` | 普通校验和可选 `--strict` 的结构、来源、证据、归因检查 | `--strict` |
-| 用户命令适配器 | `skills/project-lifecycle/scripts/project-lifecycle.ps1` | 用 `init/status/resume/validate/history/updates/record/checkpoint/push-check` 隐藏底层 Python 实现 | PowerShell 入口检查 |
-| 更新历史命令 | `skills/project-lifecycle/scripts/update_history.py` | 查看、追加更新记录和检查本地提交检查点 | 命令行为检查 |
-| 回归测试 | `tests/test_project_status.py` | 固化生命周期和边界行为 | 维护者发布检查 |
+| 用户命令适配器 | `skills/project-lifecycle/scripts/project-lifecycle.ps1` | 用 `init/status/brief/resume/validate/history/updates/record/approve/archive/checkpoint/push-check` 隐藏底层 Python 实现 | PowerShell 入口检查 |
+| 更新历史命令 | `skills/project-lifecycle/scripts/update_history.py` | 查看、追加更新记录、盖章签署、归档已完成工作项和检查本地提交检查点 | 命令行为检查 |
+| 回归测试 | `tests/test_project_status.py`、`tests/test_task_parsing.py`、`tests/test_lifecycle_actions.py` | 固化生命周期与边界行为、任务解析的四种写法、批量签署与归档 | 维护者发布检查 |
 
 ### 面向用户的文档
 

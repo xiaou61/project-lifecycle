@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <!-- 内容来自本地 Markdown；CSP 关掉脚本和内联样式，避免工件里的 HTML 变成可执行内容。 -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'"
+    />
+    <title>project-lifecycle 工件查看器</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">PL</span>
+        <div>
+          <h1>工件查看器</h1>
+          <p id="project-path" class="project-path">未选择项目</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button id="workspace" type="button" class="button">工作区</button>
+        <button id="resources" type="button" class="button">项目资料</button>
+        <button id="pick" type="button" class="button">选择项目</button>
+        <button id="refresh" type="button" class="button">刷新</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <h2>工作项</h2>
+          <span id="work-count" class="count">0</span>
+        </div>
+        <ul id="work-list" class="work-list"></ul>
+        <div id="project-warnings" class="project-warnings"></div>
+      </aside>
+
+      <section class="detail">
+        <div id="resources-view" class="resources-view hidden">
+          <div class="summary">
+            <div class="summary-head">
+              <div>
+                <h2>项目资料</h2>
+                <p id="resources-source" class="muted">—</p>
+              </div>
+              <span id="resources-count" class="badge">—</span>
+            </div>
+            <p class="muted small workspace-hint">
+              `.agent/` 里除工作项之外的常驻资料，按用途分组；点文件在右侧渲染。
+              工作项的阶段、任务和验证仍在<b>项目</b>视图里看——这里只读资料。
+            </p>
+          </div>
+          <div class="resources-split">
+            <div id="resource-groups" class="resource-groups"></div>
+            <article class="document resource-document">
+              <div class="document-head">
+                <h3 id="resource-title">未选择文件</h3>
+                <div class="document-actions">
+                  <span id="resource-dates" class="muted small"></span>
+                  <button id="resource-reveal" type="button" class="button small" disabled>在资源管理器中显示</button>
+                </div>
+              </div>
+              <div id="resource-frontmatter" class="frontmatter"></div>
+              <div id="resource-content" class="markdown"></div>
+            </article>
+          </div>
+        </div>
+
+        <div id="workspace-view" class="workspace-view hidden">
+          <div class="summary">
+            <div class="summary-head">
+              <div>
+                <h2>工作区</h2>
+                <p id="workspace-source" class="muted">—</p>
+              </div>
+              <span id="workspace-state" class="badge">—</span>
+            </div>
+            <div id="workspace-totals" class="stats"></div>
+            <p class="muted small workspace-hint">
+              点项目卡片进入该项目。清单来源优先取工作区的 <code>.agent/PROJECT-INDEX.md</code>「项目清单」表的源码目录列；
+              没有该文件时用本应用记住的项目清单（<b>选择项目</b> 会把项目加进来）。
+            </p>
+          </div>
+          <ul id="workspace-list" class="project-list"></ul>
+        </div>
+        <div id="empty-state" class="empty-state">
+          <h2>选择一个项目目录开始</h2>
+          <p>目录里需要有 <code>.agent/</code>。查看器只读取工件，不修改任何文件。</p>
+        </div>
+
+        <div id="detail-body" class="detail-body hidden">
+          <div class="summary">
+            <div class="summary-head">
+              <div>
+                <h2 id="work-title">—</h2>
+                <p id="work-subtitle" class="muted">—</p>
+              </div>
+              <span id="work-state" class="badge">—</span>
+            </div>
+            <div id="work-stats" class="stats"></div>
+            <p id="work-next" class="next-action"></p>
+            <div id="work-approval" class="approval-row"></div>
+          </div>
+
+          <nav class="tabs">
+            <button type="button" class="tab active" data-tab="overview">总览</button>
+            <button type="button" class="tab" data-tab="read">阅读</button>
+            <button type="button" class="tab" data-tab="validate">校验</button>
+            <button type="button" class="tab" data-tab="history">历史</button>
+            <button type="button" class="tab" data-tab="data">数据</button>
+          </nav>
+
+          <div id="tab-overview" class="tab-panel">
+            <section class="panel">
+              <h3 class="panel-title">阶段门槛</h3>
+              <p class="muted small">
+                按已确认的流程顺序排列；圆点颜色是这道门的状态，签署信息来自
+                <code>approve</code> 的盖章。红色说明卡在这道门上。
+              </p>
+              <ol id="gate-strip" class="gate-strip"></ol>
+            </section>
+
+            <section class="panel">
+              <h3 class="panel-title">需求追踪</h3>
+              <p class="muted small">
+                只画工件里真实写下的引用（任务的 <code>对应</code> 与 <code>依赖</code>、来源覆盖表的 REQ↔AC）。
+                连线平时隐藏，<b>鼠标悬停</b>任一节点显示它的关系，<b>点击</b>看详情。id 只在工作项内唯一。
+              </p>
+              <div id="trace-summary" class="trace-summary"></div>
+              <div id="trace-graph" class="graph trace"></div>
+              <div id="trace-detail" class="trace-detail muted small">点一个节点查看它的关系。</div>
+            </section>
+
+            <section class="panel">
+              <h3 class="panel-title">依赖与关联</h3>
+              <p class="muted small">
+                实线箭头 = 硬依赖（<code>depends_on</code>，未完成会阻塞实现和验收）；虚线 = 关联（<code>related_to</code>，不阻塞）。
+                点节点跳到该工作项。
+              </p>
+              <div id="graph" class="graph"></div>
+            </section>
+
+            <section id="other-warnings-panel" class="panel hidden">
+              <h3 class="panel-title">其他注意</h3>
+              <div id="other-warnings"></div>
+            </section>
+          </div>
+
+          <div id="tab-read" class="tab-panel hidden">
+            <ul id="artifact-list" class="artifact-list"></ul>
+            <article class="document">
+              <div class="document-head">
+                <h3 id="doc-title">—</h3>
+                <div class="document-actions">
+                  <span id="doc-dates" class="muted small"></span>
+                  <button id="reveal" type="button" class="button small">在资源管理器中显示</button>
+                </div>
+              </div>
+              <div id="doc-frontmatter" class="frontmatter"></div>
+              <div id="doc-content" class="markdown"></div>
+            </article>
+          </div>
+
+          <div id="tab-validate" class="tab-panel hidden">
+            <div id="validate-body" class="panel-body"></div>
+          </div>
+
+          <div id="tab-history" class="tab-panel hidden">
+            <div id="history-body" class="panel-body"></div>
+          </div>
+
+          <div id="tab-data" class="tab-panel hidden">
+            <section class="panel">
+              <h3 class="panel-title">project_status.py --json</h3>
+              <p class="muted small">
+                界面显示的一切都来自这份 JSON，没有任何前端推导。点 <code>"WORK-00X"</code> 跳到该工作项，点 <code>*.md</code> 路径打开文件正文。
+              </p>
+              <pre id="data-body" class="json"></pre>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="dist/renderer.js"></script>
+  </body>
+</html>

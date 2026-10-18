@@ -38,3 +38,21 @@ jobs:
       - run: npm ci
       - name: Build documentation site
         run: npm run docs:build
+
+  desktop:
+    # 只做类型检查和编译：不下载 Electron 二进制（--ignore-scripts），
+    # 因为这里要挡的是 TypeScript 编译错误，界面验证由 desktop/README.md 的 smoke 自检负责。
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: Typecheck and build
+        run: npm run build

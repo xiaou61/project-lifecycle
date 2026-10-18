@@ -86,4 +86,6 @@ Before approving requirements, search active work items for overlapping outcomes
 
 Keep the artifact at `status: draft` while a blocking question remains or until the user explicitly approves it. On approval, resolve or record every open question that affects scope and update the status and date.
 
+需求批准后由 `project-lifecycle.ps1 approve --artifact requirements` 写入 `approved_by`、`approved_at` 和可选的 `approver_role`（见 [workflow.md](workflow.md) 的“签署”）。这些字段只能由该命令盖章，Agent 不得自行填写；只有 `status: approved` 而没有签署的需求不能跨门槛。
+
 If approved requirements later change materially, return them to `draft` and mark the existing proposal, design, task plan, and verification artifacts `stale` until they are reconciled. Preserve stable requirement and acceptance identifiers when their meaning remains the same; assign new identifiers instead of silently reusing an old identifier for a different obligation.
