@@ -12,7 +12,7 @@ const ui = {
   workspace: null as WorkspaceView | null,
   resources: null as ResourceGroup[] | null,
   resourceFile: null as ResourceFile | null,
-  view: "project" as "project" | "workspace" | "resources",
+  view: "project" as "project" | "workspace" | "resources" | "relations",
   tab: "overview",
 };
 
@@ -65,9 +65,22 @@ interface Gate {
 }
 
 interface GraphNode {
-  item: WorkItemView;
+  key: string;
+  kind: "work" | "module";
+  item: WorkItemView | null;
+  module: ModuleView | null;
   x: number;
   y: number;
+  vx: number;
+  vy: number;
+  w: number;
+  h: number;
+}
+
+interface GraphEdge {
+  from: string;
+  to: string;
+  kind: "depends" | "related" | "module";
 }
 
 function byId<T extends HTMLElement>(id: string): T {
@@ -460,161 +473,1043 @@ function renderGates(): void {
   panel.classList.toggle("hidden", otherWarnings.length === 0);
 }
 
-function computeDepths(items: WorkItemView[]): Map<string, number> {
-  const byWorkId = new Map(items.map((item) => [item.work_id, item]));
-  const depth = new Map<string, number>();
-  const compute = (workId: string, seen: Set<string>): number => {
-    const cached = depth.get(workId);
-    if (cached !== undefined) return cached;
-    // 依赖环由 Python 侧的 relations 检查报告；这里只防止递归失控。
-    if (seen.has(workId)) return 0;
-    seen.add(workId);
-    const item = byWorkId.get(workId);
-    const deps = item
-      ? item.relations.depends_on.filter((dep) => !dep.missing).map((dep) => dep.work_id)
-      : [];
-    const value = deps.length === 0 ? 0 : 1 + Math.max(...deps.map((dep) => compute(dep, seen)));
-    depth.set(workId, value);
-    return value;
-  };
-  for (const item of items) compute(item.work_id, new Set());
-  return depth;
+const MODULE_W = 152;
+const MODULE_H = 50;
+/** 图的视图状态放在模块级：重新选工作项不该把用户拖好的位置和缩放重置。 */
+const graphState = {
+  signature: "",
+  nodes: [] as GraphNode[],
+  edges: [] as GraphEdge[],
+  k: 1,
+  tx: 0,
+  ty: 0,
+  showDepends: true,
+  // Paideia 这类项目的 related_to 比依赖多一个量级（26 项 170+ 条），全开就是面条；先只看硬依赖。
+  showRelated: false,
+  // 模块索引通常有 20 多条，默认叠进来会让 26 个工作项的图挤成一团；想看再开。
+  showModules: false,
+  onlyAttention: false,
+  drag: null as { key: string; startX: number; startY: number; originX: number; originY: number; moved: boolean } | null,
+  pan: null as { x: number; y: number; tx: number; ty: number } | null,
+  suppressClick: false,
+};
+
+function needsAttention(item: WorkItemView): boolean {
+  return (
+    ["blocked", "needs_attention", "stale", "failed"].includes(item.state) ||
+    item.approval.unsigned.length > 0
+  );
 }
 
-function edgePath(from: GraphNode, to: GraphNode, kind: "depends" | "related"): string {
-  const marker = kind === "depends" ? ' marker-end="url(#graph-arrow)"' : "";
-  const y1 = from.y + NODE_H / 2;
-  const y2 = to.y + NODE_H / 2;
-  if (from.x === to.x) {
-    // 同列：从右侧绕出去，避免穿过节点
-    const x = from.x + NODE_W;
-    return `<path class="edge ${kind}"${marker} d="M ${x} ${y1} C ${x + EDGE_BULGE} ${y1}, ${x + EDGE_BULGE} ${y2}, ${x} ${y2}" />`;
-  }
-  const forward = to.x > from.x;
-  const x1 = forward ? from.x + NODE_W : from.x;
-  const x2 = forward ? to.x : to.x + NODE_W;
-  const bend = Math.max(50, Math.abs(x2 - x1) * 0.45);
-  const c1 = forward ? x1 + bend : x1 - bend;
-  const c2 = forward ? x2 - bend : x2 + bend;
-  return `<path class="edge ${kind}"${marker} d="M ${x1} ${y1} C ${c1} ${y1}, ${c2} ${y2}, ${x2} ${y2}" />`;
-}
+function buildGraphModels(): void {
+  const items = (ui.status?.work_items ?? []).filter(
+    (item) => !graphState.onlyAttention || needsAttention(item),
+  );
+  const visible = new Set(items.map((item) => item.work_id));
+  const nodes: GraphNode[] = items.map((item) => ({
+    key: item.work_id,
+    kind: "work",
+    item,
+    module: null,
+    x: 0,
+    y: 0,
+    vx: 0,
+    vy: 0,
+    w: NODE_W,
+    h: NODE_H,
+  }));
+  const edges: GraphEdge[] = [];
 
-interface GraphLayout {
-  nodes: Map<string, GraphNode>;
-  width: number;
-  height: number;
-}
-
-function layoutGraph(items: WorkItemView[]): GraphLayout {
-  const depth = computeDepths(items);
-  const sorted = [...items].sort((left, right) => left.work_id.localeCompare(right.work_id));
-  const maxLevel = Math.max(...items.map((item) => depth.get(item.work_id) ?? 0), 0);
-  const nodes = new Map<string, GraphNode>();
-
-  if (maxLevel === 0) {
-    // 没有硬依赖时按深度分列会退化成一列长条，改成网格铺开。
-    const columns = Math.max(1, Math.ceil(Math.sqrt(sorted.length)));
-    sorted.forEach((item, index) => {
-      nodes.set(item.work_id, {
-        item,
-        x: GRAPH_PAD + (index % columns) * (NODE_W + NODE_GAP_X),
-        y: GRAPH_PAD + Math.floor(index / columns) * (NODE_H + NODE_GAP_Y),
-      });
-    });
-    const rows = Math.ceil(sorted.length / columns);
-    return {
-      nodes,
-      width: GRAPH_PAD * 2 + columns * NODE_W + (columns - 1) * NODE_GAP_X + EDGE_MARGIN,
-      height: GRAPH_PAD * 2 + rows * NODE_H + (rows - 1) * NODE_GAP_Y,
-    };
-  }
-
-  const columns = new Map<number, WorkItemView[]>();
-  for (const item of sorted) {
-    const level = depth.get(item.work_id) ?? 0;
-    const bucket = columns.get(level) ?? [];
-    bucket.push(item);
-    columns.set(level, bucket);
-  }
-  for (const [level, bucket] of columns) {
-    bucket.forEach((item, index) => {
-      nodes.set(item.work_id, {
-        item,
-        x: GRAPH_PAD + level * (NODE_W + NODE_GAP_X),
-        y: GRAPH_PAD + index * (NODE_H + NODE_GAP_Y),
-      });
-    });
-  }
-  const rows = Math.max(...Array.from(columns.values()).map((bucket) => bucket.length), 1);
-  return {
-    nodes,
-    width: GRAPH_PAD * 2 + (maxLevel + 1) * NODE_W + maxLevel * NODE_GAP_X + EDGE_MARGIN,
-    height: GRAPH_PAD * 2 + rows * NODE_H + (rows - 1) * NODE_GAP_Y + EDGE_MARGIN,
-  };
-}
-
-function renderGraph(): void {
-  const container = byId("graph");
-  clear(container);
-  const items = ui.status?.work_items ?? [];
-  if (items.length === 0) {
-    container.appendChild(element("p", "muted", "没有工作项。"));
-    return;
-  }
-  const { nodes, width, height } = layoutGraph(items);
-
-  const edges: string[] = [];
-  const drawn = new Set<string>();
   for (const item of items) {
-    const from = nodes.get(item.work_id);
-    if (!from) continue;
-    for (const dependency of item.relations.depends_on) {
-      const to = nodes.get(dependency.work_id);
-      if (!to) continue;
-      const key = `depends:${item.work_id}->${dependency.work_id}`;
-      if (drawn.has(key)) continue;
-      drawn.add(key);
-      edges.push(edgePath(from, to, "depends"));
+    if (graphState.showDepends) {
+      for (const dependency of item.relations.depends_on) {
+        if (visible.has(dependency.work_id)) {
+          edges.push({ from: item.work_id, to: dependency.work_id, kind: "depends" });
+        }
+      }
     }
-    for (const related of item.relations.related) {
-      const to = nodes.get(related.work_id);
-      if (!to) continue;
-      const key = `related:${[item.work_id, related.work_id].sort().join("-")}`;
-      if (drawn.has(key)) continue;
-      drawn.add(key);
-      edges.push(edgePath(from, to, "related"));
+    if (graphState.showRelated) {
+      for (const related of item.relations.related) {
+        if (visible.has(related.work_id)) {
+          edges.push({ from: item.work_id, to: related.work_id, kind: "related" });
+        }
+      }
     }
   }
 
-  const markup = Array.from(nodes.values())
-    .map((node) => nodeMarkup(node, ui.selected?.work_id === node.item.work_id))
-    .join("");
-  container.innerHTML =
-    `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
-    `<defs><marker id="graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">` +
-    `<path d="M 0 0 L 10 5 L 0 10 z" fill="#2f6fd0" /></marker></defs>` +
-    edges.join("") +
-    markup +
-    `</svg>`;
+  if (graphState.showModules) {
+    for (const module of ui.status?.modules ?? []) {
+      const hits = module.work_ids.filter((workId) => visible.has(workId));
+      if (hits.length === 0) continue;
+      const key = `M:${module.name}`;
+      nodes.push({
+        key,
+        kind: "module",
+        item: null,
+        module,
+        x: 0,
+        y: 0,
+        vx: 0,
+        vy: 0,
+        w: MODULE_W,
+        h: MODULE_H,
+      });
+      for (const workId of hits) edges.push({ from: key, to: workId, kind: "module" });
+    }
+  }
+
+  graphState.nodes = nodes;
+  graphState.edges = edges;
+  layoutForce(nodes, edges);
 }
-function nodeMarkup(node: GraphNode, selected: boolean): string {
-  const item = node.item;
+
+/** 小型力导向：节点按矩形外接尺寸互相排斥、边当弹簧、弱向心力防止散开。 */
+function layoutForce(nodes: GraphNode[], edges: GraphEdge[]): void {
+  const byKey = new Map(nodes.map((node) => [node.key, node]));
+  const work = nodes.filter((node) => node.kind === "work");
+  const modules = nodes.filter((node) => node.kind === "module");
+  work.forEach((node, index) => {
+    // 黄金角螺旋起步：比圆周均布更不容易在早期步里叠在一起。
+    const angle = index * 2.39996;
+    const radius = 90 + Math.sqrt(index + 1) * 118;
+    node.x = Math.cos(angle) * radius;
+    node.y = Math.sin(angle) * radius * 0.78;
+  });
+  modules.forEach((node, index) => {
+    const angle = index * 2.39996 + 0.9;
+    const radius = 360 + Math.sqrt(index + 1) * 120;
+    node.x = Math.cos(angle) * radius;
+    node.y = Math.sin(angle) * radius * 0.8;
+  });
+
+  // 矩形不相交所需的最小中心距：取宽高中更紧的一维，再加透气量。
+  const clearance = (a: GraphNode, b: GraphNode): number =>
+    Math.max((a.w + b.w) / 2, (a.h + b.h) / 2) + 26;
+
+  const rest: Record<GraphEdge["kind"], number> = { depends: 235, related: 275, module: 185 };
+  const steps = 900;
+  for (let step = 0; step < steps; step += 1) {
+    const cooling = 1 - step / steps;
+    for (let left = 0; left < nodes.length; left += 1) {
+      for (let right = left + 1; right < nodes.length; right += 1) {
+        const a = nodes[left];
+        const b = nodes[right];
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let distance = Math.hypot(dx, dy);
+        if (distance < 0.01) {
+          dx = ((left % 7) - 3) || 1;
+          dy = ((right % 5) - 2) || 1;
+          distance = Math.hypot(dx, dy);
+        }
+        const needed = clearance(a, b);
+        // 只在碰撞带附近排斥：库仑项会让整张图溢出画布，反而把 fit 缩放压到看不清。
+        const push = distance < needed * 1.5 ? (needed * 1.5 - distance) * 0.5 * cooling : 0;
+        const fx = (dx / distance) * push;
+        const fy = (dy / distance) * push;
+        a.vx -= fx;
+        a.vy -= fy;
+        b.vx += fx;
+        b.vy += fy;
+      }
+    }
+    for (const edge of edges) {
+      const a = byKey.get(edge.from);
+      const b = byKey.get(edge.to);
+      if (!a || !b) continue;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const distance = Math.hypot(dx, dy) || 0.01;
+      const pull = (distance - rest[edge.kind]) * 0.02;
+      const fx = (dx / distance) * pull;
+      const fy = (dy / distance) * pull;
+      a.vx += fx;
+      a.vy += fy;
+      b.vx -= fx;
+      b.vy -= fy;
+    }
+    for (const node of nodes) {
+      node.vx -= node.x * 0.004;
+      node.vy -= node.y * 0.004;
+      node.vx *= 0.84;
+      node.vy *= 0.84;
+      node.x += node.vx;
+      node.y += node.vy;
+    }
+  }
+  // 收尾：最后几轮只解重叠，让观感干净。
+  for (let pass = 0; pass < 40; pass += 1) {
+    for (let left = 0; left < nodes.length; left += 1) {
+      for (let right = left + 1; right < nodes.length; right += 1) {
+        const a = nodes[left];
+        const b = nodes[right];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const distance = Math.hypot(dx, dy) || 0.01;
+        const needed = clearance(a, b);
+        if (distance >= needed) continue;
+        const shift = (needed - distance) / 2;
+        const fx = (dx / distance) * shift;
+        const fy = (dy / distance) * shift;
+        a.x -= fx;
+        a.y -= fy;
+        b.x += fx;
+        b.y += fy;
+      }
+    }
+  }
+}
+
+/** 线从矩形边框出发，避免压在节点文字上。 */
+function boundaryPoint(from: GraphNode, to: GraphNode): { x: number; y: number } {
+  const dx = to.x + to.w / 2 - (from.x + from.w / 2);
+  const dy = to.y + to.h / 2 - (from.y + from.h / 2);
+  const scale = Math.min(
+    Math.abs(dx) < 0.01 ? Infinity : from.w / 2 / Math.abs(dx),
+    Math.abs(dy) < 0.01 ? Infinity : from.h / 2 / Math.abs(dy),
+  );
+  const ratio = Number.isFinite(scale) ? scale : 0;
+  return { x: from.x + from.w / 2 + dx * ratio, y: from.y + from.h / 2 + dy * ratio };
+}
+
+function graphEdgesMarkup(): string {
+  const byKey = new Map(graphState.nodes.map((node) => [node.key, node]));
+  return graphState.edges
+    .map((edge) => {
+      const from = byKey.get(edge.from);
+      const to = byKey.get(edge.to);
+      if (!from || !to) return "";
+      const start = boundaryPoint(from, to);
+      const finish = boundaryPoint(to, from);
+      const marker = edge.kind === "depends" ? ' marker-end="url(#graph-arrow)"' : "";
+      let path = `M ${start.x.toFixed(1)} ${start.y.toFixed(1)} L ${finish.x.toFixed(1)} ${finish.y.toFixed(1)}`;
+      if (edge.kind !== "depends") {
+        // 关联和模块线画成轻微弧线：平直虚线在密集区会糊在一起。
+        const mx = (start.x + finish.x) / 2 + (finish.y - start.y) * 0.12;
+        const my = (start.y + finish.y) / 2 - (finish.x - start.x) * 0.12;
+        path = `M ${start.x.toFixed(1)} ${start.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${finish.x.toFixed(1)} ${finish.y.toFixed(1)}`;
+      }
+      return (
+        `<path class="edge ${edge.kind}" data-from="${attr(edge.from)}" data-to="${attr(edge.to)}"` +
+        ` d="${path}"${marker} />`
+      );
+    })
+    .join("");
+}
+
+function clip(text: string, max: number): string {
+  const chars = Array.from(text);
+  return chars.length > max ? `${chars.slice(0, max).join("")}…` : text;
+}
+
+function graphNodeMarkup(node: GraphNode): string {
+  if (node.kind === "module") {
+    const module = node.module as ModuleView;
+    return (
+      `<g class="gnode module" data-key="${attr(node.key)}" data-module="${attr(module.name)}"` +
+      ` transform="translate(${node.x.toFixed(1)} ${node.y.toFixed(1)})">` +
+      `<rect class="gnode-box" width="${MODULE_W}" height="${MODULE_H}" rx="8" />` +
+      `<text class="gnode-module-name" x="11" y="21">${escapeHtml(clip(module.name, 9))}</text>` +
+      `<text class="gnode-module-meta" x="11" y="37">${escapeHtml(clip(module.path, 15))} · ${module.work_ids.length} 项</text>` +
+      `</g>`
+    );
+  }
+  const item = node.item as WorkItemView;
   const tasks = item.tasks;
   const total = tasks.pending + tasks.in_progress + tasks.done + tasks.blocked;
   const signed = Object.keys(item.approval.artifacts).length;
   const unsigned = item.approval.unsigned.length;
-  const name = item.name.length > 11 ? `${item.name.slice(0, 11)}…` : item.name;
-  const sign = unsigned > 0 ? ` · 待补签 ${unsigned}` : signed > 0 ? ` · 已签署 ${signed}` : "";
+  const sign = unsigned > 0 ? ` · 待补签 ${unsigned}` : signed > 0 ? ` · 已签 ${signed}` : "";
+  const selected = ui.selected?.work_id === item.work_id;
   return (
-    `<g class="node${selected ? " selected" : ""}" data-work-id="${attr(item.work_id)}">` +
-    `<rect class="node-box" x="${node.x}" y="${node.y}" width="${NODE_W}" height="${NODE_H}" rx="9" />` +
-    `<rect x="${node.x}" y="${node.y}" width="3" height="${NODE_H}" rx="1.5" fill="${stateColor(item.state)}" />` +
-    `<text class="node-id" x="${node.x + 14}" y="${node.y + 20}">${escapeHtml(item.work_id)}</text>` +
-    `<text class="node-name" x="${node.x + 14}" y="${node.y + 40}">${escapeHtml(name)}</text>` +
-    `<text class="node-meta" x="${node.x + 14}" y="${node.y + 58}">${escapeHtml(item.phase_label)}${total > 0 ? ` · 任务 ${tasks.done}/${total}` : ""}</text>` +
-    `<text class="node-meta" x="${node.x + 14}" y="${node.y + 74}">${escapeHtml(item.state_label + sign)}</text>` +
+    `<g class="gnode work${selected ? " selected" : ""}" data-key="${attr(node.key)}"` +
+    ` data-work-id="${attr(item.work_id)}" transform="translate(${node.x.toFixed(1)} ${node.y.toFixed(1)})">` +
+    `<rect class="gnode-box" width="${NODE_W}" height="${NODE_H}" rx="10" />` +
+    `<rect width="4" height="${NODE_H}" rx="2" fill="${stateColor(item.state)}" />` +
+    `<text class="gnode-id" x="14" y="20">${escapeHtml(item.work_id)}</text>` +
+    `<text class="gnode-name" x="14" y="41">${escapeHtml(clip(item.name, 11))}</text>` +
+    `<text class="gnode-meta" x="14" y="60">${escapeHtml(item.phase_label)}${total > 0 ? ` · 任务 ${tasks.done}/${total}` : ""}</text>` +
+    `<text class="gnode-meta" x="14" y="77">${escapeHtml(item.state_label + sign)}</text>` +
     `</g>`
   );
+}
+
+function paintGraphPositions(): void {
+  const edgeLayer = document.getElementById("graph-edges");
+  const nodeLayer = document.getElementById("graph-nodes");
+  if (!edgeLayer || !nodeLayer) return;
+  edgeLayer.innerHTML = graphEdgesMarkup();
+  nodeLayer.innerHTML = graphState.nodes.map(graphNodeMarkup).join("");
+}
+
+function applyGraphTransform(): void {
+  const world = document.getElementById("graph-world");
+  if (world) {
+    world.setAttribute(
+      "transform",
+      `translate(${graphState.tx.toFixed(1)} ${graphState.ty.toFixed(1)}) scale(${graphState.k.toFixed(3)})`,
+    );
+  }
+}
+
+function fitGraph(): void {
+  const container = byId("graph");
+  if (graphState.nodes.length === 0) return;
+  const width = container.clientWidth || 900;
+  const height = container.clientHeight || 560;
+  const minX = Math.min(...graphState.nodes.map((node) => node.x));
+  const minY = Math.min(...graphState.nodes.map((node) => node.y));
+  const maxX = Math.max(...graphState.nodes.map((node) => node.x + node.w));
+  const maxY = Math.max(...graphState.nodes.map((node) => node.y + node.h));
+  const margin = 30;
+  const spanX = Math.max(1, maxX - minX);
+  const spanY = Math.max(1, maxY - minY);
+  const fitted = Math.min((width - margin * 2) / spanX, (height - margin * 2) / spanY);
+  // 缩放下限保证 10px 文字仍可读；图超出视野就靠平移看，不把它压成看不清的一团。
+  graphState.k = Math.max(0.55, Math.min(1.15, fitted));
+  const scaledX = spanX * graphState.k;
+  const scaledY = spanY * graphState.k;
+  graphState.tx =
+    scaledX <= width - margin * 2 ? (width - scaledX) / 2 - minX * graphState.k : margin - minX * graphState.k;
+  graphState.ty =
+    scaledY <= height - margin * 2 ? (height - scaledY) / 2 - minY * graphState.k : margin - minY * graphState.k;
+  applyGraphTransform();
+}
+
+function zoomGraph(factor: number, clientX?: number, clientY?: number): void {
+  const container = byId("graph");
+  const rect = container.getBoundingClientRect();
+  const anchorX = clientX === undefined ? rect.width / 2 : clientX - rect.left;
+  const anchorY = clientY === undefined ? rect.height / 2 : clientY - rect.top;
+  const next = Math.max(0.15, Math.min(3, graphState.k * factor));
+  // 缩放前光标下的世界坐标保持不变，观感上才是“朝那个点放大”。
+  graphState.tx = anchorX - ((anchorX - graphState.tx) / graphState.k) * next;
+  graphState.ty = anchorY - ((anchorY - graphState.ty) / graphState.k) * next;
+  graphState.k = next;
+  applyGraphTransform();
+}
+
+function highlightGraph(activeKey: string): void {
+  const neighbours = new Set<string>();
+  for (const edge of Array.from(document.querySelectorAll<SVGPathElement>("#graph-edges .edge"))) {
+    const from = edge.getAttribute("data-from") ?? "";
+    const to = edge.getAttribute("data-to") ?? "";
+    const hot = Boolean(activeKey) && (from === activeKey || to === activeKey);
+    edge.classList.toggle("hot", hot);
+    if (hot) {
+      neighbours.add(from === activeKey ? to : from);
+    }
+  }
+  for (const node of Array.from(document.querySelectorAll<SVGGElement>("#graph .gnode"))) {
+    const key = node.getAttribute("data-key") ?? "";
+    node.classList.toggle("hot", Boolean(activeKey) && (key === activeKey || neighbours.has(key)));
+    node.classList.toggle("dim", Boolean(activeKey) && key !== activeKey && !neighbours.has(key));
+  }
+}
+
+function describeGraphNode(key: string): string {
+  const node = graphState.nodes.find((candidate) => candidate.key === key);
+  if (!node) return "";
+  if (node.kind === "module") {
+    const module = node.module as ModuleView;
+    const linked = module.work_ids
+      .map((workId) => {
+        const item = ui.status?.work_items.find((candidate) => candidate.work_id === workId);
+        return item ? `${workId} ${item.name}` : workId;
+      })
+      .join("、");
+    return `<b>模块 · ${escapeHtml(module.name)}</b><br>源码：${escapeHtml(module.path || "—")}<br>相关工作项：${escapeHtml(linked)}`;
+  }
+  const item = node.item as WorkItemView;
+  const dependencies = item.relations.depends_on.filter((dep) => !dep.missing).map((dep) => dep.work_id);
+  const dependents = item.relations.dependents.map((dep) => dep.work_id);
+  const related = item.relations.related.map((dep) => dep.work_id);
+  const modules = (ui.status?.modules ?? [])
+    .filter((module) => module.work_ids.includes(item.work_id))
+    .map((module) => module.name);
+  const tasks = item.tasks;
+  return (
+    `<b>${escapeHtml(item.work_id)} · ${escapeHtml(item.name)}</b> · ${escapeHtml(item.state_label)}<br>` +
+    `依赖：${dependencies.length ? dependencies.join("、") : "无"}　被依赖：${dependents.length ? dependents.join("、") : "无"}　关联：${related.length ? related.join("、") : "无"}<br>` +
+    `模块：${modules.length ? escapeHtml(modules.join("、")) : "索引里没有登记"}　任务：${tasks.done}/${tasks.pending + tasks.in_progress + tasks.done + tasks.blocked}<br>` +
+    `待补签：${item.approval.unsigned.length}　缺少证据的验收：${item.traceability.acceptance_without_evidence.length}`
+  );
+}
+
+function renderGraph(): void {
+  const container = byId("graph");
+  const status = ui.status;
+  if (!status || status.work_items.length === 0) {
+    clear(container);
+    container.appendChild(element("p", "muted", "没有工作项。"));
+    graphState.signature = "";
+    return;
+  }
+  // 只在数据或图层开关变化时重建；单纯选中工作项只改高亮，保留用户的缩放和拖动。
+  const signature = [
+    status.project_root,
+    status.work_items.length,
+    graphState.showDepends,
+    graphState.showRelated,
+    graphState.showModules,
+    graphState.onlyAttention,
+  ].join("|");
+  if (signature === graphState.signature) {
+    for (const node of Array.from(container.querySelectorAll<SVGGElement>(".gnode.work"))) {
+      node.classList.toggle("selected", node.getAttribute("data-work-id") === (ui.selected?.work_id ?? ""));
+    }
+    return;
+  }
+  graphState.signature = signature;
+  buildGraphModels();
+  container.innerHTML =
+    `<svg class="graph-svg" id="graph-svg">` +
+    `<defs><marker id="graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">` +
+    `<path d="M 0 0 L 10 5 L 0 10 z" fill="#2f6fd0" /></marker></defs>` +
+    `<g id="graph-world"><g id="graph-edges"></g><g id="graph-nodes"></g></g>` +
+    `</svg>`;
+  paintGraphPositions();
+  fitGraph();
+  const workCount = graphState.nodes.filter((node) => node.kind === "work").length;
+  const moduleCount = graphState.nodes.filter((node) => node.kind === "module").length;
+  byId("graph-count").textContent =
+    `${workCount} 个工作项 · ${moduleCount} 个模块 · ${graphState.edges.length} 条连线`;
+  byId("graph-detail").textContent = "悬停节点看关系，拖节点调整位置，滚轮缩放，空白处拖动平移。";
+}
+
+
+/* ---------- 关系图谱（3D 力导向，独立页面） ---------- */
+
+interface RelNode {
+  key: string;
+  kind: "work" | "module";
+  item: WorkItemView | null;
+  module: ModuleView | null;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  r: number;
+}
+
+interface RelEdge {
+  from: string;
+  to: string;
+  kind: "depends" | "related" | "module";
+}
+
+const relState = {
+  nodes: [] as RelNode[],
+  edges: [] as RelEdge[],
+  /** 绕 Y 轴（左右转）与 X 轴（上下俯仰）的角度。 */
+  yaw: 0.62,
+  pitch: -0.34,
+  zoom: 1,
+  signature: "",
+  showDepends: true,
+  // 3D 里关联边比 2D 更容易糊成一片，默认只画硬依赖。
+  showRelated: false,
+  showModules: false,
+  onlyAttention: false,
+  dragging: false,
+  moved: false,
+  suppressClickUntil: 0,
+  lastX: 0,
+  lastY: 0,
+  spin: false,
+  spinRaf: 0,
+  hot: "",
+};
+
+function relViewport(): { width: number; height: number } {
+  const container = document.getElementById("relations-graph");
+  return { width: container?.clientWidth || 900, height: container?.clientHeight || 620 };
+}
+
+/** 透视投影：先绕 Y 再绕 X，越远的节点越小越淡。 */
+function relProject(
+  node: RelNode,
+  width: number,
+  height: number,
+): { sx: number; sy: number; scale: number; depth: number } {
+  const cosY = Math.cos(relState.yaw);
+  const sinY = Math.sin(relState.yaw);
+  const x1 = node.x * cosY + node.z * sinY;
+  const z1 = -node.x * sinY + node.z * cosY;
+  const cosX = Math.cos(relState.pitch);
+  const sinX = Math.sin(relState.pitch);
+  const y1 = node.y * cosX - z1 * sinX;
+  const depth = node.y * sinX + z1 * cosX;
+  const camera = 2400;
+  const scale = (relState.zoom * camera) / (camera + depth);
+  return { sx: width / 2 + x1 * scale, sy: height / 2 + y1 * scale, scale, depth };
+}
+
+function buildRelModels(): void {
+  const items = (ui.status?.work_items ?? []).filter(
+    (item) => !relState.onlyAttention || needsAttention(item),
+  );
+  const visible = new Set(items.map((item) => item.work_id));
+  const nodes: RelNode[] = items.map((item) => {
+    const tasks = item.tasks;
+    const total = tasks.pending + tasks.in_progress + tasks.done + tasks.blocked;
+    return {
+      key: item.work_id,
+      kind: "work",
+      item,
+      module: null,
+      x: 0,
+      y: 0,
+      z: 0,
+      vx: 0,
+      vy: 0,
+      vz: 0,
+      // 节点大小编码工作量：任务多的工作项自然更大，一眼看出重心在哪。
+      r: 8 + Math.sqrt(Math.max(0, total)) * 2.9,
+    };
+  });
+  const edges: RelEdge[] = [];
+  for (const item of items) {
+    if (relState.showDepends) {
+      for (const dependency of item.relations.depends_on) {
+        if (visible.has(dependency.work_id)) {
+          edges.push({ from: item.work_id, to: dependency.work_id, kind: "depends" });
+        }
+      }
+    }
+    if (relState.showRelated) {
+      for (const related of item.relations.related) {
+        if (visible.has(related.work_id)) {
+          edges.push({ from: item.work_id, to: related.work_id, kind: "related" });
+        }
+      }
+    }
+  }
+  if (relState.showModules) {
+    for (const module of ui.status?.modules ?? []) {
+      const hits = module.work_ids.filter((workId) => visible.has(workId));
+      if (hits.length === 0) continue;
+      const key = `M:${module.name}`;
+      nodes.push({
+        key,
+        kind: "module",
+        item: null,
+        module,
+        x: 0,
+        y: 0,
+        z: 0,
+        vx: 0,
+        vy: 0,
+        vz: 0,
+        r: 7,
+      });
+      for (const workId of hits) edges.push({ from: key, to: workId, kind: "module" });
+    }
+  }
+  relState.nodes = nodes;
+  relState.edges = edges;
+  layoutRel3D(nodes, edges);
+}
+
+/** 3D 力导向：球面起步，碰撞排斥 + 边弹簧 + 轻度向心力。 */
+function layoutRel3D(nodes: RelNode[], edges: RelEdge[]): void {
+  const byKey = new Map(nodes.map((node) => [node.key, node]));
+  // 斐波那契球面：点均匀铺在球上，避免初始扎堆。
+  nodes.forEach((node, index) => {
+    const phi = Math.acos(1 - (2 * (index + 0.5)) / Math.max(1, nodes.length));
+    const theta = Math.PI * (1 + Math.sqrt(5)) * index;
+    // 半径按节点数放大：26 个节点挤在半径 260 的球里，斥力再大也解不开。
+    const radius = 210 + Math.sqrt(nodes.length) * 44 + (index % 4) * 22;
+    node.x = Math.sin(phi) * Math.cos(theta) * radius;
+    node.y = Math.cos(phi) * radius * 0.82;
+    node.z = Math.sin(phi) * Math.sin(theta) * radius;
+  });
+
+  const rest: Record<RelEdge["kind"], number> = { depends: 320, related: 380, module: 240 };
+  const steps = 760;
+  for (let step = 0; step < steps; step += 1) {
+    const cooling = 1 - step / steps;
+    for (let left = 0; left < nodes.length; left += 1) {
+      for (let right = left + 1; right < nodes.length; right += 1) {
+        const a = nodes[left];
+        const b = nodes[right];
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let dz = b.z - a.z;
+        let distance = Math.hypot(dx, dy, dz);
+        if (distance < 0.01) {
+          dx = ((left % 5) - 2) || 1;
+          dy = ((right % 5) - 2) || 1;
+          dz = 1;
+          distance = Math.hypot(dx, dy, dz);
+        }
+        const needed = a.r + b.r + 130;
+        const push = distance < needed * 1.55 ? (needed * 1.55 - distance) * 0.46 * cooling : 0;
+        const fx = (dx / distance) * push;
+        const fy = (dy / distance) * push;
+        const fz = (dz / distance) * push;
+        a.vx -= fx;
+        a.vy -= fy;
+        a.vz -= fz;
+        b.vx += fx;
+        b.vy += fy;
+        b.vz += fz;
+      }
+    }
+    for (const edge of edges) {
+      const a = byKey.get(edge.from);
+      const b = byKey.get(edge.to);
+      if (!a || !b) continue;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dz = b.z - a.z;
+      const distance = Math.hypot(dx, dy, dz) || 0.01;
+      const pull = (distance - rest[edge.kind]) * 0.016;
+      const fx = (dx / distance) * pull;
+      const fy = (dy / distance) * pull;
+      const fz = (dz / distance) * pull;
+      a.vx += fx;
+      a.vy += fy;
+      a.vz += fz;
+      b.vx -= fx;
+      b.vy -= fy;
+      b.vz -= fz;
+    }
+    for (const node of nodes) {
+      // 向心力只防飘散，压强了会把节点挤回中心再次重叠。
+      node.vx -= node.x * 0.0011;
+      node.vy -= node.y * 0.0011;
+      node.vz -= node.z * 0.0011;
+      node.vx *= 0.84;
+      node.vy *= 0.84;
+      node.vz *= 0.84;
+      node.x += node.vx;
+      node.y += node.vy;
+      node.z += node.vz;
+    }
+  }
+  // 收尾只解穿插：力导向收敛后仍可能有一两对贴在一起。
+  for (let pass = 0; pass < 60; pass += 1) {
+    for (let left = 0; left < nodes.length; left += 1) {
+      for (let right = left + 1; right < nodes.length; right += 1) {
+        const a = nodes[left];
+        const b = nodes[right];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const dz = b.z - a.z;
+        const distance = Math.hypot(dx, dy, dz) || 0.01;
+        const needed = a.r + b.r + 96;
+        if (distance >= needed) continue;
+        const shift = (needed - distance) / 2;
+        const fx = (dx / distance) * shift;
+        const fy = (dy / distance) * shift;
+        const fz = (dz / distance) * shift;
+        a.x -= fx;
+        a.y -= fy;
+        a.z -= fz;
+        b.x += fx;
+        b.y += fy;
+        b.z += fz;
+      }
+    }
+  }
+}
+
+function relNodeMarkup(
+  node: RelNode,
+  projection: { sx: number; sy: number; scale: number; depth: number },
+  hot: boolean,
+  dim: boolean,
+): string {
+  const selected = node.item !== null && ui.selected?.work_id === node.item.work_id;
+  const opacity = Math.max(0.34, Math.min(1, 0.72 + projection.depth / 1600));
+  if (node.kind === "module") {
+    const module = node.module as ModuleView;
+    return (
+      `<g class="rnode module${hot ? " hot" : ""}${dim ? " dim" : ""}" data-rel-key="${attr(node.key)}"` +
+      ` data-rel-module="${attr(module.name)}" opacity="${opacity.toFixed(2)}"` +
+      ` transform="translate(${projection.sx.toFixed(1)} ${projection.sy.toFixed(1)}) scale(${projection.scale.toFixed(3)})">` +
+      `<rect x="${-node.r}" y="${-node.r}" width="${node.r * 2}" height="${node.r * 2}" rx="3"` +
+      ` class="rnode-box" transform="rotate(45)" />` +
+      `<text class="rnode-label module" x="0" y="${node.r + 15}" text-anchor="middle">${escapeHtml(clip(module.name, 10))}</text>` +
+      `</g>`
+    );
+  }
+  const item = node.item as WorkItemView;
+  const tasks = item.tasks;
+  const total = tasks.pending + tasks.in_progress + tasks.done + tasks.blocked;
+  // 名称只在高亮或选中时出现：26 个节点长期挂两行字必然互相压字。
+  const showName = hot || selected;
+  return (
+    `<g class="rnode work${selected ? " selected" : ""}${hot ? " hot" : ""}${dim ? " dim" : ""}"` +
+    ` data-rel-key="${attr(node.key)}" data-work-id="${attr(item.work_id)}"` +
+    ` opacity="${opacity.toFixed(2)}"` +
+    ` transform="translate(${projection.sx.toFixed(1)} ${projection.sy.toFixed(1)}) scale(${projection.scale.toFixed(3)})">` +
+    `<circle class="rnode-halo" r="${(node.r + 4).toFixed(1)}" />` +
+    `<circle class="rnode-dot" r="${node.r.toFixed(1)}" fill="${stateColor(item.state)}" />` +
+    `<text class="rnode-id" x="0" y="${(node.r + 13).toFixed(1)}" text-anchor="middle">${escapeHtml(item.work_id)}</text>` +
+    (showName
+      ? `<text class="rnode-name" x="0" y="${(node.r + 25).toFixed(1)}" text-anchor="middle">${escapeHtml(clip(item.name, 10))}</text>`
+      : "") +
+    `<title>${escapeHtml(`${item.work_id} · ${item.name} · ${item.state_label} · 任务 ${tasks.done}/${total}`)}</title>` +
+    `</g>`
+  );
+}
+
+/** 按当前视角把整张图缩放到视口内：3D 旋转后包围盒变化很大，靠固定 zoom 一定会出画。 */
+function fitRelations(): void {
+  const { width, height } = relViewport();
+  if (relState.nodes.length === 0 || width < 10 || height < 10) return;
+  const saved = relState.zoom;
+  relState.zoom = 1;
+  const points = relState.nodes.map((node) => relProject(node, width, height));
+  relState.zoom = saved;
+  const pad = 40;
+  const minX = Math.min(...points.map((point) => point.sx));
+  const maxX = Math.max(...points.map((point) => point.sx));
+  const minY = Math.min(...points.map((point) => point.sy));
+  const maxY = Math.max(...points.map((point) => point.sy));
+  const spanX = Math.max(1, maxX - minX);
+  const spanY = Math.max(1, maxY - minY);
+  // 节点/模块多时缩得太小字就没了：给一个随规模收紧的下限，多余部分靠滚轮平移看。
+  const load = relState.nodes.length;
+  const floor = load > 40 ? 0.62 : load > 25 ? 0.72 : 0.5;
+  relState.zoom = Math.max(floor, Math.min(2.2, Math.min((width - pad * 2) / spanX, (height - pad * 2) / spanY)));
+}
+
+function paintRelations(): void {
+  const svg = document.getElementById("rel-svg");
+  if (!svg) return;
+  const { width, height } = relViewport();
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+  const projections = new Map(relState.nodes.map((node) => [node.key, relProject(node, width, height)]));
+  // 悬停时的邻域：亮该节点的边，其余节点压暗。
+  const neighbours = new Set<string>();
+  if (relState.hot) {
+    for (const edge of relState.edges) {
+      if (edge.from === relState.hot) neighbours.add(edge.to);
+      else if (edge.to === relState.hot) neighbours.add(edge.from);
+    }
+  }
+
+  const edgeMarkup = relState.edges
+    .map((edge) => {
+      const a = projections.get(edge.from);
+      const b = projections.get(edge.to);
+      if (!a || !b) return "";
+      const hot = Boolean(relState.hot) && (edge.from === relState.hot || edge.to === relState.hot);
+      const dim = Boolean(relState.hot) && !hot;
+      const opacity = dim ? 0.04 : hot ? 0.95 : edge.kind === "depends" ? 0.4 : 0.14;
+      return (
+        `<line class="redge ${edge.kind}${hot ? " hot" : ""}"` +
+        ` x1="${a.sx.toFixed(1)}" y1="${a.sy.toFixed(1)}"` +
+        ` x2="${b.sx.toFixed(1)}" y2="${b.sy.toFixed(1)}"` +
+        ` opacity="${opacity}" />`
+      );
+    })
+    .join("");
+
+  // 画家算法：远的先画，近的盖在上面。
+  const nodeMarkup = [...relState.nodes]
+    .sort((left, right) => {
+      const a = projections.get(left.key)?.depth ?? 0;
+      const b = projections.get(right.key)?.depth ?? 0;
+      return b - a;
+    })
+    .map((node) => {
+      const projection = projections.get(node.key);
+      if (!projection) return "";
+      const hot = relState.hot === node.key || neighbours.has(node.key);
+      const dim = Boolean(relState.hot) && !hot;
+      return relNodeMarkup(node, projection, hot, dim);
+    })
+    .join("");
+
+  svg.innerHTML = edgeMarkup + nodeMarkup;
+  const workCount = relState.nodes.filter((node) => node.kind === "work").length;
+  const moduleCount = relState.nodes.length - workCount;
+  byId("relations-source").textContent =
+    `${ui.root}/.agent · ${workCount} 个工作项` +
+    (moduleCount > 0 ? ` · ${moduleCount} 个模块` : "") +
+    ` · ${relState.edges.length} 条关系`;
+}
+
+/** 状态/阶段分布条形图：只数可见工作项，和图保持一致。 */
+function relBars(targetId: string, counts: Map<string, number>, colors: Map<string, string>): void {
+  const container = byId(targetId);
+  clear(container);
+  const entries = [...counts.entries()].sort((left, right) => right[1] - left[1]);
+  if (entries.length === 0) {
+    container.appendChild(element("p", "muted small", "没有数据。"));
+    return;
+  }
+  const max = Math.max(...entries.map((entry) => entry[1]));
+  for (const [label, count] of entries) {
+    const row = element("div", "bar-row");
+    row.appendChild(element("span", "bar-label", label));
+    const track = element("span", "bar-track");
+    const fill = element("span", "bar-fill");
+    fill.style.width = `${Math.round((count / max) * 100)}%`;
+    const color = colors.get(label);
+    if (color) fill.style.background = color;
+    track.appendChild(fill);
+    row.appendChild(track);
+    row.appendChild(element("span", "bar-count", String(count)));
+    container.appendChild(row);
+  }
+}
+
+function renderRelStats(): void {
+  const items = relState.nodes
+    .filter((node) => node.kind === "work")
+    .map((node) => node.item as WorkItemView);
+  const states = new Map<string, number>();
+  const phases = new Map<string, number>();
+  const colors = new Map<string, string>();
+  for (const item of items) {
+    states.set(item.state_label, (states.get(item.state_label) ?? 0) + 1);
+    colors.set(item.state_label, stateColor(item.state));
+    phases.set(item.phase_label, (phases.get(item.phase_label) ?? 0) + 1);
+  }
+  relBars("rel-state-bars", states, colors);
+  relBars("rel-phase-bars", phases, new Map());
+}
+
+function describeRelNode(key: string): string {
+  const node = relState.nodes.find((candidate) => candidate.key === key);
+  if (!node) return "";
+  if (node.kind === "module") {
+    const module = node.module as ModuleView;
+    return (
+      `<b>模块 · ${escapeHtml(module.name)}</b><br>` +
+      `源码：${escapeHtml(module.path || "—")}<br>` +
+      `工作项：${escapeHtml(module.work_ids.join("、"))}`
+    );
+  }
+  const item = node.item as WorkItemView;
+  const depends = item.relations.depends_on.filter((dep) => !dep.missing).map((dep) => dep.work_id);
+  const dependents = item.relations.dependents.map((dep) => dep.work_id);
+  const related = item.relations.related.map((dep) => dep.work_id);
+  const modules = (ui.status?.modules ?? [])
+    .filter((module) => module.work_ids.includes(item.work_id))
+    .map((module) => module.name);
+  const tasks = item.tasks;
+  const total = tasks.pending + tasks.in_progress + tasks.done + tasks.blocked;
+  return (
+    `<b>${escapeHtml(item.work_id)} · ${escapeHtml(item.name)}</b><br>` +
+    `${escapeHtml(item.phase_label)} · ${escapeHtml(item.state_label)} · ${total > 0 ? `任务 ${tasks.done}/${total}` : "无任务"}<br>` +
+    `依赖：${depends.length ? escapeHtml(depends.join("、")) : "无"}<br>` +
+    `被依赖：${dependents.length ? escapeHtml(dependents.join("、")) : "无"}<br>` +
+    `关联：${related.length ? escapeHtml(related.join("、")) : "无"}<br>` +
+    `模块：${modules.length ? escapeHtml(modules.join("、")) : "索引里没有登记"}` +
+    `<br><span class="bad-text">点一下进入该工作项</span>`
+  );
+}
+
+function renderRelations(): void {
+  if (!ui.status) return;
+  const signature = [
+    ui.status.project_root,
+    ui.status.work_items.length,
+    relState.showDepends,
+    relState.showRelated,
+    relState.showModules,
+    relState.onlyAttention,
+    (ui.status.modules ?? []).length,
+  ].join("|");
+  if (signature !== relState.signature) {
+    relState.signature = signature;
+    buildRelModels();
+    fitRelations();
+  }
+  paintRelations();
+  renderRelStats();
+}
+
+function startSpin(): void {
+  if (relState.spinRaf) return;
+  const step = (): void => {
+    if (!relState.spin) {
+      relState.spinRaf = 0;
+      return;
+    }
+    relState.yaw += 0.0045;
+    paintRelations();
+    relState.spinRaf = requestAnimationFrame(step);
+  };
+  relState.spinRaf = requestAnimationFrame(step);
+}
+
+function stopSpin(): void {
+  if (relState.spinRaf) cancelAnimationFrame(relState.spinRaf);
+  relState.spinRaf = 0;
+}
+
+async function loadRelations(): Promise<void> {
+  const root = ui.root || (await window.api.lastProject()) || "";
+  if (!root) {
+    toast("先选择一个项目，再打开关系图谱。");
+    return;
+  }
+  ui.root = root;
+  byId("project-path").textContent = root;
+  if (!ui.status) {
+    const result = await window.api.loadStatus(root);
+    if (!result.ok || !result.data) {
+      toast(result.error || "无法读取项目状态");
+      return;
+    }
+    ui.status = result.data;
+    renderSidebar();
+  }
+  showView("relations");
+  renderRelations();
+}
+
+function bindRelations(): void {
+  const container = byId("relations-graph");
+
+  container.addEventListener("pointerdown", (event) => {
+    if ((event.target as Element).closest(".rnode")) return;
+    relState.dragging = true;
+    // 每次按下都是一次新手势：上一次拖拽的抑制标记必须清掉，否则下一次点击会被吞。
+    relState.moved = false;
+    relState.lastX = event.clientX;
+    relState.lastY = event.clientY;
+    container.classList.add("dragging");
+    if (relState.spin) {
+      relState.spin = false;
+      stopSpin();
+      byId("rel-spin").classList.remove("active");
+    }
+    try {
+      container.setPointerCapture(event.pointerId);
+    } catch {
+      // 合成事件没有活动指针，捕获失败不影响拖动。
+    }
+    event.preventDefault();
+  });
+
+  container.addEventListener("pointermove", (event) => {
+    if (!relState.dragging) return;
+    const dx = event.clientX - relState.lastX;
+    const dy = event.clientY - relState.lastY;
+    relState.lastX = event.clientX;
+    relState.lastY = event.clientY;
+    if (Math.abs(dx) + Math.abs(dy) > 2) relState.moved = true;
+    relState.yaw += dx * 0.006;
+    // 俯仰限制在 ±80°，越过极点视角会翻转。
+    relState.pitch = Math.max(-1.4, Math.min(1.4, relState.pitch + dy * 0.006));
+    paintRelations();
+  });
+
+  const endDrag = (event: PointerEvent): void => {
+    relState.dragging = false;
+    // 抑制标记只对紧接着的那次 click 有效（拖拽结束浏览器会补发 click）；
+    // 用时间窗口而不是布尔位，免得之后正常点击被永久吞掉。
+    relState.suppressClickUntil = relState.moved ? Date.now() + 250 : 0;
+    container.classList.remove("dragging");
+    try {
+      if (container.hasPointerCapture(event.pointerId)) container.releasePointerCapture(event.pointerId);
+    } catch {
+      // 同上：合成事件无需释放。
+    }
+  };
+  container.addEventListener("pointerup", endDrag);
+  container.addEventListener("pointercancel", endDrag);
+
+  container.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    relState.zoom = Math.max(0.35, Math.min(3.2, relState.zoom * (event.deltaY < 0 ? 1.1 : 1 / 1.1)));
+    paintRelations();
+  }, { passive: false });
+
+  // 悬停：mousemove 负责在节点间移动，mouseover 负责进入画布的第一步（合成事件只有后者）。
+  const updateHover = (event: Event): void => {
+    if (relState.dragging) return;
+    const node = (event.target as Element).closest(".rnode");
+    const key = node ? (node.getAttribute("data-rel-key") ?? "") : "";
+    if (key === relState.hot) return;
+    relState.hot = key;
+    paintRelations();
+    if (key) byId("rel-detail").innerHTML = describeRelNode(key);
+  };
+  container.addEventListener("mousemove", updateHover);
+  container.addEventListener("mouseover", updateHover);
+
+  container.addEventListener("mouseleave", () => {
+    if (!relState.hot) return;
+    relState.hot = "";
+    paintRelations();
+  });
+
+  container.addEventListener("click", (event) => {
+    // 拖拽结束时浏览器会补发一次 click，那一次不该当成"选中节点"。
+    if (relState.suppressClickUntil && Date.now() <= relState.suppressClickUntil) {
+      relState.suppressClickUntil = 0;
+      relState.moved = false;
+      return;
+    }
+    const node = (event.target as Element).closest("[data-work-id]");
+    if (!node) return;
+    const workId = node.getAttribute("data-work-id") ?? "";
+    const item = (ui.status?.work_items ?? []).find((candidate) => candidate.work_id === workId);
+    if (!item) return;
+    showView("project");
+    void selectWorkItem(item);
+  });
+
+  container.addEventListener("dblclick", (event) => {
+    if ((event.target as Element).closest(".rnode")) return;
+    relState.yaw = 0.62;
+    relState.pitch = -0.34;
+    fitRelations();
+    paintRelations();
+  });
+
+  const toggle = (id: string, key: "showDepends" | "showRelated" | "showModules" | "onlyAttention") => {
+    byId(id).addEventListener("click", () => {
+      relState[key] = !relState[key];
+      byId(id).classList.toggle("active", relState[key]);
+      relState.signature = "";
+      renderRelations();
+    });
+  };
+  toggle("rel-depends", "showDepends");
+  toggle("rel-related", "showRelated");
+  toggle("rel-modules", "showModules");
+  toggle("rel-attention", "onlyAttention");
+
+  byId("rel-spin").addEventListener("click", () => {
+    relState.spin = !relState.spin;
+    byId("rel-spin").classList.toggle("active", relState.spin);
+    if (relState.spin) startSpin();
+    else stopSpin();
+  });
+  byId("rel-flat").addEventListener("click", () => {
+    relState.pitch = 0;
+    relState.yaw = 0;
+    byId("rel-flat").classList.toggle("active", true);
+    paintRelations();
+  });
+  byId("rel-zoom-in").addEventListener("click", () => {
+    relState.zoom = Math.min(3.2, relState.zoom * 1.18);
+    paintRelations();
+  });
+  byId("rel-zoom-out").addEventListener("click", () => {
+    relState.zoom = Math.max(0.35, relState.zoom / 1.18);
+    paintRelations();
+  });
+  byId("rel-reset").addEventListener("click", () => {
+    relState.yaw = 0.62;
+    relState.pitch = -0.34;
+    byId("rel-flat").classList.remove("active");
+    fitRelations();
+    paintRelations();
+  });
 }
 
 /* ---------- 项目资料视图 ---------- */
@@ -740,14 +1635,16 @@ async function renderResourceDocument(file: ResourceFile | null): Promise<void> 
 
 /* ---------- 工作区视图 ---------- */
 
-function showView(view: "workspace" | "project" | "resources"): void {
+function showView(view: "workspace" | "project" | "resources" | "relations"): void {
   ui.view = view;
   byId("workspace-view").classList.toggle("hidden", view !== "workspace");
   byId("resources-view").classList.toggle("hidden", view !== "resources");
+  byId("relations-view").classList.toggle("hidden", view !== "relations");
   byId("detail-body").classList.toggle("hidden", view !== "project" || !ui.selected);
   byId("empty-state").classList.toggle("hidden", view !== "project" || Boolean(ui.selected));
   document.body.classList.toggle("in-workspace", view === "workspace");
   document.body.classList.toggle("in-resources", view === "resources");
+  document.body.classList.toggle("in-relations", view === "relations");
 }
 
 async function loadWorkspace(): Promise<void> {
@@ -1432,6 +2329,124 @@ function selectTab(tab: string): void {
   if (tab === "data") renderData();
 }
 
+/** 把窗口坐标换成世界坐标：拖动和缩放都要在同一套坐标里算。 */
+function toWorld(event: { clientX: number; clientY: number }): { x: number; y: number } {
+  const rect = byId("graph").getBoundingClientRect();
+  return {
+    x: (event.clientX - rect.left - graphState.tx) / graphState.k,
+    y: (event.clientY - rect.top - graphState.ty) / graphState.k,
+  };
+}
+
+function bindGraphInteraction(): void {
+  const graph = byId("graph");
+
+  graph.addEventListener("mouseover", (event) => {
+    if (graphState.drag) return;
+    const node = (event.target as Element).closest(".gnode");
+    const key = node ? (node.getAttribute("data-key") ?? "") : "";
+    highlightGraph(key);
+    if (key) {
+      byId("graph-detail").innerHTML = describeGraphNode(key);
+    }
+  });
+  graph.addEventListener("mouseleave", () => {
+    highlightGraph("");
+    byId("graph-detail").textContent = "悬停节点看关系，拖节点调整位置，滚轮缩放，空白处拖动平移。";
+  });
+
+  graph.addEventListener("pointerdown", (event) => {
+    const element = event.target as Element;
+    const node = element.closest(".gnode");
+    const world = toWorld(event);
+    if (node) {
+      const key = node.getAttribute("data-key") ?? "";
+      const model = graphState.nodes.find((candidate) => candidate.key === key);
+      if (!model) return;
+      graphState.drag = {
+        key,
+        startX: world.x,
+        startY: world.y,
+        originX: model.x,
+        originY: model.y,
+        moved: false,
+      };
+    } else {
+      graphState.pan = { x: event.clientX, y: event.clientY, tx: graphState.tx, ty: graphState.ty };
+    }
+    graph.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  graph.addEventListener("pointermove", (event) => {
+    if (graphState.drag) {
+      const world = toWorld(event);
+      const model = graphState.nodes.find((candidate) => candidate.key === graphState.drag?.key);
+      if (!model || !graphState.drag) return;
+      const dx = world.x - graphState.drag.startX;
+      const dy = world.y - graphState.drag.startY;
+      if (Math.abs(dx) * graphState.k > 2 || Math.abs(dy) * graphState.k > 2) graphState.drag.moved = true;
+      model.x = graphState.drag.originX + dx;
+      model.y = graphState.drag.originY + dy;
+      paintGraphPositions();
+      highlightGraph(graphState.drag.key);
+      return;
+    }
+    if (graphState.pan) {
+      graphState.tx = graphState.pan.tx + (event.clientX - graphState.pan.x);
+      graphState.ty = graphState.pan.ty + (event.clientY - graphState.pan.y);
+      applyGraphTransform();
+    }
+  });
+
+  const endDrag = (event: PointerEvent): void => {
+    if (graphState.drag?.moved) graphState.suppressClick = true;
+    graphState.drag = null;
+    graphState.pan = null;
+    if (graph.hasPointerCapture(event.pointerId)) graph.releasePointerCapture(event.pointerId);
+  };
+  graph.addEventListener("pointerup", endDrag);
+  graph.addEventListener("pointercancel", endDrag);
+
+  graph.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    zoomGraph(event.deltaY < 0 ? 1.12 : 1 / 1.12, event.clientX, event.clientY);
+  }, { passive: false });
+
+  graph.addEventListener("click", (event) => {
+    if (graphState.suppressClick) {
+      graphState.suppressClick = false;
+      return;
+    }
+    const node = (event.target as Element).closest("[data-work-id]");
+    if (!node) return;
+    const workId = node.getAttribute("data-work-id") ?? "";
+    const item = (ui.status?.work_items ?? []).find((candidate) => candidate.work_id === workId);
+    if (item) void selectWorkItem(item);
+  });
+
+  graph.addEventListener("dblclick", (event) => {
+    if ((event.target as Element).closest(".gnode")) fitGraph();
+  });
+
+  // 图层开关：只要有变化就重建模型，fit 后回到全图视野。
+  const toggle = (id: string, key: "showDepends" | "showRelated" | "showModules" | "onlyAttention") => {
+    byId(id).addEventListener("click", () => {
+      graphState[key] = !graphState[key];
+      byId(id).classList.toggle("active", graphState[key]);
+      graphState.signature = "";
+      renderGraph();
+    });
+  };
+  toggle("graph-depends", "showDepends");
+  toggle("graph-related", "showRelated");
+  toggle("graph-modules", "showModules");
+  toggle("graph-attention", "onlyAttention");
+  byId("graph-fit").addEventListener("click", () => fitGraph());
+  byId("graph-zoom-in").addEventListener("click", () => zoomGraph(1.2));
+  byId("graph-zoom-out").addEventListener("click", () => zoomGraph(1 / 1.2));
+}
+
 function bind(): void {
   byId("pick").addEventListener("click", () => {
     void (async () => {
@@ -1442,7 +2457,10 @@ function bind(): void {
   byId("refresh").addEventListener("click", () => {
     if (ui.view === "workspace") void loadWorkspace();
     else if (ui.view === "resources") void loadResources();
-    else if (ui.root) void loadProject(ui.root);
+    else if (ui.view === "relations") {
+      relState.signature = "";
+      void loadRelations();
+    } else if (ui.root) void loadProject(ui.root);
   });
   byId("workspace").addEventListener("click", () => {
     void loadWorkspace();
@@ -1450,6 +2468,10 @@ function bind(): void {
   byId("resources").addEventListener("click", () => {
     void loadResources();
   });
+  byId("relations").addEventListener("click", () => {
+    void loadRelations();
+  });
+  bindRelations();
   byId("resource-groups").addEventListener("click", (event) => {
     const row = (event.target as Element).closest("[data-resource-path]");
     if (!row) return;
@@ -1472,13 +2494,8 @@ function bind(): void {
   for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>(".tab"))) {
     button.addEventListener("click", () => selectTab(button.dataset.tab ?? "overview"));
   }
-  byId("graph").addEventListener("click", (event) => {
-    const target = (event.target as Element).closest("[data-work-id]");
-    if (!target) return;
-    const workId = target.getAttribute("data-work-id") ?? "";
-    const item = (ui.status?.work_items ?? []).find((candidate) => candidate.work_id === workId);
-    if (item) void selectWorkItem(item);
-  });
+  // 关联图谱：悬停高亮邻域、点节点联动、拖节点改位、滚轮缩放、空白拖动平移。
+  bindGraphInteraction();
   // 追踪图：悬停亮出该节点的连线，点击把关系写成文字。
   const traceGraph = byId("trace-graph");
   traceGraph.addEventListener("mouseover", (event) => {

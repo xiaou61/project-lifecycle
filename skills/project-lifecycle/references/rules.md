@@ -14,6 +14,8 @@
 
 初始化器只创建 `.agent/rules/`，不会猜测或填写规则。首次初始化后，Agent 先检查仓库并提出草案；用户确认后才写入 `always.md`，并设置 `status: active`、`configured: true`。规则未确认时可以讨论、设计和做不依赖未知规则的只读检查，但不能实现、部署、迁移或变更数据。
 
+用户愿意在项目里固定签署人时，可在 `always.md` 的 frontmatter 写 `approver: <姓名>`。`approve` 省略 `--by` 时用它填签署人——**它只提供身份，不提供批准**：是否批准仍取决于用户当轮是否明确确认，模型不能因为这个默认值自行调用 `approve`。
+
 ### 工作项约束
 
 `.agent/changes/<WORK编号>-<中文名称>/requirements.md` 保存本次目标、范围、验收和特殊约束。下游 proposal、design、tasks 只能在已批准范围内收敛。一次变更的取舍放在工作项；跨变更决策放 `.agent/notes/`（写法见 [notes.md](notes.md)）；稳定共享协议放 `.agent/specs/` 或 `.agent/references/`；长期可检索知识放 `.agent/memory.md`。

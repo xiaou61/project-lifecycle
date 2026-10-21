@@ -1,20 +1,30 @@
-# Requirements Discovery
+# 需求澄清
 
-Use this reference while clarifying and recording what the user needs. Requirements describe desired behavior and constraints, not the implementation chosen to deliver them.
+在澄清和记录用户需要什么时用本参考。需求描述期望行为和约束，不描述用来实现它们的方案。
 
-## Conversation
+## 常见借口与反驳
 
-- Assign a concise Chinese work-item name when a managed requirement first appears, then preserve that name throughout the conversation and lifecycle artifacts. Read [relationships.md](relationships.md) to allocate its stable `WORK-*` identity and evaluate related requirements.
-- When the user asks to investigate or interview the requirement before producing a PRD/Task, read [requirements-interview.md](requirements-interview.md) and use its optional deep-interview mode. It extends this conversation without changing the artifact or approval model.
-- Begin from the user's stated outcome and inspect relevant repository context before asking questions the code can answer.
-- Ask focused questions in small batches. Prioritize questions that change scope, user-visible behavior, data ownership, integrations, constraints, or acceptance.
-- Reflect decisions back in concrete language and distinguish confirmed facts, assumptions, and open questions.
-- Load `.agent/rules/always.md` before recording constraints. Put only this work item's stricter or additional constraints in `requirements.md`; do not duplicate every project rule or silently waive one. Follow [rules.md](rules.md) when a requested exception conflicts with a project `MUST`.
-- Do not force the user through a generic questionnaire. Omit dimensions that do not matter to this work.
-- In deep-interview mode, ask one focused question per round, reflect the answer into the artifact immediately, and stop only when the decision tree and final-confirmation conditions are closed.
-- Ask only when the choice changes the goal, user-visible behavior, data ownership, external integration, public interface, acceptance, security, project rules, or deployment, and cannot be safely inferred from approved artifacts and repository patterns. Otherwise choose the existing pattern and record a material assumption.
+| 借口 | 为什么站不住 | 该做什么 |
+| --- | --- | --- |
+| 用户目标说得很清楚了，直接写代码 | 说清的是目标，不是边界；未确认的假设会以返工和 bug 的形式回来 | 先落 `requirements.md` 的「已确认事实」与「待确认问题」 |
+| 这是技术选择，我自己定就行 | 改变范围、数据归属、外部集成、公共接口、验收或部署的，就是用户决定 | 按事实/决定/选择三类分别记录 |
+| 问题先空着，做着做着就清楚了 | 会改变交付边界的开放问题阻断需求批准，下游会建在流沙上 | 解决或明确记录，再标 `approved` |
+| 已经有 PRD 了，照着做不会漏 | 没读来源、没有锚点和映射的转述，无法复查是否漏项 | 启用 `source_coverage: required` 并逐行填来源覆盖表 |
+| 这个需求和别的差不多，直接合了 | 是否可独立批准/验收要先判断，凭感觉合并会污染已在做的工作 | 先搜索重叠，再决定合并、硬依赖还是软关联 |
 
-## Requirements Artifact
+## 对话
+
+- 受管理的需求第一次出现时，给它一个简短的中文工作项名称，并在此后的对话和生命周期工件里一直沿用。读 [relationships.md](relationships.md) 分配稳定的 `WORK-*` 标识并评估相关工作项。
+- 用户要求先调查或访谈需求再产出 PRD/Task 时，读 [requirements-interview.md](requirements-interview.md) 使用其可选的深挖模式。它扩展这段对话，不改变工件或批准模型。
+- 从用户陈述的结果出发；代码能回答的问题先查仓库，再问人。
+- 小批量地提聚焦问题。优先问会改变范围、用户可见行为、数据归属、集成、约束或验收的问题。
+- 用具体语言复述决定，并区分已确认事实、假设和开放问题。
+- 记录约束前先加载 `.agent/rules/always.md`。`requirements.md` 里只放本次工作项更严格或额外追加的约束；不要重复每条项目规则，也不要悄悄豁免某条。请求的例外与项目 `MUST` 冲突时按 [rules.md](rules.md) 处理。
+- 不要逼用户走通用问卷。与本次工作无关的维度直接跳过。
+- 深挖模式下每轮只问一个聚焦问题，把回答立刻反映到工件里，只在决策树和最终确认条件都关闭时才停。
+- 只在选择会改变目标、用户可见行为、数据归属、外部集成、公共接口、验收、安全、项目规则或部署，且无法从已批准工件和仓库模式安全推断时才提问。否则沿用现有模式，并记录一条实质假设。
+
+## 需求工件
 
 在 `requirements.md` 的 frontmatter 中记录风险模式和兼容工作流：
 
@@ -46,7 +56,7 @@ workflow: compact
 | PRD.md | file | 第 12-18 行 | 登录成功后进入首页 | REQ-001 | AC-001 | src/auth/** | 逐行核对 | verified |
 ```
 
-Write the shortest document that makes the work testable. Use these sections when relevant:
+写能让工作可验证的最短文档。按需使用这些章节：
 
 ```markdown
 # <工作项>需求
@@ -78,14 +88,14 @@ Write the shortest document that makes the work testable. Use these sections whe
 
 只有会改变交付边界的待确认问题阻断需求批准；实现选择必须记录理由，但不替代用户对产品范围的决定。
 
-Give durable requirements stable identifiers such as `REQ-001` and acceptance criteria identifiers such as `AC-001` when there is more than a trivial handful. State acceptance criteria as observable outcomes. Avoid vague terms such as "fast", "easy", or "robust" unless the document defines what they mean.
+需求条目超过少数几条时，给长期需求稳定的编号如 `REQ-001`，给验收标准编号如 `AC-001`。验收标准要写成可观察的结果。避免"快""易用""健壮"这类模糊词，除非文档定义了它们的具体含义。
 
-For a new managed work item, create the initial `requirements.md` during the first discussion with its `work_id`, Chinese `work` name, the user's original outcome, known facts, and open questions. This is the current-phase artifact, not an empty scaffold. Use `depends_on` and `related_to` only as defined in [relationships.md](relationships.md), and explain each relation briefly under `## 关联工作项`.
+新的受管理工作项，在第一次讨论时就创建初始 `requirements.md`，写上 `work_id`、中文 `work` 名称、用户原始诉求、已知事实和开放问题。这是当前阶段的工件，不是空壳。`depends_on` 和 `related_to` 只在 [relationships.md](relationships.md) 定义的含义内使用，并在 `## 关联工作项` 下简要说明每条关系。
 
-Before approving requirements, search active work items for overlapping outcomes, acceptance criteria, shared contracts, data ownership, or interfaces. Merge requests that cannot be independently approved and accepted; use a hard dependency or soft relation only when they remain genuinely separate work items.
+批准需求前，搜索活动工作项中重叠的结果、验收标准、共享契约、数据归属或接口。无法独立批准和验收的请求应合并；只有它们确实是彼此独立的工作项时，才用硬依赖或软关联。
 
-Keep the artifact at `status: draft` while a blocking question remains or until the user explicitly approves it. On approval, resolve or record every open question that affects scope and update the status and date.
+有阻断性问题未解决时，或用户尚未明确批准前，工件保持 `status: draft`。批准时，解决或记录每个影响范围的开放问题，并更新状态和日期。
 
-需求批准后由 `project-lifecycle.ps1 approve --artifact requirements` 写入 `approved_by`、`approved_at` 和可选的 `approver_role`（见 [workflow.md](workflow.md) 的“签署”）。这些字段只能由该命令盖章，Agent 不得自行填写；只有 `status: approved` 而没有签署的需求不能跨门槛。
+需求批准后由 `$lifecycle approve --artifact requirements` 写入 `approved_by`、`approved_at` 和可选的 `approver_role`（见 [workflow.md](workflow.md) 的“签署”）。这些字段只能由该命令盖章，Agent 不得自行填写；只有 `status: approved` 而没有签署的需求不能跨门槛。
 
-If approved requirements later change materially, return them to `draft` and mark the existing proposal, design, task plan, and verification artifacts `stale` until they are reconciled. Preserve stable requirement and acceptance identifiers when their meaning remains the same; assign new identifiers instead of silently reusing an old identifier for a different obligation.
+已批准的需求后来发生实质变化时，把它退回 `draft`，并把现有提案、设计、任务计划和验证工件标为 `stale`，直到核对完成。含义不变时保留原有的需求与验收编号；为不同的义务分配新编号，不要悄悄复用旧编号。

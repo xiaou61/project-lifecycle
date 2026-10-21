@@ -1,16 +1,28 @@
-# Task Planning
+# 任务计划
 
-Use this reference after the planning boundary is approved and before implementation begins. In `full` mode that boundary is the approved proposal and design; in `compact` mode it is the approved requirements. A task plan converts those decisions into an executable sequence; it does not choose product scope or architecture.
+规划边界批准之后、开始实施之前用本参考。`full` 模式下该边界是已批准的提案和设计；`compact` 模式下是已批准的需求。任务计划把这些决定转成可执行顺序，它不决定产品范围或架构。
+
+## 常见借口与反驳
+
+| 借口 | 为什么站不住 | 该做什么 |
+| --- | --- | --- |
+| 接口名等实现时再定 | 相邻任务会同时开工，两个执行者会各自发明一个名字，最后要返工对齐 | 现在就在接口块里字面写死 |
+| 先写一个大任务，细节做到时再说 | 「实现整个模块」没有可检查的结果，无法判断做到哪算完 | 拆到一个动作一个可验证结果 |
+| 这个失败模式太边缘，先不列 | 没写归属的失败模式，最终没有任何任务会去测 | 进「评审焦点」表，指定任务与测试名 |
+| 拆这么细太啰嗦，合起来更省事 | 判据不是行数，是每个任务能否独立实现并验证；计划明显长于代码才该合并 | 按比例检查判断，而不是凭感觉 |
+| 先标任务完成，测试回头再补 | 没有验证命令的任务，完成状态无法核对 | 每个任务当场写下验证命令与期望输出 |
 
 ## Preconditions
 
-- Read the approved `requirements.md`. In `full` mode also read the approved `proposal.md` and `design.md`; in `compact` mode the approved requirements and this task plan are the planning boundary.
-- Inspect the current repository so paths, symbols, test locations, and commands are real rather than guessed.
-- Return to the earliest affected artifact when a task would require new behavior or a material design decision.
+## 前置条件
 
-## Task Artifact
+- 读已批准的 `requirements.md`。`full` 模式下还要读已批准的 `proposal.md` 和 `design.md`；`compact` 模式下已批准的需求加本任务计划就是规划边界。
+- 检查当前仓库，让路径、符号、测试位置和命令都是真实的，而不是猜的。
+- 任务需要新行为或实质设计决策时，回到最早受影响的工件。
 
-Create `<artifact-root>/tasks.md` with only the detail needed to execute and verify the work:
+## 任务工件
+
+创建 `<工件根>/tasks.md`，只写执行和验证所需的细节：
 
 ```markdown
 # <工作项>实施任务
@@ -56,17 +68,19 @@ Create `<artifact-root>/tasks.md` with only the detail needed to execute and ver
 
 每条都必须落到某个任务的测试里。写"无"时要说明为什么规格不暗示任何此类失败模式；空着不写等于跳过这项检查。
 
-Use stable `TASK-*` identifiers when there is more than a trivial handful. Task state is `pending | in_progress | done | blocked`; artifact state remains `draft | approved | stale` in YAML frontmatter.
+任务条目超过少数几条时用稳定的 `TASK-*` 编号。任务状态是 `pending | in_progress | done | blocked`；工件状态仍是 YAML frontmatter 里的 `draft | approved | stale`。
 
-Each task should be small enough to implement and verify as one coherent change. State exact paths and existing symbol names when known, dependencies on earlier tasks, the requirements or acceptance criteria it serves, and at least one observable verification step. Do not include placeholder instructions such as "add suitable tests" or "handle edge cases" without naming the expected behavior.
+每个任务应小到可以作为一次连贯变更来实施和验证。已知时写准确的路径和现有符号名、对前置任务的依赖、它服务的需求或验收标准，以及至少一个可观察的验证步骤。不要写"补充合适的测试""处理边界情况"这类没有指明预期行为的占位指令。
 
 优先把任务拆成纵向切片：每个任务穿过本次变更实际涉及的必要层（例如数据、接口、界面和测试），完成后能独立演示或验证用户可见行为，而不是按“先改完所有后端、再改完所有前端”做水平分层。每个任务显式列出真正会阻塞它的 `TASK-*`；没有实际依赖就写“无”，不要为了排序制造依赖。
 
 如果无法纵向切片是因为一次机械重构会同时影响大量调用方，按“扩展旧接口 -> 分批迁移 -> 删除旧接口”的 expand-contract 顺序拆分，并保持旧形式在迁移期间可用。其他情况下，不要用一个“大重构”任务掩盖多个无法独立验证的交付结果。
 
-在把任务计划标为 `approved` 前，向用户展示编号后的任务标题、阻塞关系和每项可独立交付的结果，并确认拆分粒度是否过粗、过细或需要合并。这个确认只校验执行计划，不重新决定已批准的产品范围。用户确认后用 `project-lifecycle.ps1 approve --artifact tasks` 盖章写入 `approved_by` 和 `approved_at`；只有该命令写签署字段（见 [workflow.md](workflow.md) 的“签署”）。同一轮确认涵盖多个阶段时用 `--artifact all` 一次签完，只留一条历史记录。
+**探针任务**：确实需要先验证“这个 API/库/环境能不能这么用”时，允许一个交付物是决策记录的任务——验证写“结论已写入 `.agent/notes/<主题>.md`，并被后续任务的依据引用”，而不是编造一个行为断言去撞验证硬门。探针只回答一个问题，结论出来后就结束；它不能替代实现任务，也不能当作验收证据。
 
-Do not duplicate detailed interface or data design from `design.md`; link to the relevant section. Do not turn every local edit into a separate task when one coherent task is easier to execute and review.
+在把任务计划标为 `approved` 前，向用户展示编号后的任务标题、阻塞关系和每项可独立交付的结果，并确认拆分粒度是否过粗、过细或需要合并。这个确认只校验执行计划，不重新决定已批准的产品范围。用户确认后用 `$lifecycle approve --artifact tasks` 盖章写入 `approved_by` 和 `approved_at`；只有该命令写签署字段（见 [workflow.md](workflow.md) 的“签署”）。同一轮确认涵盖多个阶段时用 `--artifact all` 一次签完，只留一条历史记录。
+
+不要重复 `design.md` 里详细的接口或数据设计，链接到相应章节。一个连贯任务更容易执行和评审时，不要把它拆成一堆局部编辑。
 
 ## 计划质量门（批准前自审）
 
@@ -81,4 +95,4 @@ Do not duplicate detailed interface or data design from `design.md`; link to the
 - **接口字面一致**：相邻任务的“接口”块里，同一个函数名、参数类型、返回类型写法必须完全一致。
 - **状态可被脚本读到**：任务用 `### TASK-001 | pending | 名称`、带“状态”列的表格、或 `## T-01 名称` + 复选框小节之一。三种写法都能被状态查询解析；其他格式会让未完成的工作项显示成没有任务。
 
-Keep `tasks.md` at `status: draft` until the user explicitly approves the implementation sequence. During implementation, update task state from actual execution. A local step discovered inside the approved design may be added with a short reason. If a task changes scope, public behavior, interfaces, owned data, security, migration, or architecture, stop and revise the earliest affected upstream artifact instead.
+`tasks.md` 保持 `status: draft`，直到用户明确批准执行顺序。实施期间按实际执行更新任务状态。在已批准的设计范围内发现的局部步骤可以补充，并写一句理由。任务若改变范围、公共行为、接口、归属数据、安全、迁移或架构，停下并修订最早受影响的上游工件。

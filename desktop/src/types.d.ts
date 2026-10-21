@@ -136,10 +136,19 @@ interface WorkItemView {
   };
 }
 
+/** INDEX.md「模块索引」表的一行：模块名、源码路径、相关工作项。 */
+interface ModuleView {
+  name: string;
+  path: string;
+  work_ids: string[];
+}
+
 interface StatusView {
   schema_version: string;
   generated_at: string;
   project_root: string;
+  /** 主进程从 .agent/INDEX.md 解析后附加；Python 状态里没有这一段。 */
+  modules?: ModuleView[];
   workspace: string;
   scope: string;
   initialized: boolean;

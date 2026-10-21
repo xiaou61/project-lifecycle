@@ -3,7 +3,7 @@
 这页把常见的“我该怎么用”直接对应到 `project-lifecycle` 的入口、工件和边界，共 33 个问题（其中 `18.1`、`18.2`、`24.1` 是对 18 和 24 的追问）。示例默认使用 Windows PowerShell；`$lifecycle` 指向已安装 Skill 的统一命令入口：
 
 ```powershell
-$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
+$lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecycle.ps1"   # macOS/Linux 用 project-lifecycle.sh
 ```
 
 ## 认识这套 Skill
@@ -125,11 +125,15 @@ $lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecyc
 
 ### 14. 三四个对话并行时，推荐怎样安排？
 
-推荐“一项工作、一个分支、一个 Worktree、一个写入对话”。例如为 `WORK-003` 创建独立目录：
+推荐“一项工作、一个分支、一个 Worktree、一个写入对话”。
+
+Agent 在第一次要实施某个 `WORK-003`、即将改源码时会问一次要不要开 worktree，用户同意才创建；已经在独立目录里工作后不会再问。例如：
 
 ```powershell
 git worktree add "..\我的项目-WORK-003" -b "work/WORK-003"
 ```
+
+开之前确认这个工作项的 `.agent/changes/WORK-003-*/` 已经提交：worktree 只检出已提交内容，未提交的需求和任务文件不会出现在新目录里。用户拒绝时留在当前目录，遵守“同一目录同一时刻只允许一个写入对话”，不要每轮反复追问。
 
 该对话只在新目录处理 `WORK-003`；其他对话使用不同工作项和不同 Worktree。各自完成后，在自己的目录运行测试、`status` 和 `validate`，由一个整合对话查看差异并合并。
 

@@ -3,7 +3,7 @@
 这些是给用户和自动化调用的稳定入口。底层 Python 文件属于 Skill 实现细节，普通用户不需要直接运行 Python。
 
 ```powershell
-$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
+$lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecycle.ps1"   # macOS/Linux 用 project-lifecycle.sh
 ```
 
 ## 初始化
@@ -101,6 +101,7 @@ $lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecyc
   --verification "pytest tests/test_login.py -q：通过"
 
 # 用户确认需求后盖章：写入审批人、角色和脚本时间戳，并追加一条决策记录
+# --by 可省略，省略时取 .agent/rules/always.md 的 approver；都没有时报错而不是猜
 & $lifecycle approve "F:\我的项目" --work WORK-003 --artifact requirements --by "张三" --role "产品"
 
 # 用户一次确认整版：签完已存在的需求/方案/设计/任务，只写一条历史记录

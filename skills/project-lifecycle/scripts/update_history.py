@@ -296,6 +296,26 @@ def resolve_work_dir(root: Path, work_id: str) -> Path:
     return Path(str(matches[0]["path"]))
 
 
+def resolve_signer(root: Path, explicit: str | None) -> str:
+    """解析签署人：本次显式传入，或 `.agent/rules/always.md` 里用户确认过的 `approver`。
+
+    只补身份，不补批准——是否批准仍由用户表述判断，模型不能凭这个默认值自行签署。
+    """
+    if explicit and explicit.strip():
+        return explicit.strip()
+    rules = root / ".agent" / "rules" / "always.md"
+    if rules.is_file():
+        approver = project_status.frontmatter_fields(
+            rules.read_text(encoding="utf-8-sig")
+        ).get("approver", "")
+        if approver:
+            return approver
+    raise RuntimeError(
+        "缺少 --by：请在 .agent/rules/always.md 的 frontmatter 写入 "
+        "approver: <用户姓名>（由用户确认），或本次显式传 --by。"
+    )
+
+
 def approve(args: argparse.Namespace, root: Path) -> int:
     """把用户确认写成带签署人和时间戳的签署记录。
 
@@ -304,6 +324,7 @@ def approve(args: argparse.Namespace, root: Path) -> int:
     业务验收仍要单独 `--artifact test-report`：它要求报告已是 passed。
     """
     work_dir = resolve_work_dir(root, args.work)
+    args.by = resolve_signer(root, args.by)
     if args.artifact == "all":
         names = [
             name
@@ -455,7 +476,7 @@ def main() -> int:
         action="store_true",
         help="把已完成的工作项移入 changes/archive/（可配合 --work 只归档一个）",
     )
-    parser.add_argument("--by", help="审批人姓名，必须来自用户本人或项目名单，不得由模型编造")
+    parser.add_argument("--by", help="审批人姓名；省略时取 .agent/rules/always.md 的 approver，不得由模型编造")
     parser.add_argument("--tail", type=int, help="只查看最近 N 条记录")
     parser.add_argument("--json", action="store_true", help="输出 JSON")
     parser.add_argument("--work", default="maintenance", help="WORK 编号或 maintenance")
@@ -474,7 +495,7 @@ def main() -> int:
         if args.check:
             return git_checkpoint(root, args.json)
         if args.approve:
-            missing = [name for name in ("work", "artifact", "by") if not getattr(args, name)]
+            missing = [name for name in ("work", "artifact") if not getattr(args, name)]
             if missing:
                 parser.error("--approve 缺少：" + ", ".join("--" + name for name in missing))
             if args.work == "maintenance":

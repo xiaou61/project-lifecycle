@@ -1,8 +1,20 @@
-# Testing And Verification
+# 测试与验证
 
-Use this reference after implementation to plan and record verification against the approved upstream boundary and acceptance criteria. `strict`/`full` mode also uses the approved design; `managed`/`compact` mode does not require a separate design.
+实施之后、按已批准的上游边界和验收标准规划并记录验证时用本参考。`strict`/`full` 模式还要用已批准的设计；`managed`/`compact` 模式不要求单独的设计。
 
 验证强度由本次改动和验收标准决定，不由 `strict` 标签机械放大。`strict` 主要增加工件、审批和证据门槛；仍然只运行能够证明本次行为的最窄可信检查，除非用户或已批准计划要求扩大范围。
+
+## 常见借口与反驳
+
+「完成前的硬门」已逐条驳回的说法不在这里重复；下表是它没覆盖、但同样常见的几种。
+
+| 借口 | 为什么站不住 | 该做什么 |
+| --- | --- | --- |
+| 改动很小，不用跑 | 改动大小不代表风险大小，判断依据是行为有没有变 | 跑能证明这次行为的最窄命令 |
+| 上游工件没变，旧报告还能用 | 只要那次运行之后代码或行为变过，旧结果就不再是证据 | 重新跑受影响检查 |
+| 重跑一次绿了，是 flaky | 共享资源上的绿同样不作数，重跑到绿是概率不是修复 | 先确认独占资源，再查清不稳定原因 |
+| 用户口头说验收通过了 | 口头同意不是审计事实，报告也得先 `passed` | 用 `approve --artifact test-report` 登记 |
+| 测试全绿，所以用户会满意 | `passed` 只是测试证据，不等于业务验收或可发布 | 分开陈述测试结果与验收状态 |
 
 ## 完成前的硬门
 
@@ -28,11 +40,13 @@ Use this reference after implementation to plan and record verification against 
 
 **跳过（skipped）不等于通过。** 测试按条件跳过时退出码仍是 0；必须单独数 skipped 列并说明为什么跳过。项目若用"未配置就跳过"的集成测试写法，任何一次绿色构建都可能一条真实用例都没跑。
 
+**共享资源上的运行不是证据。** 同机可能有其他会话（人或 agent）在同时跑测试。凡是用到数据库、端口、临时目录、固定账号或固定种子数据的检查，先确认这次运行拿的是独占资源——项目若提供隔离入口（分配独占库、独立 worktree、可覆写端口），**必须走它**，而不是走默认命令再声称通过。共用资源上的红先当成竞争，查清前不要报成产品缺陷；共用资源上的绿同样不作数。
+
 **修缺陷要反向验证。** 修 bug 的证据不是"现在过了"，而是"去掉修复后原症状的用例确实红"（red-green 已实测）。没做反向验证的修复，可能只是把测试写成了对照新行为。
 
-## Test Plan
+## 测试计划
 
-Create `<artifact-root>/testing/plan.md` with the same `work_id` and Chinese `work` name as the upstream artifacts. Use `artifact: test-plan` and `status: draft | ready | stale` in frontmatter. Include only relevant test levels and checks:
+创建 `<工件根>/testing/plan.md`，`work_id` 和中文 `work` 名称与上游工件一致。frontmatter 用 `artifact: test-plan` 和 `status: draft | ready | stale`。只包含相关的测试层级和检查：
 
 ```markdown
 # <工作项>测试计划
@@ -46,15 +60,15 @@ Create `<artifact-root>/testing/plan.md` with the same `work_id` and Chinese `wo
 ## 已知缺口
 ```
 
-The acceptance matrix maps each `AC-*` criterion to an executable test, a manual inspection, or an explicit gap. Name the intended test location or command when known. Test externally observable behavior and meaningful contracts rather than document wording or implementation trivia.
+验收矩阵把每条 `AC-*` 映射到可执行测试、人工检查或明确的缺口。已知时写明预期的测试位置或命令。测外部可观察的行为和有意义的契约，不要测文档措辞或实现琐事。
 
-Before running the plan, confirm that the required upstream artifacts are approved rather than `draft` or `stale`: `full` mode requires requirements, proposal, design and task plan; `compact` mode requires requirements and task plan. This is an execution precondition, not a separate user approval of the test plan. If any upstream artifact changes materially after a result is recorded, mark the report `stale` and rerun the affected checks; a previously passing command is not evidence for changed behavior.
+执行计划前，确认所需上游工件已批准，而不是 `draft` 或 `stale`：`full` 模式需要需求、提案、设计和任务计划；`compact` 模式需要需求和任务计划。这是执行前置条件，不是对测试计划的又一次用户批准。任何上游工件在结果记录后发生实质变化时，把报告标为 `stale` 并重跑受影响的检查；之前跑绿的命令不能作为变更后行为的证据。
 
-Place executable tests in the repository's established unit, integration, end-to-end, or other test directories. Do not place executable tests under the documentation artifact root unless that is already the repository convention.
+把可执行测试放在仓库既有的单元、集成、端到端或其他测试目录里。除非仓库本来就这么约定，不要把可执行测试放在文档工件根目录下。
 
-## Verification Report
+## 验证报告
 
-Run the narrowest checks that provide credible evidence for the affected behavior, then broaden only when the change reaches shared or cross-system behavior. Record the same `work_id` and Chinese `work` name with `artifact: test-report` and `status: passed | partial | failed | stale` in frontmatter. Record the exact commands or manual procedures actually performed and their outcomes in `<artifact-root>/testing/report.md`:
+跑能对受影响行为提供可信证据的最窄检查，只有变更触及共享或跨系统行为时才扩大范围。报告里记同样的 `work_id` 和中文 `work` 名称，frontmatter 用 `artifact: test-report` 和 `status: passed | partial | failed | stale`。在 `<工件根>/testing/report.md` 记录实际执行的确切命令或人工步骤及其结果：
 
 ```markdown
 # <工作项>验证报告
@@ -66,9 +80,9 @@ Run the narrowest checks that provide credible evidence for the affected behavio
 ## 剩余风险
 ```
 
-Distinguish `passed`, `failed`, and `not run`. Do not infer success from code inspection when execution is required, and do not hide unavailable infrastructure, credentials, flaky results, or environmental limitations. A partial or failed report is still useful evidence; it is not completion. `passed` is test evidence and does not by itself mean user business acceptance or release.
+区分 `passed`、`failed` 和 `not run`。需要执行时，不要从代码检查推断成功；不要隐瞒不可用的基础设施、凭据、不稳定的结果或环境限制。部分通过或失败的报告仍是有用的证据，但它不是完成。`passed` 是测试证据，本身不代表用户业务验收或可发布。
 
-业务验收是另一个事实，写在同一份报告的 frontmatter 里：用户明确验收通过后运行 `project-lifecycle.ps1 approve --work WORK-003 --artifact test-report --by "李四"`，写入 `accepted_by` 和 `accepted_at`（见 [workflow.md](workflow.md) 的“签署”）。它只登记验收，不改报告的 `status`，也不替代 `passed`；报告不是 `passed` 时拒绝登记。没有验收记录时报告仍然是有效的测试证据，只是完成结算还差用户验收。
+业务验收是另一个事实，写在同一份报告的 frontmatter 里：用户明确验收通过后运行 `$lifecycle approve --work WORK-003 --artifact test-report --by "李四"`，写入 `accepted_by` 和 `accepted_at`（见 [workflow.md](workflow.md) 的“签署”）。它只登记验收，不改报告的 `status`，也不替代 `passed`；报告不是 `passed` 时拒绝登记。没有验收记录时报告仍然是有效的测试证据，只是完成结算还差用户验收。
 
 ### 冒烟测试是可选项
 

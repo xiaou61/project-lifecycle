@@ -1,6 +1,6 @@
 # Project Lifecycle Skill
 
-面向 Codex 的中文项目开发 Skill。它把需要持久追踪的需求、决策、任务和验证证据保存到目标项目的 `.agent/`，让跨会话恢复有事实依据，同时按工作风险缩短流程。Skill 仓库自身的维护记录见 [`CHANGELOG.md`](CHANGELOG.md)。
+面向 Codex、ZCode 等 Agent 宿主的项目开发 Skill（Windows、macOS、Linux 均可用）。它把需要持久追踪的需求、决策、任务和验证证据保存到目标项目的 `.agent/`，让跨会话恢复有事实依据，同时按工作风险缩短流程。Skill 仓库自身的维护记录见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 Skill 运行时入口是 `skills/project-lifecycle/SKILL.md`。详细协议按需从 `skills/project-lifecycle/references/` 读取；根目录 README 只做使用说明，不是运行时状态源。仓库的模块地图见 [VitePress 总索引](docs/reference/index.md)；项目理解型 HTML 的生成规则见 [`references/html.md`](skills/project-lifecycle/references/html.md)，实际文件只在用户同意后放入目标项目的 `.agent/html/`。
 
@@ -78,7 +78,10 @@ skills/project-lifecycle/
   references/core-history.md        Git 核心组件历史视图
   references/update-history.md      更新日志字段、本地检查点和推送边界
   references/html.md                项目理解型 HTML 的同意与保存边界
-  scripts/project-lifecycle.ps1    面向用户的统一命令入口
+  examples/managed-walkthrough.md   从需求到验证的最小完整走查
+  scripts/project-lifecycle.ps1    面向用户的统一命令入口（Windows）
+  scripts/project-lifecycle.sh     面向用户的统一命令入口（macOS/Linux）
+  scripts/project-lifecycle.py     命令映射与转发，上面两个入口共用
   scripts/update_history.py        更新历史与本地检查点命令实现
   scripts/init_project.py           幂等初始化器
   scripts/project_status.py         只读状态汇总器
@@ -98,12 +101,12 @@ skills/project-lifecycle/
 使用 $skill-installer 从 https://github.com/xiaou61/project-lifecycle/tree/main/skills/project-lifecycle 安装 project-lifecycle。
 ```
 
-也可以把仓库 checkout 到 Codex 支持的 Skill 发现目录。以当前 Codex 文档和 `$skill-installer` 输出为准，不要把某台机器的绝对路径写进项目规则。
+也可以把仓库 checkout 到宿主的 Skill 发现目录（Codex 的 `~/.codex/skills`、ZCode 的 `~/.agents/skills`）。以宿主的 Skill 文档和 `$skill-installer` 输出为准，不要把某台机器的绝对路径写进项目规则。
 
-下面所有示例用 `$lifecycle` 代表已安装 Skill 里的命令适配器。它需要 Python 3.9 或更高版本；`<已安装 Skill 目录>` 指当前宿主的 Skill 发现目录（例如 Codex 的 `$env:USERPROFILE\.codex\skills`），按本机实际位置解析即可：
+下面所有示例用 `$lifecycle` 代表已安装 Skill 里的命令适配器。它需要 Python 3.9 或更高版本；`<已安装 Skill 目录>` 指当前宿主的 Skill 发现目录，按本机实际位置解析即可（Windows 用 `.ps1`，macOS/Linux 用 `.sh`）：
 
 ```powershell
-$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
+$lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecycle.ps1"   # macOS/Linux 用 project-lifecycle.sh
 ```
 
 ### 初始化项目

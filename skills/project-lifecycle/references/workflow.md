@@ -11,13 +11,20 @@
 - `.agent/INDEX.md` 只做模块/资料导航，`.agent/html/` 只放理解材料；外层 `PROJECT-INDEX.md` 只导航多仓库。
 - 换会话、上下文压缩或用户说“继续”时，先恢复规范和状态；用户明确批准后才能跨阶段门槛。
 
+## 常见借口与反驳
+
+| 借口 | 为什么站不住 | 该做什么 |
+| --- | --- | --- |
+| 用户说了“继续”，等于批准了 | “继续”“开始做”只表达动作意图，除非同句明确批准 | 停在最早未批准的门槛并说明差什么 |
+| 上下文压缩了，但我记得批准过 | 聊天和模型记忆不是事实源，压缩后记忆不可靠 | 重新读工件，以 `status` 与签署字段为准 |
+| 状态显示已完成，那就是完成了 | `state` 是工件投影，不是源码扫描结果 | 核对任务、diff 和测试，再看 `code_sync` |
+| 就在当前目录改，省得开 worktree | 同目录多写入方会互相覆盖，改动还会归错工作项 | 首次实施前问一次，按用户答复执行 |
+| 顺手把别人的未提交改动一起提了 | 用户已有与未知归属的改动必须原样保留 | 只提交当前工作项归属的文件 |
+| 用户说“存一下”，那就能推了 | 本地保存不推断远端授权 | 推送、tag、部署要用户明确要求 |
+
 ## 风险模式
 
-| 模式 | 适用范围 | 必要记录 | 允许的验证 |
-| --- | --- | --- | --- |
-| `lite` | 单文件、低风险、边界清楚的小修复 | 聊天和更新历史（若有项目历史） | 能证明本次改动的最窄检查 |
-| `managed` | 需要跨会话或多步骤，但不改变公共边界的普通功能 | `requirements.md`、`tasks.md`、`testing/`；`workflow: compact` | 按验收矩阵执行，不因模式自动增加测试 |
-| `strict` | 公共接口、数据、迁移、安全、部署、架构或跨模块高风险变更 | `workflow: full` 的完整阶段工件 | 最窄可信检查；严格校验是工件门槛，不等于更多测试 |
+`lite`、`managed`、`strict` 的适用范围、必要记录、允许的验证和"只能升级不能降级"的判据只在 `SKILL.md` 的「风险路由」维护，本文件不重复。
 
 `requirements.md` 可以记录 `mode` 和 `mode_reason`。旧工件没有 `mode` 时，状态查询按 `workflow: compact -> managed`、`workflow: full -> strict` 兼容推导。显式 `mode` 非法或缺少理由只产生警告；`validate --strict` 才会把这些兼容性警告视为失败。
 
@@ -48,10 +55,9 @@
 
 1. **确定项目**：多仓库先读外层 `PROJECT-INDEX.md` 和项目映射，再读目标项目的 `AGENTS.override.md`、`AGENTS.md` 和说明；需要定位模块时再读项目 `.agent/INDEX.md`。
 2. **恢复规范**：读 `.agent/rules/always.md`。文件缺失、草案、无效或冲突时先查仓库并提出草案；可以继续只读讨论和不依赖未知规则的设计/验证，但实现、部署、迁移和数据变更必须等待确认。
-3. **查询状态**：通过已安装 Skill 的统一命令入口运行。不要把底层 Python 文件相对当前项目解析，也不要从目标项目的 `.agent/scripts/` 查找状态或校验脚本。`$lifecycle` 指向已安装 Skill 目录下的脚本适配器，由 Agent 按当前宿主的 Skill 安装位置解析（例如 Codex 的 `$env:USERPROFILE\.codex\skills\`、ZCode 的 `$env:USERPROFILE\.agents\skills\`），不要把某一个宿主的绝对路径写进项目规则；适配器需要 Python 3.9 或更高版本：
+3. **查询状态**：通过已安装 Skill 的统一命令入口运行（`$lifecycle` 的解析规则见 `SKILL.md` 顶部）。不要把底层 Python 文件相对当前项目解析，也不要从目标项目的 `.agent/scripts/` 查找状态或校验脚本：
 
    ```powershell
-   $lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
    & $lifecycle brief <project-root> --json      # 每轮默认：只含活动工作项、阻塞、下一步
    & $lifecycle status <project-root> --json     # 完整清单、签署、依赖、预算、全部警告
    & $lifecycle resume <project-root> --work WORK-003 --json
@@ -67,7 +73,6 @@
 发布或交接前可运行：
 
 ```powershell
-$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
 & $lifecycle validate <project-root> --json
 ```
 
@@ -94,6 +99,8 @@ $lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecyc
 | 任务已批准且有未完成任务 | 开发实现 | 无硬依赖和规范阻塞时改代码并同步任务 |
 | 任务完成但没有通过验证报告 | 测试验收 | 记录证据、缺口和风险 |
 | 上游一致、任务完成、验证通过 | 完成沉淀 | 核对规格、记忆并可选归档（归档前按 [specs.md](specs.md) 修正旧路径引用） |
+
+在“开发实现”阶段，批准一次计划后可连续执行到每个任务自己的验证为止，不必每完成一个任务就停下汇报；遇到范围变化、验证失败或新的决策点再停。
 
 `strict` 工作项在实现阶段还会收到一条不阻断的提示：`tasks.md` 缺少 `## 评审焦点`。它提醒的是"规格暗示、却没有任务测试覆盖的失败模式"，格式与归属规则见 [tasks.md](tasks.md)。工作项已 `passed` 后不再提示——回头补历史计划不会改变已发生的事。
 
@@ -134,13 +141,43 @@ $project-lifecycle 在当前项目继续 WORK-003，先恢复规范和状态，�
 
 本 Skill 解决的是“换对话后恢复正确事实”和“多个活动工作项不串线”，不提供同一工作树的文件锁、实时协作编辑或自动合并。多个对话同时打开同一目录、同一分支并修改同一文件时，仍可能互相覆盖、产生冲突或把 Git 改动归到错误的工作项。
 
-推荐把并行对话按工作项隔离到不同分支和 Git Worktree：
+### 开始实施前询问 Worktree（仅在工作区不干净时）
 
-```powershell
-git worktree add "..\项目-WORK-003" -b "work/WORK-003"
+`resume --json` 的 `worktree.decision` 有三种值，按它执行，不要自己另判：
+
+| 值 | 含义 | 动作 |
+| --- | --- | --- |
+| `active` | 已在独立 worktree 内 | 不询问，直接实施 |
+| `proceed` | 工作区干净 | 不询问，直接在当前目录实施并遵守单写入方约定 |
+| `ask_user` | 工作区有未提交改动 | 问一次，见下 |
+
+**只在 `ask_user` 时打断用户**。触发点仍是用户第一次要求实施某个 `WORK-*`，且即将修改源码、测试、配置或工件；只读调查、读文档、代码审查不触发。
+
+```text
+工作区有未提交改动。要不要为 WORK-003 开一个独立的 Git worktree？
+- 开：在新分支 work/WORK-003 上工作，目录 ..\<项目>-WORK-003，不碰当前目录的改动
+- 不开：直接在当前目录工作，同一时刻只允许一个写入对话
 ```
 
-每个对话只负责一个 `WORK-*` 和一个 Worktree；完成后在自己的目录运行 `status`、`validate` 和测试，再由一个明确的整合对话审查差异并合并。只读调查、文档阅读和代码审查可以共享目录；任何会写源码、测试、配置或工件的对话都应先确认目录归属。无法使用 Worktree 时，采用“同一目录同一时刻只允许一个写入对话”的人工约定，并在交接前运行 `checkpoint`。
+用户同意就在项目根执行：
+
+```powershell
+git worktree add "..\<项目>-WORK-003" -b "work/WORK-003"
+```
+
+用户拒绝或环境不支持（非 Git 仓库、已有目录冲突）就在当前目录工作，改为遵守“同一目录同一时刻只允许一个写入对话”，并在交接前运行 `checkpoint`。
+
+**问之前先核对三件事**，任一不满足就说明原因、不要硬开：
+
+- 当前目录是 Git 仓库，且 `git status` 里没有属于其他工作项或来源不明的改动；
+- 目标分支 `work/WORK-003` 和目录都不存在（`git worktree list` 已登记过的直接复用并告知路径）；
+- **该工作项的 `.agent/changes/WORK-003-*/` 已提交**。新 worktree 只检出已提交内容，未提交的需求和任务文件不会出现在里面；没提交就先提交这些工件（只提交当前工作项归属的文件），或明确告知用户在旧目录继续。
+
+**只问一次**：同一个工作项问过一次就不再重复；用户已在 worktree 内工作、或本会话明确答复过“不开”，都按已决处理。每个对话只负责一个 `WORK-*` 和一个 Worktree；完成后在自己的目录运行 `status`、`validate` 和测试，再由一个明确的整合对话审查差异并合并。
+
+决定要写进事实源：创建成功后把分支、worktree 路径和创建时间追加到 `.agent/history/updates.md`（用 `$lifecycle record --type decision`），这样换会话时能知道工作在哪个目录，而不是靠记忆。
+
+`resume --json` 会带一个 `worktree` 字段，`decision` 只有两种值：`active`（已在链接 worktree 内，不要再问）和 `ask_user`（在主工作树里，改代码前问一次）。它只在当前阶段是 `implementation` 时出现；需求讨论、方案设计阶段不会提示。判定依据是 `git rev-parse --git-dir` 与 `--git-common-dir` 是否相同，不依赖目录名。
 
 ## 工作项选择、关系与批准
 
@@ -161,7 +198,6 @@ git worktree add "..\项目-WORK-003" -b "work/WORK-003"
 签署只走命令入口，时间戳由脚本盖：
 
 ```powershell
-$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
 & $lifecycle approve "F:\我的项目" --work WORK-003 --artifact all --by "张三" --role "产品"
 & $lifecycle approve "F:\我的项目" --work WORK-003 --artifact design --by "张三" --role "技术"
 & $lifecycle approve "F:\我的项目" --work WORK-003 --artifact test-report --by "李四"
@@ -174,7 +210,7 @@ $lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecyc
 规则：
 
 - `approved_by`、`approved_at`、`approver_role`、`accepted_by`、`accepted_at` 只能由 `approve` 写入。Agent 不得凭自己的判断填写这些字段——那等于让模型替用户签字。
-- `--by` 必须是用户本人给出的姓名或项目名单中的姓名，不得编造；用户没有说明时先问一次，不要默认填“用户”或 Agent 自己的名字。
+- `--by` 省略时取 `.agent/rules/always.md` 的 `approver`；两者都没有时先问一次用户姓名。不得编造或默认填“用户”、Agent 自己的名字（写法见 [rules.md](rules.md)）。
 - 用户明确批准时，Agent 可以代跑 `approve` 并回显写入的姓名和时间；用户也可以自己运行同一条命令。用户没批准就不要跑。
 - 报告登记业务验收要求 `testing/report.md` 已经是 `passed`；`partial`、`failed` 或 `stale` 的报告拒绝登记。
 - 工件缺签署时，状态输出会给出警告并阻断自动恢复；`validate` 按警告报告（旧工件保留原样），`validate --strict` 视为失败。签署时间戳格式错误一律是错误。

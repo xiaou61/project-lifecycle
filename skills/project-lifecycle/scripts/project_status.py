@@ -1494,6 +1494,27 @@ def git_status(project_root: Path) -> dict[str, object]:
     )
     if head.returncode == 0:
         result["head"] = head.stdout.strip()
+    # 链接 worktree 里 --git-dir 指向主仓库的 .git/worktrees/<名>，--git-common-dir 仍指向 .git；
+    # 两者不同就说明已经隔离过，不必再问用户。
+    resolved = []
+    for option in ("--git-dir", "--git-common-dir"):
+        probe = subprocess.run(
+            ["git", "-C", str(project_root), "rev-parse", option],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+        if probe.returncode != 0:
+            break
+        resolved.append((project_root / probe.stdout.strip()).resolve())
+    if len(resolved) == 2:
+        result["worktree"] = {
+            "linked": resolved[0] != resolved[1],
+            "branch": result["branch"],
+            "path": str(project_root),
+        }
     result["status"] = "dirty" if entries else "clean"
     result["attribution"] = "unclassified" if entries else "none"
     result["attribution_required"] = bool(entries)
@@ -1647,6 +1668,27 @@ def resume_context(
     }
     resume_warnings = [str(warning) for warning in requirements["warnings"]]
     resume_warnings.extend(str(warning) for warning in candidate.get("hygiene", []))
+    worktree_info = git.get("worktree") or {}
+    worktree = None
+    if candidate["phase"] == "implementation" and worktree_info:
+        linked = bool(worktree_info.get("linked"))
+        if linked:
+            decision = "active"
+        elif git["status"] == "clean":
+            decision = "proceed"
+        else:
+            decision = "ask_user"
+        worktree = {
+            "decision": decision,
+            "linked": linked,
+            "branch": worktree_info.get("branch"),
+            "hint": {
+                "active": f"已在独立 worktree（分支 {worktree_info.get('branch')}）中，不要重复询问。",
+                "proceed": "工作区干净，直接在当前目录实施并遵守单写入方约定；只有即将与另一个对话同目录写入时才需要 worktree。",
+                "ask_user": "工作区有未提交改动，开始改源码前先问用户一次是否开独立 worktree；"
+                "用户同意再执行 git worktree add，拒绝则在当前目录工作并遵守单写入方约定。只读调查不询问。",
+            }[decision],
+        }
     return {
         "mode": mode,
         "reason": reason,
@@ -1654,6 +1696,7 @@ def resume_context(
         "candidates": [],
         "blockers": blockers,
         "warnings": resume_warnings,
+        "worktree": worktree,
         "read_paths": resume_read_paths(project_root, candidate),
         "handoff_prompt": (
             f"$project-lifecycle 继续 {candidate['work_id']}，先恢复规范和状态；"

@@ -1,16 +1,16 @@
-# Proposal
+# 提案
 
-Use this reference to choose what will be built and why. A proposal is a decision document between requirements and detailed design.
+用本参考决定要做什么以及为什么。提案是位于需求和详细设计之间的决策文档。
 
-## Preconditions
+## 前置条件
 
-- Read the current `requirements.md` and relevant repository architecture.
-- Require approved requirements unless the user approves them while requesting the proposal.
-- If repository evidence contradicts a requirement or makes it infeasible, surface that conflict before recommending an approach.
+- 读当前的 `requirements.md` 和相关仓库架构。
+- 需求需已批准，除非用户在提出方案请求的同时批准它。
+- 如果仓库证据与需求矛盾或使需求不可行，先指出冲突，再推荐方案。
 
-## Proposal Artifact
+## 提案工件
 
-Use these sections when relevant:
+按需使用以下章节：
 
 ```markdown
 # <工作项>提案
@@ -26,10 +26,10 @@ Use these sections when relevant:
 ## 待决定事项
 ```
 
-The recommended approach should explain the essential mechanism, affected ownership areas, and why it best satisfies the requirements. Record only genuine alternatives, including the status quo when it was a credible option. State the strongest case for each alternative before explaining why it was not selected, and record what the chosen approach gives up; an option dismissed only as "worse" invites the next reader to propose it again.
+推荐方案要说明核心机制、受影响的归属范围，以及它为什么最满足需求。只记录真正的备选方案，包括现状——当它确实是可信选项时。先写清每个备选方案最有力的理由，再解释为什么没选它，并记录所选方案放弃了什么；仅以"更差"打发掉的选项，会让下一个读者再提一次。
 
-Keep detailed class names, schemas, payloads, and file-by-file changes for the design unless they are necessary to establish feasibility. Do not present estimates as facts without evidence.
+详细的类名、schema、载荷和逐文件改动留到设计阶段，除非它们对判断可行性是必要的。没有证据时不要把估算当事实陈述。
 
-Map the proposal to requirement and acceptance identifiers so omissions are visible. Keep the proposal at `status: draft` until the user explicitly approves the selected approach and any material open decisions. Approval is recorded with `project-lifecycle.ps1 approve --artifact proposal`, which stamps `approved_by` and `approved_at`; only that command writes the signer fields (see the “签署” section in [workflow.md](workflow.md)).
+把提案映射到需求和验收编号，让遗漏可见。提案保持 `status: draft`，直到用户明确批准所选方案和所有实质性的待决定事项。批准通过 `$lifecycle approve --artifact proposal` 记录，写入 `approved_by` 和 `approved_at`；只有该命令写签署字段（见 [workflow.md](workflow.md) 的"签署"）。
 
-Do not add product scope in the proposal. When the recommended approach requires behavior absent from the requirements, revise and reapprove the requirements first. A materially changed approved proposal makes the current design, task plan, and verification artifacts `stale`.
+不要在提案里增加产品范围。推荐方案需要需求中没有的行为时，先修订并重新批准需求。已批准的提案发生实质变化后，当前设计、任务计划和验证工件标为 `stale`。

@@ -1,50 +1,50 @@
-# Project Memory
+# 项目记忆
 
-Use this reference when reading or maintaining the target project's `.agent/memory.md`.
+读写目标项目的 `.agent/memory.md` 时用本参考。
 
-## Purpose And Authority
+## 目的与权威
 
-Project memory is a compact retrieval layer for durable knowledge that may affect future tasks. It answers "what should the next agent remember?" It does not replace:
+项目记忆是"可能影响未来任务的长期知识"的紧凑检索层。它回答"下一个 agent 应该记住什么"。它不替代：
 
-- approved requirements, proposals, or designs;
-- current source code and executable tests;
-- Git history;
-- `.agent/notes/`, which explains why a durable decision was made; or
-- `.agent/references/`, which holds shared source material and external facts.
+- 已批准的需求、提案或设计；
+- 当前源码和可执行测试；
+- Git 历史；
+- `.agent/notes/`，它解释某个长期决策为什么这样做；或
+- `.agent/references/`，它存放共享资料和外部事实。
 
-When memory conflicts with a current authoritative source, follow and cite the authoritative source, then mark the memory `stale` or replace it. A memory entry never approves a lifecycle gate or expands scope.
+记忆与当前权威来源冲突时，以权威来源为准并引用它，然后把该记忆标为 `stale` 或替换掉。记忆条目永远不能批准生命周期门槛，也不能扩大范围。
 
-## Retrieve Before Work
+## 开工前先检索
 
-For a substantial task, first list entry headings:
+做实质任务前，先列出条目标题：
 
 ```sh
 rg -n "^## MEM-" .agent/memory.md
 ```
 
-Then search using a small set of terms from the feature name, module, affected paths, constraints, and technologies:
+然后用功能名、模块、受影响路径、约束和技术等少量词检索：
 
 ```sh
 rg -n -i -C 6 "auth|session|security" .agent/memory.md
 ```
 
-Read matching entries and their cited sources when the decision is material. Read the whole file only when it is small or the task is repository-wide. If `rg` is unavailable, use the environment's ordinary text search or read the file directly.
+决策重要时，读匹配条目及其引用的来源。只在文件很小或任务涉及整个仓库时通读全文。没有 `rg` 时，用环境自带的文本搜索或直接读文件。
 
-## What To Record
+## 记录什么
 
-Record an item only when it is evidence-backed and likely to affect work beyond the current task, such as:
+只在有证据支撑、且可能影响当前任务之外的工作时记录，例如：
 
-- a stable architectural boundary or invariant;
-- a cross-feature convention or constraint;
-- an explicitly confirmed, durable user or team preference;
-- a non-obvious operational procedure that will be reused; or
-- a verified failure lesson with a concrete prevention rule.
+- 稳定的架构边界或不变量；
+- 跨功能的约定或约束；
+- 用户或团队明确确认过的长期偏好；
+- 会被复用的、不直观的操作流程；或
+- 有具体防范规则的已验证失败教训。
 
-Do not record task progress, ordinary implementation details, chat summaries, TODO items, temporary errors, unsupported guesses, secrets, credentials, personal data, or content already easy to discover from the repository. Link to a detailed note or reference instead of copying it.
+不要记录任务进度、普通实现细节、聊天摘要、TODO、临时错误、无依据的猜测、密钥、凭据、个人数据，或从仓库里很容易查到的内容。指向详细笔记或参考资料，不要复制过来。
 
-## Entry Format
+## 条目格式
 
-Store entries under `## 记忆条目` using this compact schema:
+条目写在 `## 记忆条目` 之下，使用这个紧凑结构：
 
 ```markdown
 ## MEM-001 | active | constraint
@@ -58,26 +58,26 @@ Store entries under `## 记忆条目` using this compact schema:
 - 失效条件：公开 API 版本策略发生变化。
 ```
 
-Use these rules:
+规则：
 
-- IDs use `MEM-001`, `MEM-002`, and so on. Allocate the next unused number; never renumber or reuse an ID.
-- Status is `active`, `stale`, or `superseded`.
-- Category is normally `constraint`, `architecture`, `convention`, `preference`, `operation`, or `lesson`. Add a category only when none of these describes a recurring real need.
-- Tags use short lowercase terms already used in the repository when possible.
-- Scope names the project area, feature, module, path, interface, or requirement to which the entry applies.
-- Evidence cites an approved artifact, note, reference, test, commit, repository path, or dated explicit user confirmation.
-- Review is the last date the evidence was checked, not merely the date the text was edited.
-- Add an invalidation condition only when one can be stated concretely.
-- Keep the summary independently useful. Add detail below the fields only when it changes how the memory should be applied.
+- 编号用 `MEM-001`、`MEM-002`……分配下一个未用过的编号；永远不重排或复用编号。
+- 状态为 `active`、`stale` 或 `superseded`。
+- 类别通常是 `constraint`、`architecture`、`convention`、`preference`、`operation` 或 `lesson`。这些都不足以描述某个反复出现的真实需求时，才新增类别。
+- 标签尽量用仓库里已经在用的简短小写词。
+- 范围写该条目适用的项目区域、功能、模块、路径、接口或需求。
+- 依据引用已批准的工件、笔记、参考资料、测试、提交、仓库路径，或带日期的明确用户确认。
+- 复核是最后一次核对证据的日期，不只是改文字的日期。
+- 只有能具体写清时才加失效条件。
+- 摘要要能独立使用。只有在会影响记忆如何应用时，才在字段下方补充细节。
 
-Remove `当前暂无长期记忆。` when adding the first entry.
+添加第一条记忆时删掉 `当前暂无长期记忆。`。
 
-## Maintain Without Accumulating Noise
+## 维护但不堆积噪音
 
-- Search for an existing entry before adding one. Update it when the fact is the same; do not append a paraphrased duplicate.
-- Mark an entry `stale` when its evidence may no longer be current and re-check it before relying on it.
-- When a conclusion is replaced, create the new entry, mark the old one `superseded`, and add `- 替代：MEM-xxx` to the old entry.
-- Keep active entries concise. Move detailed rationale to `.agent/notes/` and source material to `.agent/references/`.
-- Preserve useful change history through Git. The working memory should optimize current retrieval, not retain every obsolete explanation inline.
+- 添加前先搜现有条目。事实相同时更新它，不要追加一个改写的副本。
+- 证据可能不再有效时把条目标为 `stale`，并在依赖它之前重新核对。
+- 结论被替换时，创建新条目，把旧条目标为 `superseded`，并在旧条目上加 `- 替代：MEM-xxx`。
+- 活动条目保持简练。详细理由移到 `.agent/notes/`，原始资料移到 `.agent/references/`。
+- 用 Git 保留有用的变更历史。工作记忆应优化当前检索，而不是内联保留每一条过期解释。
 
-At the end of a phase or substantial task, review whether durable knowledge was added, changed, or invalidated. Update memory only when the answer is yes, and tell the user which IDs changed.
+每个阶段或实质任务结束时，回顾长期知识是否有新增、变更或失效。只有答案是"有"时才更新记忆，并告诉用户哪些编号变了。

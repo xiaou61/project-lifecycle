@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import argparse
-import shutil
 import sys
 from pathlib import Path
 
@@ -156,15 +155,6 @@ def create_text_if_missing(path: Path, content: str) -> str:
     return "创建"
 
 
-def copy_if_missing(source: Path, destination: Path) -> str:
-    if destination.exists():
-        if not destination.is_file():
-            raise RuntimeError(f"目标路径已存在但不是文件：{destination}")
-        return "保留"
-    shutil.copyfile(source, destination)
-    return "创建"
-
-
 def validate_existing_paths(paths: tuple[Path, ...], expected: str) -> None:
     for path in paths:
         if path.exists() and (not path.is_dir() if expected == "目录" else not path.is_file()):
@@ -194,7 +184,6 @@ def main() -> int:
                 workspace / "memory.md",
                 workspace / "rules" / "always.md",
                 workspace / "history" / "updates.md",
-                workspace / "scripts" / "generate_core_history.py",
             ),
             "文件",
         )
@@ -209,10 +198,6 @@ def main() -> int:
         memory_status = create_text_if_missing(workspace / "memory.md", MEMORY_TEMPLATE)
         history_status = create_text_if_missing(
             workspace / "history" / "updates.md", UPDATE_HISTORY_TEMPLATE
-        )
-        generator_status = copy_if_missing(
-            Path(__file__).with_name("generate_core_history.py"),
-            workspace / "scripts" / "generate_core_history.py",
         )
     except (OSError, RuntimeError) as error:
         print(f"初始化失败：{error}", file=sys.stderr)
@@ -230,7 +215,6 @@ def main() -> int:
     else:
         print(f"待用户确认后创建：{rules_path}")
         print("提示：初始化不会写入固定项目规则；请先检查项目并向用户提出规则草案，确认后再创建 always.md。")
-    print(f"{generator_status}：{workspace / 'scripts' / 'generate_core_history.py'}")
     if agents_existed:
         print("提示：未修改已有 AGENTS.md；请确认其中包含何时使用 $project-lifecycle 的项目规则。")
     if (target / "AGENTS.override.md").is_file():

@@ -7,7 +7,7 @@
 在新对话或上下文压缩后先运行：
 
 ```powershell
-$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
+$lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecycle.ps1"   # macOS/Linux 用 project-lifecycle.sh
 & $lifecycle resume "F:\我的项目" --json
 ```
 
@@ -64,7 +64,7 @@ JSON 顶层还带 `schema_version` 和 `generated_at`。脚本集成应读取字
 如果同时有多个未完成工作项，不能按目录时间、Git 最近修改时间或最近聊天猜测。先列候选，再明确指定：
 
 ```powershell
-$lifecycle = "<已安装 Skill 目录>\project-lifecycle\scripts\project-lifecycle.ps1"
+$lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecycle.ps1"   # macOS/Linux 用 project-lifecycle.sh
 & $lifecycle resume "F:\我的项目" --work WORK-003
 ```
 
@@ -121,7 +121,7 @@ $project-lifecycle 在当前项目继续实施 WORK-003。先恢复规范和状�
 
 目前已经解决的是恢复和防串项：每个工作项有稳定的 `WORK-*` 编号，多个活动项时恢复命令会进入 `ask_user`，不会根据最近聊天、目录时间或 Git 最近修改时间替你猜；脏工作区也必须先做归因。没有解决的是同一目录里的实时并发写入，Skill 没有文件锁，也不会自动合并两个对话的修改。
 
-最安全的安排是“一项工作，一个分支，一个 Worktree，一个写入对话”：
+最安全的安排是“一项工作，一个分支，一个 Worktree，一个写入对话”。恢复结果里的 `worktree.decision` 有三种值：已在 worktree 内是 `active`，工作区干净是 `proceed`（直接实施，不再询问），工作区有未提交改动是 `ask_user` 才需要问一次要不要开独立 worktree。创建前确认该工作项的 `.agent/changes/WORK-*/` 已提交，否则新目录里看不到需求与任务文件：
 
 ```powershell
 git worktree add "..\我的项目-WORK-003" -b "work/WORK-003"

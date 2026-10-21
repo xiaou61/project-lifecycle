@@ -760,7 +760,7 @@ code {
   border-style: dashed;
 }
 
-/* 依赖图 */
+/* 关联图谱：SVG 占满面板，缩放平移由 transform 驱动，所以不用滚动条。 */
 .graph {
   overflow: auto;
   min-height: 120px;
@@ -769,63 +769,214 @@ code {
   justify-content: safe center;
 }
 
-.graph svg {
+#graph {
+  position: relative;
   display: block;
+  height: clamp(380px, 56vh, 720px);
+  min-height: 240px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 1px 1px, #dbe6f3 1px, transparent 0) 0 0 / 22px 22px,
+    var(--panel);
+  cursor: grab;
+  touch-action: none;
 }
 
-.graph .node-box {
-  fill: var(--panel-2);
+#graph:active {
+  cursor: grabbing;
+}
+
+.graph-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+}
+
+.gnode {
+  cursor: grab;
+}
+
+.gnode-box {
+  fill: var(--panel);
   stroke: var(--line);
-  stroke-width: 1;
+  stroke-width: 1.2;
 }
 
-.graph .node.selected .node-box {
+.gnode.work .gnode-box {
+  filter: drop-shadow(0 1px 2px rgba(23, 38, 60, 0.08));
+}
+
+.gnode:hover .gnode-box {
   stroke: var(--accent);
   stroke-width: 2;
 }
 
-.graph .node {
-  cursor: pointer;
-}
-
-.graph .node:hover .node-box {
+.gnode.selected .gnode-box {
   stroke: var(--accent);
+  stroke-width: 2.5;
 }
 
-.graph .node-id {
+.gnode.module .gnode-box {
+  fill: #eaf1fa;
+  stroke-dasharray: 5 4;
+}
+
+.gnode.hot .gnode-box {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.gnode.dim {
+  opacity: 0.28;
+}
+
+.gnode-id {
   fill: var(--muted);
   font-size: 10px;
   font-family: Consolas, monospace;
+  pointer-events: none;
 }
 
-.graph .node-name {
+.gnode-name {
   fill: var(--text);
   font-size: 12px;
+  pointer-events: none;
 }
 
-.graph .node-meta {
+.gnode-meta {
   fill: var(--muted);
   font-size: 10px;
+  pointer-events: none;
 }
 
-.graph .edge {
+.gnode-module-name {
+  fill: var(--text);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.gnode-module-meta {
+  fill: var(--muted);
+  font-size: 9px;
+  font-family: Consolas, monospace;
+  pointer-events: none;
+}
+
+/* 连线平时压低，悬停才亮；26 个工作项全亮就是面条。 */
+#graph-edges .edge {
   fill: none;
   stroke: #a9bed6;
-  stroke-width: 1.6;
+  stroke-width: 1.4;
+  opacity: 0.28;
 }
 
-.graph .edge.depends {
+#graph-edges .edge.depends {
   stroke: var(--accent);
-  stroke-width: 2;
+  stroke-width: 1.8;
+  opacity: 0.45;
 }
 
-.graph .edge.related {
+#graph-edges .edge.related {
   stroke-dasharray: 6 5;
 }
 
-.graph .edge-label {
-  fill: var(--muted);
-  font-size: 10px;
+#graph-edges .edge.module {
+  stroke: #8fa6bd;
+  stroke-dasharray: 2 4;
+}
+
+#graph-edges .edge.hot {
+  opacity: 0.95;
+  stroke-width: 2.4;
+}
+
+.graph-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.graph-toolbar-gap {
+  flex: 1;
+}
+
+.graph-count {
+  margin-right: 4px;
+}
+
+.chip-toggle {
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.chip-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.chip-toggle.active {
+  border-color: var(--accent);
+  background: #e7f0fd;
+  color: var(--accent);
+}
+
+.graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.graph-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-line {
+  width: 22px;
+  height: 0;
+  border-top: 2px solid #a9bed6;
+}
+
+.legend-line.depends {
+  border-color: var(--accent);
+}
+
+.legend-line.related {
+  border-top-style: dashed;
+}
+
+.legend-line.module {
+  border-top-style: dotted;
+  border-color: #8fa6bd;
+}
+
+.legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.legend-dot.complete {
+  background: var(--ok);
+}
+
+.legend-dot.running {
+  background: var(--accent);
+}
+
+.legend-dot.attention {
+  background: var(--bad);
 }
 
 /* 数据面板 */
@@ -1080,6 +1231,228 @@ code {
 
 .resource-document {
   min-height: 320px;
+}
+
+/* 关系图谱（3D 全宽视图） */
+body.in-relations .layout {
+  grid-template-columns: 1fr;
+}
+
+body.in-relations .sidebar {
+  display: none;
+}
+
+.relations-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 16px 20px 18px;
+  gap: 12px;
+}
+
+.relations-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.relations-head h2 {
+  font-size: 17px;
+}
+
+.relations-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.relations-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
+}
+
+.relations-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  min-width: 0;
+}
+
+.relations-graph {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  /* 径向渐变压暗边缘，3D 的纵深感靠它撑住一半。 */
+  background:
+    radial-gradient(circle at 50% 42%, #ffffff 0%, #eaf1fa 52%, #dbe6f3 100%);
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+
+.relations-graph.dragging {
+  cursor: grabbing;
+}
+
+.rel-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+}
+
+.rel-help {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.redge {
+  stroke-width: 1.2;
+}
+
+.redge.depends {
+  stroke: var(--accent);
+  stroke-width: 1.6;
+}
+
+.redge.related {
+  stroke: #8fa6bd;
+  stroke-dasharray: 5 5;
+}
+
+.redge.module {
+  stroke: #b3a6d8;
+  stroke-dasharray: 2 4;
+}
+
+.redge.hot {
+  stroke-width: 2.4;
+}
+
+.rnode {
+  cursor: pointer;
+}
+
+.rnode-dot {
+  stroke: #ffffff;
+  stroke-width: 1.5;
+}
+
+.rnode-halo {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 0;
+  opacity: 0.9;
+}
+
+.rnode.selected .rnode-halo,
+.rnode.hot .rnode-halo {
+  stroke-width: 2;
+}
+
+.rnode.dim {
+  opacity: 0.18 !important;
+}
+
+.rnode-box {
+  fill: #ded5f2;
+  stroke: #a493cf;
+  stroke-width: 1.2;
+}
+
+.rnode-id {
+  fill: var(--text);
+  font-size: 9px;
+  font-family: Consolas, monospace;
+  pointer-events: none;
+}
+
+.rnode-name {
+  fill: var(--muted);
+  font-size: 8px;
+  pointer-events: none;
+}
+
+.rnode-label.module {
+  fill: #6b5b9c;
+  font-size: 9px;
+  pointer-events: none;
+}
+
+.relations-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.rel-panel {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 12px 14px;
+}
+
+.rel-panel h3 {
+  font-size: 13px;
+  margin-bottom: 9px;
+}
+
+.rel-detail {
+  line-height: 1.75;
+}
+
+.bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) 26px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.bar-label {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+
+.bar-count {
+  text-align: right;
+  font-family: Consolas, monospace;
+  color: var(--muted);
 }
 
 /* 工作区视图 */

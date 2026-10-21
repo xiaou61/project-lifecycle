@@ -1,15 +1,15 @@
-# Stable Project Specs
+# 稳定项目规格
 
-Use this reference when the project needs a durable statement of current behavior, shared contracts, architecture boundaries, domain rules, or operational invariants. Stable specs are the project's small, human-readable current-state view; they are not a second source-code tree and they are not a list of every feature ever discussed.
+项目需要长期保留的当前行为、共享契约、架构边界、领域规则或运行不变量时，用本参考。稳定规格是项目"当前状态"的简短人类可读视图；它不是第二份源码树，也不是所有讨论过的功能的清单。
 
-## Two Folders, Two Questions
+## 两个目录，两个问题
 
 ```text
-.agent/specs/                  What should be true today?
-.agent/changes/<WORK-id>-<Chinese-name>/  What are we changing, and how will we prove it?
+.agent/specs/                             今天应该成立什么？
+.agent/changes/<WORK编号>-<中文名称>/      我们要改什么，怎么证明？
 ```
 
-Use one file per meaningful domain or contract, for example:
+每个有意义的领域或契约一个文件，例如：
 
 ```text
 .agent/specs/
@@ -19,37 +19,37 @@ Use one file per meaningful domain or contract, for example:
   operations.md
 ```
 
-Do not create a file merely because a folder exists. For a small project, one `project.md` or no stable spec at all may be enough. Keep executable behavior in source and tests; a spec should state the contract and point to authoritative code, tests, or references when useful.
+不要因为目录存在就创建文件。小项目一个 `project.md`，甚至完全没有稳定规格也可能够用。可执行的行为留在源码和测试里；规格说明契约，并在有用时指向权威的代码、测试或参考资料。
 
-## What Belongs In A Spec
+## 规格里写什么
 
-Record facts that several future work items need, such as:
+记录多个未来工作项都需要的事实，例如：
 
-- externally observable behavior and scenarios;
-- public interfaces and compatibility rules;
-- ownership and boundaries between components;
-- data invariants, security constraints, or migration rules; and
-- operational expectations that are part of the product contract.
+- 外部可观察的行为与场景；
+- 公共接口与兼容规则；
+- 组件之间的归属与边界；
+- 数据不变量、安全约束或迁移规则；
+- 属于产品契约一部分的运行预期。
 
-Do not put temporary brainstorming, an unapproved proposal, task checkboxes, chat transcripts, generated Git history, credentials, or unsupported guesses in `specs/`.
+不要把临时头脑风暴、未批准的提案、任务勾选、聊天记录、生成的 Git 历史、凭据或无依据的猜测写进 `specs/`。
 
-## Change And Reconciliation
+## 变更与核对
 
-1. Read the affected stable spec before drafting a change.
-2. In `.agent/changes/<WORK-id>-<Chinese-name>/requirements.md`, describe the requested outcome and acceptance criteria. State whether a stable spec is expected to change.
-3. After approval, record the approach in `proposal.md`, implementation detail in `design.md`, and execution order in `tasks.md`.
-4. Implement and verify against the approved artifacts.
-5. If the delivered behavior changes a stable contract, update the affected spec from the verified result. Preserve the change documents as the rationale and evidence.
-6. Optionally move the completed change directory to `.agent/changes/archive/YYYY-MM-DD-<WORK-id>-<Chinese-name>/`. Archive only after verification; keep the files intact so Git can show the complete decision trail. Renaming the directory breaks every reference to its old path: before considering the archive done, update the live references in `.agent/INDEX.md`, `specs/`, `memory.md`, `rules/always.md`, `notes/` and other work items. `project-lifecycle.ps1 validate` reports these as warnings (failures under `--strict`); `.agent/history/updates.md` is exempt because it is an append-only timeline and must not be rewritten.
+1. 起草变更前先读受影响的稳定规格。
+2. 在 `.agent/changes/<WORK编号>-<中文名称>/requirements.md` 中描述期望结果和验收标准，并说明稳定规格是否预期改变。
+3. 批准后，在 `proposal.md` 记录方案，在 `design.md` 记录实现细节，在 `tasks.md` 记录执行顺序。
+4. 按已批准的工件实施并验证。
+5. 交付的行为改变了稳定契约时，按已验证的结果更新受影响的规格。保留变更文档作为理由和证据。
+6. 可选地把已完成的工作项目录移到 `.agent/changes/archive/YYYY-MM-DD-<WORK编号>-<中文名称>/`。只在验证之后归档；文件保持完整，好让 Git 展示完整的决策链。重命名目录会打断所有指向旧路径的引用：在认定归档完成前，更新 `.agent/INDEX.md`、`specs/`、`memory.md`、`rules/always.md`、`notes/` 和其他工作项里的活引用。`$lifecycle validate` 会把这些报为警告（`--strict` 下视为失败）；`.agent/history/updates.md` 豁免，因为它是追加式时间线，不能回改。
 
-Do not update a stable spec before implementation just to make a failing or unauthorized change look compliant. If implementation reveals that the spec or approved requirements were wrong, stop, return the earliest affected artifact to `draft`, and obtain approval.
+不要为了让一个失败或未授权的变更看起来合规，就在实施前先行修改稳定规格。如果实施发现规格或已批准需求是错的，停下，把最早受影响的工件退回 `draft`，重新取得批准。
 
-## Authority And Conflicts
+## 权威与冲突
 
-- Approved requirements define the scope of the current change.
-- Approved design and tasks define the authorized implementation path.
-- Stable specs define the intended current contract across changes.
-- Source code and executable tests show what is actually implemented.
-- Git history shows when the artifacts and code changed.
+- 已批准的需求定义本次变更的范围。
+- 已批准的设计和任务定义被授权的实施路径。
+- 稳定规格定义跨变更的预期当前契约。
+- 源码和可执行测试展示实际实现了什么。
+- Git 历史展示工件和代码何时改变。
 
-A conflict is useful evidence of drift. Report it and identify which artifact must be revised; do not silently choose the document that makes the current code look correct.
+冲突是漂移的有用证据。报告它并指出该修订哪个工件；不要悄悄挑一个能让当前代码看起来正确的文档。

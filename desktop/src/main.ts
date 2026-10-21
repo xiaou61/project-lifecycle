@@ -384,6 +384,42 @@ function parseProjectIndex(indexPath: string): string[] {
   return roots;
 }
 
+/** 读 .agent/INDEX.md 的「模块索引」表：模块名 → 相关工作项。表里没写 WORK- 编号的行跳过。 */
+function parseModules(indexPath: string): ModuleView[] {
+  const text = readFileSync(indexPath, { encoding: "utf8" });
+  const section = text.split(/^##\s+模块索引\s*$/m)[1] ?? "";
+  const table = section.split(/^##\s+/m)[0];
+  const rows = table
+    .split(/\r?\n/)
+    .filter((line) => line.trim().startsWith("|"))
+    .map((line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim()))
+    .filter((cells) => !cells.every((cell) => /^:?-{3,}:?$/.test(cell)));
+  if (rows.length < 2) return [];
+  const modules: ModuleView[] = [];
+  for (const cells of rows.slice(1)) {
+    const name = (cells[0] ?? "").replace(/`/g, "").trim();
+    if (!name) continue;
+    // 相关工作项固定是最右一列，但描述里也可能出现 WORK- 编号，所以从右往左找第一格含编号的。
+    const workCell = [...cells].reverse().find((cell) => /WORK-\d+/.test(cell)) ?? "";
+    const workIds = Array.from(new Set(workCell.match(/WORK-\d+/g) ?? []));
+    if (workIds.length === 0) continue;
+    const sourcePath = (cells[1] ?? "").replace(/`/g, "").split("（")[0].trim();
+    modules.push({ name, path: sourcePath, work_ids: workIds });
+  }
+  return modules;
+}
+
+function loadModules(root: string): ModuleView[] {
+  const indexPath = path.join(root, ".agent", "INDEX.md");
+  if (!existsSync(indexPath)) return [];
+  try {
+    return parseModules(indexPath);
+  } catch {
+    // 索引是可选资料；解析失败不该让整个状态加载失败。
+    return [];
+  }
+}
+
 /** 项目清单来源：工作区索引优先，其次是应用自己记住的清单。 */
 async function resolveProjectList(root: string): Promise<{ source: string; sourcePath: string; roots: string[] }> {
   const candidates = [
@@ -552,7 +588,9 @@ function registerHandlers(): void {
   ipcMain.handle("load-status", async (_event, root: string) => {
     try {
       const result = await runPython("project_status.py", [root, "--json", "--include-archive"]);
-      return { ok: true, data: parseJson<StatusView>(result), error: "" };
+      const status = parseJson<StatusView>(result);
+      status.modules = loadModules(root);
+      return { ok: true, data: status, error: "" };
     } catch (error) {
       return { ok: false, data: null, error: (error as Error).message };
     }
@@ -646,7 +684,17 @@ async function runUiChecks(root: string): Promise<UiCheck[]> {
   await new Promise<void>((resolve) => {
     window.webContents.once("did-finish-load", () => resolve());
   });
-  await new Promise((resolve) => setTimeout(resolve, 6000));
+  // 首屏要等 Python 推导完所有工作项；固定 6 秒在慢机上会抢跑成空列表。
+  // 轮询到侧栏有内容或进了工作区视图，最多等 30 秒。
+  await evaluate(
+    `(async () => {` +
+      ` for (let i = 0; i < 60; i += 1) {` +
+      `   if (document.querySelectorAll(".work-item").length > 0) return;` +
+      `   if (!document.getElementById("workspace-view")?.classList.contains("hidden")) return;` +
+      `   await new Promise((r) => setTimeout(r, 500));` +
+      ` }` +
+      `})()`,
+  );
 
   // 前置检查：IPC 没注册或项目没加载时，后面几条会假通过。
   const loaded = await evaluate(`document.getElementById("project-path")?.textContent ?? ""`);
@@ -737,6 +785,70 @@ async function runUiChecks(root: string): Promise<UiCheck[]> {
       `document.querySelector(".work-item.selected")?.dataset.workId ?? "none"`,
     );
     record("关系图点节点联动", graphTarget === selected, `点 ${graphTarget} → 选中 ${selected}`);
+
+    // 图谱布局：力导向的结果必须彼此不重叠，否则文字会糊成一团。
+    await evaluate(`document.querySelector('[data-tab="overview"]').click()`);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    const layoutProbe = await evaluate(
+      `(() => {` +
+        ` const boxes = Array.from(document.querySelectorAll("#graph .gnode.work"))` +
+        `   .map((node) => node.getBoundingClientRect());` +
+        ` let overlaps = 0;` +
+        ` for (let i = 0; i < boxes.length; i += 1) {` +
+        `   for (let j = i + 1; j < boxes.length; j += 1) {` +
+        `     const a = boxes[i], b = boxes[j];` +
+        `     const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);` +
+        `     const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);` +
+        `     if (w > 6 && h > 6) overlaps += 1;` +
+        `   }` +
+        ` }` +
+        ` return boxes.length + "|" + overlaps;` +
+        `})()`,
+    );
+    const [layoutNodes, layoutOverlaps] = layoutProbe.split("|");
+    record(
+      "图谱节点不重叠",
+      Number(layoutNodes) === workItemCount && Number(layoutOverlaps) === 0,
+      `${layoutNodes} 个节点，${layoutOverlaps} 处重叠`,
+    );
+
+    // 缩放：按钮要真的改世界坐标系的 scale，而不只是换样式。
+    const zoomBefore = await evaluate(
+      `document.getElementById("graph-world")?.getAttribute("transform") ?? ""`,
+    );
+    await evaluate(`document.getElementById("graph-zoom-in").click()`);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const zoomAfter = await evaluate(
+      `document.getElementById("graph-world")?.getAttribute("transform") ?? ""`,
+    );
+    record("图谱缩放按钮生效", zoomBefore !== zoomAfter && zoomAfter.includes("scale"), `${zoomBefore} → ${zoomAfter}`);
+    await evaluate(`document.getElementById("graph-fit").click()`);
+
+    // 图层开关：打开「关联」必须增加连线；没有关联数据时如实报跳过。
+    const dependsOnly = await evaluate(`String(document.querySelectorAll("#graph-edges .edge").length)`);
+    await evaluate(`document.getElementById("graph-related").click()`);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const withRelated = await evaluate(`String(document.querySelectorAll("#graph-edges .edge").length)`);
+    record(
+      "图谱关联图层开关",
+      Number(withRelated) > Number(dependsOnly) || Number(dependsOnly) === 0,
+      `硬依赖 ${dependsOnly} 条 → 加关联 ${withRelated} 条`,
+    );
+    // 关回去，别影响后面的截图与检查。
+    await evaluate(`document.getElementById("graph-related").click()`);
+
+    const moduleProbe = await evaluate(
+      `(() => { const before = document.querySelectorAll("#graph .gnode.module").length;` +
+        ` document.getElementById("graph-modules").click(); return "opened:" + before; })()`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const moduleAfter = await evaluate(`String(document.querySelectorAll("#graph .gnode.module").length)`);
+    record(
+      "图谱模块图层开关",
+      Number(moduleAfter) > 0 || moduleProbe === "opened:0",
+      `打开后 ${moduleAfter} 个模块节点${Number(moduleAfter) === 0 ? "（该项目 INDEX.md 没有模块索引，跳过）" : ""}`,
+    );
+    await evaluate(`document.getElementById("graph-modules").click()`);
   }
 
   await evaluate(`document.querySelector('[data-tab="data"]').click()`);
@@ -796,7 +908,17 @@ async function runUiChecks(root: string): Promise<UiCheck[]> {
 
   // 工作区视图：清单来源、项目卡片、点卡片回到项目视图
   await evaluate(`document.getElementById("workspace").click()`);
-  await new Promise((resolve) => setTimeout(resolve, 5000));
+  // 每个项目都要跑一次 Python 汇总，项目多或机器慢时固定等待会抢跑成 0 张卡片。
+  await evaluate(
+    `(async () => {` +
+      ` for (let i = 0; i < 60; i += 1) {` +
+      `   if (document.querySelectorAll(".project-card").length > 0) return;` +
+      `   const source = document.getElementById("workspace-source")?.textContent ?? "—";` +
+      `   if (source !== "—" && source !== "读取中") return;` +
+      `   await new Promise((r) => setTimeout(r, 500));` +
+      ` }` +
+      `})()`,
+  );
   const workspaceState = await evaluate(
     `(document.getElementById("workspace-view")?.classList.contains("hidden") ? "hidden" : "shown") +` +
       ` "|" + (document.getElementById("workspace-source")?.textContent ?? "") +` +
@@ -809,7 +931,15 @@ async function runUiChecks(root: string): Promise<UiCheck[]> {
     `(() => { const card = document.querySelector(".project-card");` +
       ` if (!card) return "0"; card.click(); return "1"; })()`,
   );
-  await new Promise((resolve) => setTimeout(resolve, 3500));
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  await evaluate(
+    `(async () => {` +
+      ` for (let i = 0; i < 60; i += 1) {` +
+      `   if (!document.getElementById("detail-body")?.classList.contains("hidden")) return;` +
+      `   await new Promise((r) => setTimeout(r, 500));` +
+      ` }` +
+      `})()`,
+  );
   const projectVisible = await evaluate(
     `document.getElementById("detail-body")?.classList.contains("hidden") ? "hidden" : "shown"`,
   );
@@ -817,6 +947,82 @@ async function runUiChecks(root: string): Promise<UiCheck[]> {
     "点项目卡片进入项目",
     cardClicked === "1" && projectVisible === "shown",
     `详情 ${projectVisible}`,
+  );
+
+  // 关系图谱（3D 全宽视图）
+  await evaluate(`document.getElementById("relations").click()`);
+  await evaluate(
+    `(async () => {` +
+      ` for (let i = 0; i < 60; i += 1) {` +
+      `   if (document.querySelectorAll("#rel-svg .rnode").length > 0) return;` +
+      `   await new Promise((r) => setTimeout(r, 500));` +
+      ` }` +
+      `})()`,
+  );
+  const relStateProbe = await evaluate(
+    `(document.getElementById("relations-view")?.classList.contains("hidden") ? "hidden" : "shown") +` +
+      ` "|" + String(document.querySelectorAll("#rel-svg .rnode.work").length) +` +
+      ` "|" + String(document.querySelectorAll("#rel-svg .redge").length) +` +
+      ` "|" + String(document.querySelectorAll("#rel-state-bars .bar-row").length)`,
+  );
+  const [relVisible, relNodes, relEdges, relBars] = relStateProbe.split("|");
+  record("关系图谱视图打开", relVisible === "shown" && Number(relNodes) > 0, `${relNodes} 个节点`);
+  record("关系图谱连线渲染", Number(relEdges) > 0, `${relEdges} 条边`);
+  record("关系图谱分布条形图", Number(relBars) > 0, `${relBars} 行`);
+
+  // 悬停要亮邻域并把关系写成文字：这是 3D 里唯一能读关系的手段。
+  const relHover = await evaluate(
+    `(async () => { const node = document.querySelector("#rel-svg .rnode.work");` +
+      ` if (!node) return "无节点";` +
+      ` const id = node.getAttribute("data-rel-key") ?? "";` +
+      ` node.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));` +
+      ` await new Promise((r) => setTimeout(r, 300));` +
+      ` const dim = document.querySelectorAll("#rel-svg .rnode.dim").length;` +
+      ` const text = (document.getElementById("rel-detail")?.textContent ?? "").length;` +
+      ` return id + "|" + dim + "|" + text; })()`,
+  );
+  const [relHoverId, relDimmed, relDetailLen] = relHover.split("|");
+  record(
+    "关系图谱悬停压暗邻域",
+    relHoverId !== "无节点" && Number(relDimmed) > 0 && Number(relDetailLen) > 20,
+    `${relHoverId}：压暗 ${relDimmed} 个、详情 ${relDetailLen} 字`,
+  );
+
+  // 旋转必须真的改变投影，否则"3D"只是圆的排版。
+  const relBefore = await evaluate(
+    `(() => { const node = document.querySelector("#rel-svg .rnode.work");` +
+      ` const rect = node.getBoundingClientRect(); return Math.round(rect.left) + "," + Math.round(rect.top); })()`,
+  );
+  await evaluate(
+    `(async () => { const graph = document.getElementById("relations-graph");` +
+      ` const opts = { bubbles: true, clientX: 400, clientY: 300, pointerId: 1 };` +
+      ` graph.dispatchEvent(new PointerEvent("pointerdown", opts));` +
+      ` graph.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, clientX: 620, clientY: 380, pointerId: 1 }));` +
+      ` graph.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: 620, clientY: 380, pointerId: 1 }));` +
+      ` await new Promise((r) => setTimeout(r, 300)); })()`,
+  );
+  const relAfter = await evaluate(
+    `(() => { const node = document.querySelector("#rel-svg .rnode.work");` +
+      ` const rect = node.getBoundingClientRect(); return Math.round(rect.left) + "," + Math.round(rect.top); })()`,
+  );
+  record("关系图谱拖拽旋转视角", relBefore !== relAfter, `${relBefore} → ${relAfter}`);
+
+  // 3D 节点允许视图上相邻（投影重叠），因此只断言点节点能跳回工作项。
+  const relClick = await evaluate(
+    `(async () => { const node = document.querySelector("#rel-svg .rnode.work");` +
+      ` if (!node) return "无节点";` +
+      ` const id = node.getAttribute("data-work-id") ?? "";` +
+      ` node.dispatchEvent(new MouseEvent("click", { bubbles: true }));` +
+      ` await new Promise((r) => setTimeout(r, 2000));` +
+      ` const selected = document.querySelector(".work-item.selected")?.dataset.workId ?? "none";` +
+      ` const visible = document.getElementById("detail-body")?.classList.contains("hidden") ? "hidden" : "shown";` +
+      ` return id + "|" + selected + "|" + visible; })()`,
+  );
+  const [relClickId, relSelected, relDetailVisible] = relClick.split("|");
+  record(
+    "关系图谱点节点进入工作项",
+    relClickId === relSelected && relDetailVisible === "shown",
+    `${relClickId} → 选中 ${relSelected}，详情 ${relDetailVisible}`,
   );
 
   window.destroy();
@@ -907,6 +1113,23 @@ async function runShot(root: string, out: string, tab: string): Promise<number> 
       await window.webContents.executeJavaScript(`document.getElementById("workspace").click()`);
       console.log("切换到工作区视图");
       await new Promise((resolve) => setTimeout(resolve, 4000));
+    } else if (tabName === "relations") {
+      const switched = await window.webContents.executeJavaScript(
+        `(async () => {` +
+          // 初始 loadProject 可能还没跑完，它结束时会把视图改回项目；
+          // 所以反复点，直到 relations 视图稳定可见为止。
+          ` for (let i = 0; i < 40; i += 1) {` +
+          `   document.getElementById("relations").click();` +
+          `   await new Promise((r) => setTimeout(r, 400));` +
+          `   const view = document.getElementById("relations-view");` +
+          `   const nodes = document.querySelectorAll("#rel-svg .rnode").length;` +
+          `   if (view && !view.classList.contains("hidden") && nodes > 0) return "ok|" + nodes;` +
+          ` }` +
+          ` return "failed|0";` +
+          `})()`,
+      );
+      const [state, nodeCount] = String(switched).split("|");
+      console.log(`切换到关系图谱视图：${state}（${nodeCount} 个节点）`);
     } else if (["overview", "read", "validate", "history", "data"].includes(tabName)) {
       const active = await window.webContents.executeJavaScript(
         `(() => { const button = document.querySelector('[data-tab="${tabName}"]');` +
@@ -917,15 +1140,37 @@ async function runShot(root: string, out: string, tab: string): Promise<number> 
       await new Promise((resolve) => setTimeout(resolve, 2500));
     }
     if (offset) {
-      await window.webContents.executeJavaScript(
-        `document.querySelector('.detail').scrollTop = ${Number(offset) || 0}`,
-      );
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      // 偏移量后可跟图层开关，例如 overview@1150+related+modules，用来截到不同图层。
+      // 关系图谱页的开关前缀是 rel-，其余用 graph-。
+      const [offsetValue, ...flags] = offset.split("+");
+      for (const flag of flags) {
+        const prefix = tabName === "relations" ? "rel" : "graph";
+        await window.webContents.executeJavaScript(
+          `(() => { const button = document.getElementById("${prefix}-${flag}");` +
+            ` if (!button) return "missing"; if (!button.classList.contains("active")) button.click(); return "on"; })()`,
+        );
+      }
+      if (flags.length > 0) await new Promise((resolve) => setTimeout(resolve, 1400));
+      if (tabName !== "relations") {
+        await window.webContents.executeJavaScript(
+          `document.querySelector('.detail').scrollTop = ${Number(offsetValue) || 0}`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
     }
   }
+  // 窗口被遮挡时 Chromium 会跳过重绘，capturePage 可能拿到切换前的旧帧：
+  // 真正显示并置顶窗口，等两帧渲染完再截。
+  window.show();
+  window.moveTop();
   window.focus();
   window.webContents.invalidate();
-  await new Promise((resolve) => setTimeout(resolve, 800));
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  await window.webContents.executeJavaScript(
+    `new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))`,
+  );
+  window.webContents.invalidate();
+  await new Promise((resolve) => setTimeout(resolve, 600));
   const image = await window.webContents.capturePage();
   await writeFile(out, image.toPNG());
   console.log(`已保存界面截图：${out}`);

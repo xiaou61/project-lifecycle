@@ -100,6 +100,33 @@ class ApproveAllTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 update_history.approve(args, root)
 
+    def test_by_falls_back_to_project_approver(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            work_dir = build_project(root)
+            (root / ".agent" / "rules" / "always.md").write_text(
+                "---\nstatus: active\nconfigured: true\napprover: 王五\n---\n\n# 规范\n",
+                encoding="utf-8",
+            )
+            args = argparse.Namespace(
+                work="WORK-001", artifact="requirements", by=None, role="", json=False
+            )
+            update_history.approve(args, root)
+            self.assertIn(
+                "approved_by: 王五",
+                (work_dir / "requirements.md").read_text(encoding="utf-8"),
+            )
+
+    def test_by_missing_everywhere_refuses_to_guess(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            build_project(root)
+            args = argparse.Namespace(
+                work="WORK-001", artifact="requirements", by=None, role="", json=False
+            )
+            with self.assertRaises(RuntimeError):
+                update_history.approve(args, root)
+
 
 class ArchiveTest(unittest.TestCase):
     def test_refuses_unfinished_item(self) -> None:

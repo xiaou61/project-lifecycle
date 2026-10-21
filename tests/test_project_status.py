@@ -15,7 +15,7 @@ SKILL_ROOT = ROOT / "skills" / "project-lifecycle"
 STATUS_SCRIPT = SKILL_ROOT / "scripts" / "project_status.py"
 INIT_SCRIPT = SKILL_ROOT / "scripts" / "init_project.py"
 UPDATE_SCRIPT = SKILL_ROOT / "scripts" / "update_history.py"
-LIFECYCLE_PS1 = SKILL_ROOT / "scripts" / "project-lifecycle.ps1"
+LIFECYCLE_ENTRY = SKILL_ROOT / "scripts" / "project-lifecycle.py"
 
 
 def load_status_module():
@@ -417,6 +417,47 @@ class ProjectStatusTests(unittest.TestCase):
         self.assertEqual(status["work_items"][0]["workspace_attribution"]["status"], "not_required")
         self.assertEqual(status["resume"]["mode"], "auto_resume")
 
+    def test_worktree_question_only_when_workspace_is_dirty(self) -> None:
+        """干净工作区直接 proceed；有未提交改动才问一次；已隔离到 worktree 不再问。"""
+        self.managed_work("WORK-014", "隔离实施")
+        subprocess.run(["git", "init", "-q"], cwd=self.project, check=True, capture_output=True)
+        for args in (
+            ["git", "config", "user.email", "t@example.com"],
+            ["git", "config", "user.name", "t"],
+            ["git", "add", "."],
+            ["git", "commit", "-qm", "init"],
+        ):
+            subprocess.run(args, cwd=self.project, check=True, capture_output=True)
+
+        clean = project_status.inspect_project(self.project)
+        self.assertFalse(clean["git"]["worktree"]["linked"])
+        self.assertEqual(clean["resume"]["worktree"]["decision"], "proceed")
+
+        # 新文件引用在 .gitignore 之外，确保算作未提交改动。
+        (self.project / "note.txt").write_text("dirty\n", encoding="utf-8")
+        dirty = project_status.inspect_project(self.project)
+        self.assertEqual(dirty["git"]["status"], "dirty")
+        self.assertEqual(dirty["resume"]["worktree"]["decision"], "ask_user")
+        (self.project / "note.txt").unlink()
+
+        linked = Path(tempfile.mkdtemp(prefix="pl-worktree-")) / "wt"
+        subprocess.run(
+            ["git", "worktree", "add", "-q", str(linked), "-b", "work/WORK-014"],
+            cwd=self.project,
+            check=True,
+            capture_output=True,
+        )
+        try:
+            inside = project_status.inspect_project(linked)
+            self.assertTrue(inside["git"]["worktree"]["linked"])
+            self.assertEqual(inside["resume"]["worktree"]["decision"], "active")
+        finally:
+            subprocess.run(
+                ["git", "worktree", "remove", "--force", str(linked)],
+                cwd=self.project, capture_output=True, check=False,
+            )
+
+
     def test_legacy_workspace_attribution_is_ignored(self) -> None:
         """旧项目里的 workspace.md 不再被校验，也不再阻止恢复。"""
         self.managed_work("WORK-014", "归因完成")
@@ -543,9 +584,10 @@ class ProjectStatusTests(unittest.TestCase):
         self.assertIn("模式：managed（受管理）", project_status.render_resume(status))
 
     def test_validate_entry_does_not_force_strict_mode(self) -> None:
-        script = LIFECYCLE_PS1.read_text(encoding="utf-8-sig")
-        self.assertNotIn('$Command -eq "validate" -and $forwardedArgs -notcontains "--strict"', script)
-        self.assertIn("validate", script)
+        # 命令映射现在只在 project-lifecycle.py：validate 不得自带 --strict。
+        entry = LIFECYCLE_ENTRY.read_text(encoding="utf-8")
+        self.assertIn('"validate": ("project_validate.py", [])', entry)
+        self.assertNotIn('"validate": ("project_validate.py", ["--strict"]', entry)
 
     def test_strict_validation_is_opt_in_for_compatibility_warnings(self) -> None:
         self.confirm_rules()
@@ -920,7 +962,9 @@ class InitializationTests(unittest.TestCase):
             self.assertTrue((project / ".agent" / "history" / "updates.md").is_file())
             self.assertEqual(index.read_text(encoding="utf-8"), "# 用户维护的项目索引\n")
             self.assertEqual(rules.read_text(encoding="utf-8"), "# 用户自定义项目规范\n\n## MUST\n\n- 保留此规则\n")
-            self.assertTrue((project / ".agent" / "scripts" / "generate_core_history.py").is_file())
+            # .agent/scripts/ 是留给目标项目自己的辅助脚本；Skill 的脚本不得复制进去，
+            # 否则每个项目都会多一份会随 Skill 升级而过期的副本。
+            self.assertFalse((project / ".agent" / "scripts" / "generate_core_history.py").exists())
 
     def test_new_project_explains_lifecycle_entry(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

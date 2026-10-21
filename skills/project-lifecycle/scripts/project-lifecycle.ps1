@@ -1,61 +1,24 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet("init", "status", "brief", "resume", "validate", "history", "updates", "record", "approve", "archive", "checkpoint", "push-check")]
     [string]$Command,
 
     [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
     [string[]]$CommandArgs
 )
 
+# 命令映射只在 project-lifecycle.py 维护一份；这里只负责找到 Python 并转发。
 $ErrorActionPreference = "Stop"
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$entry = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "project-lifecycle.py"
 
 if (Get-Command py -ErrorAction SilentlyContinue) {
-    $pythonCommand = "py"
-    $pythonPrefix = @("-3", "-X", "utf8")
+    & py -3 -X utf8 $entry $Command @CommandArgs
 }
 elseif (Get-Command python -ErrorAction SilentlyContinue) {
-    $pythonCommand = "python"
-    $pythonPrefix = @("-X", "utf8")
+    & python -X utf8 $entry $Command @CommandArgs
 }
 else {
     throw "未找到 Python 运行时。请让 Agent 使用已安装 Skill 的命令入口，或由维护者配置 Python；用户不需要直接运行 Python。"
 }
 
-$pythonVersion = & $pythonCommand @pythonPrefix -c "import sys; print('%d.%d' % sys.version_info[:2])" 2>$null
-if (-not $pythonVersion -or [version]$pythonVersion -lt [version]"3.9") {
-    throw "需要 Python 3.9 或更高版本；当前解析到 $pythonCommand $pythonVersion。请让 Agent 使用已安装 Skill 的命令入口，或由维护者配置受支持的 Python。"
-}
-
-$scriptName = switch ($Command) {
-    "init" { "init_project.py" }
-    "status" { "project_status.py" }
-    "brief" { "project_status.py" }
-    "resume" { "project_status.py" }
-    "validate" { "project_validate.py" }
-    "history" { "generate_core_history.py" }
-    "updates" { "update_history.py" }
-    "record" { "update_history.py" }
-    "approve" { "update_history.py" }
-    "archive" { "update_history.py" }
-    "checkpoint" { "update_history.py" }
-    "push-check" { "update_history.py" }
-}
-
-$forwardedArgs = @($CommandArgs)
-if ($Command -eq "resume" -and $forwardedArgs -notcontains "--resume") {
-    $forwardedArgs += "--resume"
-}
-if ($Command -eq "brief" -and $forwardedArgs -notcontains "--brief") {
-    $forwardedArgs += "--brief"
-}
-if ($Command -eq "updates") { $forwardedArgs += "--list" }
-if ($Command -eq "record") { $forwardedArgs += "--record" }
-if ($Command -eq "approve") { $forwardedArgs += "--approve" }
-if ($Command -eq "archive") { $forwardedArgs += "--archive" }
-if ($Command -eq "checkpoint") { $forwardedArgs += "--check" }
-if ($Command -eq "push-check") { $forwardedArgs += "--push-check" }
-
-& $pythonCommand @pythonPrefix (Join-Path $scriptDir $scriptName) @forwardedArgs
 exit $LASTEXITCODE

@@ -1,17 +1,17 @@
-# Design
+# 设计
 
-Use this reference to turn an approved proposal into instructions that can be implemented without rediscovering material decisions.
+用本参考把已批准的提案转成可直接实施的说明，使执行者不必重新发现关键决策。
 
-## Grounding
+## 依据
 
-- Read the approved requirements and proposal.
-- Inspect the actual modules, interfaces, data stores, tests, and deployment configuration affected by the work.
-- Reuse current architectural patterns unless the approved proposal deliberately changes them.
-- Prefer exact repository paths and existing symbol names when known. Mark planned names as planned rather than describing them as existing.
+- 读已批准的需求与提案。
+- 检查本次工作真正涉及的模块、接口、数据存储、测试和部署配置。
+- 复用现有架构模式，除非已批准的提案明确要改变它。
+- 已知时优先写仓库里的真实路径和现有符号名。计划中的名字要标明是"计划"，不要描述成已存在。
 
-## Design Artifact
+## 设计工件
 
-Use only the sections that affect implementation:
+只保留影响实施的章节：
 
 ```markdown
 # <工作项>设计
@@ -30,8 +30,8 @@ Use only the sections that affect implementation:
 ## 待决定事项
 ```
 
-The design must identify boundaries that other modules rely on, state validation and failure behavior, and explain compatibility or migration where persisted data or public interfaces change. Diagrams are optional and should be used only when they clarify relationships that prose cannot express compactly.
+设计必须指认其他模块依赖的边界，写明校验与失败行为，并在持久化数据或公共接口变化时说明兼容或迁移方案。图是可选项，只在能比文字更紧凑地说明关系时使用。
 
-Map design elements and planned tests back to requirements and acceptance criteria. Do not introduce speculative extension points or abstractions with only one foreseeable use.
+把设计元素和计划中的测试映射回需求与验收标准。不要引入只有一个可预见用途的预留扩展点或抽象。
 
-Keep the design at `status: draft` until the user explicitly approves it. Approval is recorded with `project-lifecycle.ps1 approve --artifact design`, which stamps `approved_by` and `approved_at`; only that command writes the signer fields (see the “签署” section in [workflow.md](workflow.md)). After approval, use `tasks.md` for exact execution order and file-level steps rather than expanding the design into a second checklist. During implementation, a material deviation returns the design to draft and makes the task plan and prior verification evidence `stale`; a local factual correction may be recorded without reopening approval.
+设计保持 `status: draft`，直到用户明确批准。批准通过 `$lifecycle approve --artifact design` 记录，写入 `approved_by` 和 `approved_at`；只有该命令写签署字段（见 [workflow.md](workflow.md) 的"签署"）。批准后用 `tasks.md` 承载准确的执行顺序和文件级步骤，不要把设计扩写成第二份清单。实施中出现实质偏离时，设计回到 `draft`，任务计划和既有验证证据标为 `stale`；局部事实修正可记录后继续，不必重新走批准。

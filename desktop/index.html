@@ -20,6 +20,7 @@
         </div>
       </div>
       <div class="topbar-actions">
+        <button id="relations" type="button" class="button">关系图谱</button>
         <button id="workspace" type="button" class="button">工作区</button>
         <button id="resources" type="button" class="button">项目资料</button>
         <button id="pick" type="button" class="button">选择项目</button>
@@ -65,6 +66,52 @@
               <div id="resource-frontmatter" class="frontmatter"></div>
               <div id="resource-content" class="markdown"></div>
             </article>
+          </div>
+        </div>
+
+        <div id="relations-view" class="relations-view hidden">
+          <div class="relations-head">
+            <div>
+              <h2>关系图谱</h2>
+              <p id="relations-source" class="muted">—</p>
+            </div>
+            <div class="relations-toolbar">
+              <button type="button" id="rel-depends" class="chip-toggle active">硬依赖</button>
+              <button type="button" id="rel-related" class="chip-toggle">关联</button>
+              <button type="button" id="rel-modules" class="chip-toggle">模块</button>
+              <button type="button" id="rel-attention" class="chip-toggle">只看待处理</button>
+              <span class="graph-toolbar-gap"></span>
+              <button type="button" id="rel-spin" class="chip-toggle">自动旋转</button>
+              <button type="button" id="rel-flat" class="chip-toggle">俯视</button>
+              <button type="button" id="rel-zoom-in" class="chip-toggle" title="放大">＋</button>
+              <button type="button" id="rel-zoom-out" class="chip-toggle" title="缩小">－</button>
+              <button type="button" id="rel-reset" class="chip-toggle">复位</button>
+            </div>
+          </div>
+          <div class="relations-body">
+            <div class="relations-canvas">
+              <div id="relations-graph" class="relations-graph">
+                <svg id="rel-svg" class="rel-svg"></svg>
+              </div>
+              <p class="muted small rel-help">
+                拖动空白处旋转视角，滚轮缩放，双击空白复位；拖节点无意义（3D 靠旋转找关系），点节点进入该工作项。
+                圆的大小是任务量，颜色是状态；悬停看细节，其余节点压暗。
+              </p>
+            </div>
+            <aside class="relations-side">
+              <section class="rel-panel">
+                <h3>状态分布</h3>
+                <div id="rel-state-bars" class="bar-list"></div>
+              </section>
+              <section class="rel-panel">
+                <h3>阶段分布</h3>
+                <div id="rel-phase-bars" class="bar-list"></div>
+              </section>
+              <section class="rel-panel">
+                <h3>选中节点</h3>
+                <div id="rel-detail" class="rel-detail muted small">点一个节点查看它的关系。</div>
+              </section>
+            </aside>
           </div>
         </div>
 
@@ -134,12 +181,35 @@
             </section>
 
             <section class="panel">
-              <h3 class="panel-title">依赖与关联</h3>
+              <h3 class="panel-title">关联图谱</h3>
               <p class="muted small">
-                实线箭头 = 硬依赖（<code>depends_on</code>，未完成会阻塞实现和验收）；虚线 = 关联（<code>related_to</code>，不阻塞）。
-                点节点跳到该工作项。
+                实线箭头 = 硬依赖（<code>depends_on</code>）；虚线弧 = 关联（<code>related_to</code>）；
+                浅色小卡 = <code>.agent/INDEX.md</code> 模块索引里的模块，连到它登记的工作项。
+                <b>拖节点</b>调整位置，<b>滚轮</b>缩放，<b>空白拖动</b>平移，双击节点回到全图。
               </p>
+              <div class="graph-toolbar">
+                <button type="button" id="graph-depends" class="chip-toggle active">硬依赖</button>
+                <button type="button" id="graph-related" class="chip-toggle">关联</button>
+                <button type="button" id="graph-modules" class="chip-toggle">模块</button>
+                <button type="button" id="graph-attention" class="chip-toggle">只看待处理</button>
+                <span class="graph-toolbar-gap"></span>
+                <span id="graph-count" class="graph-count muted small"></span>
+                <button type="button" id="graph-zoom-in" class="chip-toggle" title="放大">＋</button>
+                <button type="button" id="graph-zoom-out" class="chip-toggle" title="缩小">－</button>
+                <button type="button" id="graph-fit" class="chip-toggle">复位</button>
+              </div>
               <div id="graph" class="graph"></div>
+              <div id="graph-detail" class="trace-detail muted small">
+                悬停节点看关系，拖节点调整位置，滚轮缩放，空白处拖动平移。
+              </div>
+              <div class="graph-legend muted small">
+                <span><i class="legend-line depends"></i>硬依赖</span>
+                <span><i class="legend-line related"></i>关联</span>
+                <span><i class="legend-line module"></i>模块归属</span>
+                <span><i class="legend-dot complete"></i>完成</span>
+                <span><i class="legend-dot running"></i>进行中</span>
+                <span><i class="legend-dot attention"></i>需要处理</span>
+              </div>
             </section>
 
             <section id="other-warnings-panel" class="panel hidden">
