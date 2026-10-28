@@ -36,10 +36,10 @@ const nodes: Node[] = [
   },
   {
     id: 'restore', step: '03', title: '恢复事实', eyebrow: '恢复层',
-    summary: '先定位真实项目，再从规则、状态和 Git 归因恢复上下文。',
+    summary: '先定位真实项目，再从规则、状态和 Git 状态恢复上下文。',
     input: '项目路径、PROJECT-INDEX.md、WORK-*（可选）',
-    process: ['读取 AGENTS 与 .agent/rules/always.md', '运行 project_status.py --json 与 --resume --json', '检查工作区改动是否已归因'],
-    output: '当前阶段、阻塞、建议读取路径、接力提示', guard: '多工作项、未知归因、规则未确认或漂移时返回 ask_user。',
+    process: ['读取 AGENTS 与 .agent/rules/always.md', '运行 project_status.py --json 与 --resume --json', '检查未提交改动是否属于当前工作项'],
+    output: '当前阶段、阻塞、建议读取路径、接力提示', guard: '多工作项、未知改动归属、规则未确认或漂移时返回 ask_user。',
     owner: 'project_status.py', files: ['skills/project-lifecycle/scripts/project_status.py', '.agent/INDEX.md', '.agent/rules/always.md'], link: '/guide/resume', color: '#3b82f6'
   },
   {
@@ -48,7 +48,7 @@ const nodes: Node[] = [
     input: '待确认目标、范围、行为、约束和验收',
     process: ['区分事实、用户决定、Agent 实现选择', '建立最小决策树，一轮只问一个问题', '每次回答立即写入 requirements.md'],
     output: '稳定术语、用户决定、无阻塞的需求摘要', guard: '访谈完成不等于批准；必须由用户确认最终摘要。',
-    owner: 'requirements-interview.md', files: ['skills/project-lifecycle/references/requirements-interview.md', '.agent/changes/WORK-*/requirements.md'], link: '/guide/requirements-interview', color: '#a855f7'
+    owner: 'requirements.md', files: ['skills/project-lifecycle/references/requirements.md', '.agent/changes/WORK-*/requirements.md'], link: '/guide/requirements-interview', color: '#a855f7'
   },
   {
     id: 'artifacts', step: '05', title: '阶段工件', eyebrow: '事实层',
@@ -64,7 +64,7 @@ const nodes: Node[] = [
     input: '工件状态、depends_on、related_to、规则和 Git 状态',
     process: ['按最早未满足阶段决定下一步', '硬依赖未完成 → 阻断实现和验收', '关系影响 → 对受影响工作项回退阶段'],
     output: '允许动作，或明确的 blockers', guard: '“继续”“开始做”“执行 WORK-*”本身不等于批准。',
-    owner: 'workflow + relationships', files: ['skills/project-lifecycle/references/workflow.md', 'skills/project-lifecycle/references/relationships.md', 'skills/project-lifecycle/references/rules.md'], link: '/reference/boundaries', color: '#f97316'
+    owner: 'workflow.md', files: ['skills/project-lifecycle/references/workflow.md'], link: '/reference/boundaries', color: '#f97316'
   },
   {
     id: 'implement', step: '07', title: '实现与测试', eyebrow: '执行层',
@@ -76,11 +76,11 @@ const nodes: Node[] = [
   },
   {
     id: 'handoff', step: '08', title: '完成沉淀 / 接力', eyebrow: '持续层',
-    summary: '把稳定知识沉淀到 specs、memory，并用 WORK-* 在新对话继续。',
+    summary: '把稳定知识沉淀到 specs 和 notes，并用 WORK-* 在新对话继续。',
     input: '验证结果、当前事实、未完成事项和下一步',
-    process: ['验证通过后核对规格和长期记忆', '需要继续时输出真实 WORK-* 接力句', '新对话重新读取事实，不搬运旧聊天'],
+    process: ['验证通过后核对规格和遗留事项', '需要继续时输出真实 WORK-* 接力句', '新对话重新读取事实，不搬运旧聊天'],
     output: '可交接的完成状态或下一轮恢复入口', guard: '不能凭时间戳或上一轮聊天猜测当前工作项。',
-    owner: 'workflow.md + project_status.py', files: ['.agent/specs/', '.agent/memory.md', 'skills/project-lifecycle/references/workflow.md'], link: '/guide/resume', color: '#ec4899'
+    owner: 'workflow.md + project_status.py', files: ['.agent/specs/', '.agent/notes/', 'skills/project-lifecycle/references/workflow.md'], link: '/guide/resume', color: '#ec4899'
   },
 ]
 
@@ -148,11 +148,11 @@ function selectNode(id: string) {
       <div class="layer-arrow">↓ 识别意图与风险</div>
       <div class="layer-row layer-skill"><span class="layer-label">Skill 协议层</span><strong>SKILL.md + references/workflow.md</strong><small>路由流程、恢复顺序、门槛、批准、漂移和完成语义</small><a href="/guide/full-workflow">查看全流程</a></div>
       <div class="layer-arrow">↓ 读取并写入事实</div>
-      <div class="layer-row layer-facts"><span class="layer-label">项目事实层</span><strong>.agent/</strong><small>rules · INDEX · changes/WORK-* · specs · memory · html</small><a href="/reference/">查看总索引</a></div>
+      <div class="layer-row layer-facts"><span class="layer-label">项目事实层</span><strong>.agent/</strong><small>rules · INDEX · changes/WORK-* · specs · notes</small><a href="/reference/">查看总索引</a></div>
       <div class="layer-arrow split">↙ 状态恢复　　　　　　　　　↘ 阶段执行</div>
       <div class="layer-row layer-tools"><span class="layer-label">确定性工具层</span><strong>project_status.py · project_validate.py · init_project.py</strong><small>状态推导、恢复探针、严格校验、幂等初始化</small><a href="/reference/commands">查看命令</a></div>
       <div class="layer-arrow">↓ 证据回写</div>
-      <div class="layer-row layer-output"><span class="layer-label">交付与理解层</span><strong>源码 / 测试 / testing/report.md / VitePress / html</strong><small>实现结果可验证，知识可复用，下一轮可接力</small><a href="/guide/resume">查看恢复与接力</a></div>
+      <div class="layer-row layer-output"><span class="layer-label">交付与理解层</span><strong>源码 / 测试 / testing/report.md / VitePress 教程</strong><small>实现结果可验证，知识可复用，下一轮可接力</small><a href="/guide/resume">查看恢复与接力</a></div>
     </div>
 
     <p class="architecture-note"><strong>读图方式：</strong>先看执行流理解“什么时候做什么”，再切到分层关系理解“哪一层负责什么”。所有状态来自项目工件和确定性脚本，教程只负责解释。</p>

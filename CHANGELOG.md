@@ -2,6 +2,16 @@
 
 本文件记录 `project-lifecycle` Skill 仓库本身的维护变更；目标项目的逐轮记录写在各自的 `.agent/history/updates.md`。Git 提交仍是可回滚事实源。
 
+## 2026-10-28 · 精简 Skill：删长期记忆、HTML 材料与核心历史，合并 5 个参考文件
+
+- 类型：refactor（不兼容：目标项目结构）
+- 变更：**参考文件 15 → 7**，Skill 正文 91.1 KB → 72.6 KB（-20%），包内文件 26 → 16。删除 `references/memory.md`、`html.md`、`core-history.md`、`requirements-interview.md`、`relationships.md`、`rules.md`、`notes.md`、`specs.md`，以及 `scripts/generate_core_history.py`、`history` 命令、`agents/openai.yaml`、`scripts/__pycache__`。**删的是工件类型，不只是文档**：初始化器不再创建 `.agent/memory.md` 和 `.agent/html/`，INDEX/README 模板不再登记；查看器去掉「长期记忆」「理解材料」两个分组和 core-components 提示。**合并保留能力**：需求深挖并入 `requirements.md`；工作项标识/frontmatter/依赖关系、规则优先级、稳定规格、决策说明并入 `workflow.md`（含归档后旧路径引用与 `approver` 默认签署人规则）；`SKILL.md` 删除与 workflow 重复的「每轮顺序」，命令清单去掉 `history`（12 → 11 个）。README、VitePress 教程、架构组件、QA（33 → 31 题）同步去掉已删功能，并修正 `workspace.md` 归因机制停用后仍留在文档里的旧描述。
+- 决策：**没有校验的记忆就不是约束**——`project_status.py`/`project_validate.py` 从不解析 `MEM-*`，它只带来手工编号和 `stale`/`superseded` 的簿记成本；跨任务事实由 `rules/always.md`、`specs/` 和 `notes/` 承担。**核心历史就是 `git log --follow` 的投影**——为它维护 units JSON、post-commit hook、`--check` 和重命名规则不划算。**HTML 理解材料需要逐次授权**——政策四段里只有“先征得同意”是硬约束，不再单列工件目录。**合并而不是删规则**：优先级链、frontmatter 字段、`approver` 默认值、规格更新与归档引用检查都是脚本或流程依赖的事实，逐条搬进 `workflow.md` 后才删除原文件。**不做兼容迁移**：老项目残留的 `memory.md`/`html/` 不被任何校验或状态读取，保留为孤儿文件无害，不自动删除用户资料。
+- 依据：`skills/project-lifecycle/SKILL.md`、`references/{workflow,requirements}.md`、`scripts/{init_project,project-lifecycle,project_status}.py`、`tests/test_project_status.py`、`desktop/src/main.ts`、`README.md`、`docs/`。
+- 验证：`python -m unittest discover -s tests -p "test_*.py"` 共 80 条通过；`compileall` 通过；`npm run build`（desktop tsc）与 `npm run docs:build` 通过；临时目录 `init` 实测只创建 `rules/specs/changes/notes/references/history/scripts` 与 `INDEX.md`、`README.md`、`history/updates.md`，不再有 `memory.md`/`html/`。
+- 本地提交：见本轮提交。
+- 远端推送：见本轮推送。
+
 ## 2026-10-21（第二轮）· 反借口表、体积减法、签署人默认值与 worktree 三态、全量中文化
 
 - 类型：feature + refactor

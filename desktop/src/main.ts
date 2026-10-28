@@ -222,27 +222,15 @@ const RESOURCE_GROUPS: Array<{ key: string; label: string; hint: string; dirs: s
     dirs: ["notes"],
   },
   {
-    key: "memory",
-    label: "长期记忆",
-    hint: "跨任务的长期知识；不能替代当前工作项的需求事实",
-    dirs: ["."],
-  },
-  {
     key: "references",
     label: "参考资料",
     hint: "长期可检索的外部资料与留档",
     dirs: ["references"],
   },
   {
-    key: "html",
-    label: "理解材料",
-    hint: "用户明确同意后生成的项目理解型 HTML，不替代源码或验收证据",
-    dirs: ["html"],
-  },
-  {
     key: "history",
-    label: "更新历史与生成视图",
-    hint: "updates.md 是追加式时间线；core-components.md 是 Git 历史的生成视图",
+    label: "更新历史",
+    hint: "updates.md 是追加式时间线，不替代工作项工件或 Git 历史",
     dirs: ["history"],
   },
   {
@@ -294,8 +282,8 @@ async function loadResources(root: string): Promise<ResourceGroup[]> {
     const seen = new Set<string>();
     for (const dir of group.dirs) {
       for (const relative of listResourceFiles(root, dir, RESOURCE_FILE_CAP)) {
-        // "." 这一组只收根目录下的三个单文件，不收子目录
-        if (dir === "." && !["INDEX.md", "README.md", "memory.md"].includes(relative)) continue;
+        // "." 这一组只收根目录下的两个单文件，不收子目录
+        if (dir === "." && !["INDEX.md", "README.md"].includes(relative)) continue;
         const absolute = path.join(root, ".agent", dir, relative);
         if (seen.has(absolute) || !existsSync(absolute)) continue;
         seen.add(absolute);

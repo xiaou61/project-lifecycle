@@ -16,7 +16,7 @@ $lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecyc
 | 模式 | 含义 | 下一步 |
 | --- | --- | --- |
 | `auto_resume` | 唯一活动工作项，阶段门槛、依赖和工作区没有已知阻塞 | 读取建议路径后继续当前阶段 |
-| `ask_user` | 有多个候选，或存在审批、依赖、来源覆盖、Git 归因等阻塞 | 先选择工作项或处理阻塞 |
+| `ask_user` | 有多个候选，或存在审批、依赖、来源覆盖等阻塞 | 先选择工作项或处理阻塞 |
 | `out_of_scope` | 没有未完成工作项、编号已归档，或当前路径只是外层导航工作区 | 创建新工作项或切换到真实项目 |
 
 当返回 `work_item` 时，恢复包还会从该工作项的 `requirements.md` 原文提取当前任务事实：
@@ -47,7 +47,7 @@ $lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecyc
 }
 ```
 
-这些字段是恢复提示，不是新的状态数据库。`documented_state` 只表示工件推导状态，不等于源码实时完成度；测试报告没有锚点、提交变化或工作区变脏时，`code_sync` 不会是 `verified`，并要求重新核对。上下文压缩后仍要按 `read_paths` 重新读取 `always.md`、`requirements.md` 和当前阶段工件，并核对 `tasks.md`、Git 差异和实际测试；`requirements.md` 缺少目标或验收标准时，Skill 只提示缺口，不从旧聊天、摘要或长期记忆中臆造内容。
+这些字段是恢复提示，不是新的状态数据库。`documented_state` 只表示工件推导状态，不等于源码实时完成度；测试报告没有锚点、提交变化或工作区变脏时，`code_sync` 不会是 `verified`，并要求重新核对。上下文压缩后仍要按 `read_paths` 重新读取 `always.md`、`requirements.md` 和当前阶段工件，并核对 `tasks.md`、Git 差异和实际测试；`requirements.md` 缺少目标或验收标准时，Skill 只提示缺口，不从旧聊天或摘要中臆造内容。
 
 恢复结果还会给出：
 
@@ -55,7 +55,7 @@ $lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecyc
 - `blockers`：不能静默绕过的阻塞；
 - `read_paths`：恢复前应该读取的规则和工件；
 - `handoff_prompt`：可以直接粘贴到新对话的接力句；
-- `git`：分支、改动数量和归因状态。
+- `git`：分支和改动数量。
 
 JSON 顶层还带 `schema_version` 和 `generated_at`。脚本集成应读取字段和枚举，不要依赖中文文本或输出顺序。
 
@@ -74,32 +74,9 @@ $lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecyc
 $project-lifecycle 在当前项目继续 WORK-003，先恢复规范和状态，再按当前阶段执行。
 ```
 
-## Git 改动归因
+## Git 改动归属
 
-恢复输出看到 Git 为 dirty 时，在对应工作项下创建或更新 `workspace.md`，逐项处理：
-
-| 归类 | 处理方式 |
-| --- | --- |
-| 当前工作项改动 | 对照 `tasks.md` 和受影响路径，记录它属于哪项任务 |
-| 用户已有改动 | 保留原样，不覆盖、不代替用户提交 |
-| 未知改动 | 停止实现或清理，先让用户确认归属 |
-
-最小归因文件：
-
-```markdown
----
-base_commit: <当前基准 commit>
----
-
-## 工作区归因
-
-| 路径 | 归属 | 说明 |
-| --- | --- | --- |
-| src/login.ts | current_work | TASK-001 的实现 |
-| README.md | user_existing | 用户原有未提交修改 |
-```
-
-只有每条 Git 改动都出现在表格中、归属值有效、说明不为空且 `base_commit` 与当前 HEAD 匹配时，恢复探针才会把归因标为 complete。脏工作区不是失败，但它不能被自动当成“任务完成”或“验证通过”。Git 无法读取时按未知处理，并人工核对。
+恢复输出看到 Git 为 dirty 时，不要把它自动当成当前工作项的改动：属于当前工作项的对照 `tasks.md` 和受影响路径确认；用户已有的保留原样，不覆盖、不代替用户提交；未知改动先让用户确认归属，再实现或清理。脏工作区本身不是失败，但不能被当成“任务完成”或“验证通过”。
 
 ## 接力句
 
@@ -119,7 +96,7 @@ $project-lifecycle 在当前项目继续实施 WORK-003。先恢复规范和状�
 
 ## 三四个对话同时改一个项目怎么办
 
-目前已经解决的是恢复和防串项：每个工作项有稳定的 `WORK-*` 编号，多个活动项时恢复命令会进入 `ask_user`，不会根据最近聊天、目录时间或 Git 最近修改时间替你猜；脏工作区也必须先做归因。没有解决的是同一目录里的实时并发写入，Skill 没有文件锁，也不会自动合并两个对话的修改。
+目前已经解决的是恢复和防串项：每个工作项有稳定的 `WORK-*` 编号，多个活动项时恢复命令会进入 `ask_user`，不会根据最近聊天、目录时间或 Git 最近修改时间替你猜；脏工作区里的未知改动也不能算到当前工作项头上。没有解决的是同一目录里的实时并发写入，Skill 没有文件锁，也不会自动合并两个对话的修改。
 
 最安全的安排是“一项工作，一个分支，一个 Worktree，一个写入对话”。恢复结果里的 `worktree.decision` 有三种值：已在 worktree 内是 `active`，工作区干净是 `proceed`（直接实施，不再询问），工作区有未提交改动是 `ask_user` 才需要问一次要不要开独立 worktree。创建前确认该工作项的 `.agent/changes/WORK-*/` 已提交，否则新目录里看不到需求与任务文件：
 
@@ -133,4 +110,4 @@ git worktree add "..\我的项目-WORK-003" -b "work/WORK-003"
 & $lifecycle checkpoint "F:\我的项目" --json
 ```
 
-看到 `dirty`、`unclassified` 或多个活动工作项时，不要让新对话直接改代码；先指定 `--work WORK-xxx`，补齐 `workspace.md`，或请用户确认未知改动归属。这样能防止错误接力，但不能替代 Git 分支合并和人工冲突处理。
+看到 `dirty`、`unclassified` 或多个活动工作项时，不要让新对话直接改代码；先指定 `--work WORK-xxx`，或请用户确认未知改动归属。这样能防止错误接力，但不能替代 Git 分支合并和人工冲突处理。

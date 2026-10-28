@@ -32,7 +32,7 @@ $lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecyc
 & $lifecycle resume "F:\我的项目"
 & $lifecycle resume "F:\我的项目" --json
 
-# 检查结构、重复标识符、来源引用、测试证据和 Git 归因
+# 检查结构、重复标识符、来源引用、测试证据和归档后的旧路径引用
 & $lifecycle validate "F:\我的项目" --json
 
 # 发布或交接时把兼容性警告也视为失败
@@ -54,9 +54,8 @@ $lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecyc
 | `brief` | 只输出活动工作项、阻塞和下一步（约 2–3 KB） | 每轮状态查询（默认） |
 | `status` | 完整清单：阶段、签署、依赖、预算与全部提示 | 状态恢复 |
 | `resume` | 输出可恢复上下文和接力提示 | 跨会话接力 |
-| `validate` | 检查工件、来源、证据和归因，保留兼容性警告 | 日常交接检查 |
+| `validate` | 检查工件、来源、证据和归档引用，保留兼容性警告 | 日常交接检查 |
 | `validate --strict` | 在上述检查基础上把警告视为失败 | 发布前质量门槛 |
-| `history` | 生成核心组件历史视图 | 可追溯性 |
 | `updates` | 查看 `.agent/history/updates.md` 的最近记录 | 每轮变化时间线 |
 | `record` | 按固定字段追加一条结构化更新记录 | 变更留痕 |
 | `approve` | 把用户确认盖章成带审批人和时间的签署记录 | 审批签署 |
@@ -69,19 +68,7 @@ $lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecyc
 
 `status` 与 `resume` 的 JSON 里，`state_evidence.code_sync` 区分四种情况：`verified`（报告绑定当前 HEAD 且工作区没有源码改动）、`drift`（报告覆盖到它绑定的提交，之后仓库继续改）、`stale`（锚点之后已提交源码改动，需要重新验证）、`unknown`（报告没绑提交）。`drift` 不推翻当时的结论，但也**不**当作"现在仍然成立"。
 
-这借鉴了 Superpowers 的组合方式：每个动作有清晰边界，但仍由一个生命周期 Skill 统一处理事实、批准和漂移。用户侧风险模式是 `lite`、`managed`、`strict`；`compact`、`full` 是写入工件的兼容工作流字段，需求深挖和 HTML 理解材料按需读取，不是重复安装的 Skill。
-
-## 核心历史
-
-为项目声明的核心组件生成确定性的 Git 历史视图：
-
-```powershell
-& $lifecycle history `
-  --config ".agent/core-components.json" `
-  --output ".agent/history/core-components.md"
-```
-
-配置格式和改名规则见[总索引](/reference/)中的“Git 历史视图”条目。
+这借鉴了 Superpowers 的组合方式：每个动作有清晰边界，但仍由一个生命周期 Skill 统一处理事实、批准和漂移。用户侧风险模式是 `lite`、`managed`、`strict`；`compact`、`full` 是写入工件的兼容工作流字段，需求深挖写在 `requirements.md` 里，不是重复安装的 Skill。
 
 ## 更新历史与提交边界
 

@@ -1196,7 +1196,7 @@ def inspect_work(work_dir: Path, archived: bool = False) -> dict[str, object]:
             archived,
             "completed",
             "complete",
-            "核对 specs、memory 和遗留事项；需要审计轨迹时再归档该工作项。",
+            "核对 specs 和遗留事项；需要审计轨迹时再归档该工作项。",
             artifacts,
             tasks,
             warnings,

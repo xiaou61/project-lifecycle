@@ -957,14 +957,14 @@ class InitializationTests(unittest.TestCase):
 
             self.assertEqual(agents.read_text(encoding="utf-8"), "# 用户原有规则\n")
             self.assertEqual(source.read_text(encoding="utf-8"), "VALUE = 1\n")
-            self.assertTrue((project / ".agent" / "memory.md").is_file())
-            self.assertTrue((project / ".agent" / "html").is_dir())
+            self.assertFalse((project / ".agent" / "memory.md").exists())
+            self.assertFalse((project / ".agent" / "html").exists())
             self.assertTrue((project / ".agent" / "history" / "updates.md").is_file())
             self.assertEqual(index.read_text(encoding="utf-8"), "# 用户维护的项目索引\n")
             self.assertEqual(rules.read_text(encoding="utf-8"), "# 用户自定义项目规范\n\n## MUST\n\n- 保留此规则\n")
             # .agent/scripts/ 是留给目标项目自己的辅助脚本；Skill 的脚本不得复制进去，
             # 否则每个项目都会多一份会随 Skill 升级而过期的副本。
-            self.assertFalse((project / ".agent" / "scripts" / "generate_core_history.py").exists())
+            self.assertFalse((project / ".agent" / "scripts" / "project_status.py").exists())
 
     def test_new_project_explains_lifecycle_entry(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -988,7 +988,7 @@ class InitializationTests(unittest.TestCase):
             self.assertIn("阶段批准", workspace_readme)
             self.assertIn("references/workflow.md", workspace_readme)
             self.assertIn("## 模块索引", project_index)
-            self.assertIn(".agent/html/", project_index)
+            self.assertIn(".agent/specs/", project_index)
             self.assertIn("project-lifecycle.ps1 status", project_index)
             self.assertNotIn(".agent/scripts/project_status.py", project_index)
             update_history = project / ".agent" / "history" / "updates.md"

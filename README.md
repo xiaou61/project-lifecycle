@@ -2,7 +2,7 @@
 
 面向 Codex、ZCode 等 Agent 宿主的项目开发 Skill（Windows、macOS、Linux 均可用）。它把需要持久追踪的需求、决策、任务和验证证据保存到目标项目的 `.agent/`，让跨会话恢复有事实依据，同时按工作风险缩短流程。Skill 仓库自身的维护记录见 [`CHANGELOG.md`](CHANGELOG.md)。
 
-Skill 运行时入口是 `skills/project-lifecycle/SKILL.md`。详细协议按需从 `skills/project-lifecycle/references/` 读取；根目录 README 只做使用说明，不是运行时状态源。仓库的模块地图见 [VitePress 总索引](docs/reference/index.md)；项目理解型 HTML 的生成规则见 [`references/html.md`](skills/project-lifecycle/references/html.md)，实际文件只在用户同意后放入目标项目的 `.agent/html/`。
+Skill 运行时入口是 `skills/project-lifecycle/SKILL.md`。详细协议按需从 `skills/project-lifecycle/references/` 读取；根目录 README 只做使用说明，不是运行时状态源。仓库的模块地图见 [VitePress 总索引](docs/reference/index.md)。
 
 ## 什么时候使用
 
@@ -39,7 +39,6 @@ your-project/
     README.md                       工作区说明
     INDEX.md                        按模块定位代码、规格、变更和理解材料
     rules/always.md                 用户确认后的项目常驻规范
-    memory.md                       跨任务仍有效的长期记忆
     specs/                          当前共享事实、契约和边界
     changes/WORK-编号-中文名/       一次变更的需求、任务和验证
       requirements.md
@@ -49,44 +48,34 @@ your-project/
       testing/plan.md
       testing/report.md
     notes/ references/              决策理由和共享资料
-    html/                            AI 生成的项目理解型 HTML
-    history/                        更新历史和 Git 历史视图
+    history/                        更新历史
     scripts/                        项目内确定性辅助脚本
   src/                              项目原有源代码
   tests/                            项目原有可执行测试
 ```
 
-`.agent/INDEX.md` 回答“这个模块的代码、规格、变更和理解材料在哪里”，只做导航，不复制阶段状态；`.agent/html/` 保存帮助理解项目的独立 HTML。`.agent/specs/` 回答“项目现在应该怎样工作”，`.agent/changes/` 回答“这次要改什么以及怎样证明改对”。`rules/always.md` 只放经用户确认、适用于多个任务的长期规则。
+`.agent/INDEX.md` 回答“这个模块的代码、规格、变更和资料在哪里”，只做导航，不复制阶段状态。`.agent/specs/` 回答“项目现在应该怎样工作”，`.agent/changes/` 回答“这次要改什么以及怎样证明改对”。`rules/always.md` 只放经用户确认、适用于多个任务的长期规则。
 
 ## Skill 包
 
 ```text
 skills/project-lifecycle/
   SKILL.md                         运行时底线、风险路由和参考入口
-  agents/openai.yaml               Codex UI 元数据
-  references/workflow.md           唯一的详细执行与恢复协议
-  references/rules.md              规则层级、优先级和恢复边界
-  references/requirements.md       需求澄清和验收标准
+  references/workflow.md           唯一的执行、恢复与协作协议
+  references/requirements.md       需求澄清、标识关系和验收标准
   references/proposal.md           方案和取舍（full）
   references/design.md             组件、接口、数据流和失败行为（full）
   references/tasks.md              任务前置条件和执行拆分
   references/testing.md            验收矩阵、证据和剩余风险
-  references/relationships.md      依赖和关联
-  references/specs.md               稳定规格的写入边界
-  references/memory.md              长期记忆的证据和失效规则
-  references/notes.md               决策说明的写作结构、命名和失效规则
-  references/core-history.md        Git 核心组件历史视图
-  references/update-history.md      更新日志字段、本地检查点和推送边界
-  references/html.md                项目理解型 HTML 的同意与保存边界
-  examples/managed-walkthrough.md   从需求到验证的最小完整走查
+  references/update-history.md     更新日志字段、本地检查点和推送边界
+  examples/managed-walkthrough.md  从需求到验证的最小完整走查
   scripts/project-lifecycle.ps1    面向用户的统一命令入口（Windows）
   scripts/project-lifecycle.sh     面向用户的统一命令入口（macOS/Linux）
   scripts/project-lifecycle.py     命令映射与转发，上面两个入口共用
   scripts/update_history.py        更新历史与本地检查点命令实现
-  scripts/init_project.py           幂等初始化器
-  scripts/project_status.py         只读状态汇总器
-  scripts/project_validate.py       工件校验器（可选严格模式）
-  scripts/generate_core_history.py  Git 历史生成器
+  scripts/init_project.py          幂等初始化器
+  scripts/project_status.py        只读状态汇总器
+  scripts/project_validate.py      工件校验器（可选严格模式）
 ```
 
 阶段工件的字段和写法见同名参考文件。不要在项目中另建 `.agent/current.md`、`state.json` 或手工状态索引。
@@ -115,7 +104,7 @@ $lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecyc
 & $lifecycle init "F:\我的项目"
 ```
 
-初始化器是幂等的：缺少时创建资料目录、入口模板和历史脚本，保留已有 `AGENTS.md`、`.agent/`、源代码、测试和 Git 历史。它不会安装 Skill、猜测项目规则、移动旧目录、修改产品文件或创建空白工作项。
+初始化器是幂等的：缺少时创建资料目录、入口模板和更新历史文件，保留已有 `AGENTS.md`、`.agent/`、源代码、测试和 Git 历史。它不会安装 Skill、猜测项目规则、移动旧目录、修改产品文件或创建空白工作项。
 
 首次初始化后，Agent 先检查仓库并提出项目常驻规则草案；用户确认后才创建 `.agent/rules/always.md`。规则未确认前允许讨论和只读检查，但不能实现、部署、迁移或变更数据。
 
@@ -168,7 +157,7 @@ Agent 会主动给受管理需求分配不复用的中文名称和 `WORK-*` 编�
 
 状态查询返回当前阶段、工件状态、任务计数、依赖、关联、阻塞原因和下一步。`resume` 额外输出唯一可恢复工作项、建议读取路径和可复制接力句；JSON 顶层有稳定的 `schema_version` 和 `generated_at`，`git` 概览会标出脏工作区和归因状态。需要检查重复 `REQ-*`/`AC-*`/`TASK-*`、正式来源引用、结构化测试证据和项目规则时，使用 `project-lifecycle.ps1 validate`。外层工作区只返回导航提示，不承载 `WORK-*` 状态。
 
-多个对话可以通过不同 `WORK-*` 接力，但 Skill 不提供同一工作树的文件锁或自动合并。并行写入时为每个工作项使用独立分支和 Git Worktree；不能使用 Worktree 时，同一目录同一时刻只允许一个写入对话，切换前先运行 `checkpoint` 并完成 `workspace.md` 归因。详细问答见 [VitePress QA](docs/guide/qa.md)。
+多个对话可以通过不同 `WORK-*` 接力，但 Skill 不提供同一工作树的文件锁或自动合并。并行写入时为每个工作项使用独立分支和 Git Worktree；不能使用 Worktree 时，同一目录同一时刻只允许一个写入对话，切换前先运行 `checkpoint`。详细问答见 [VitePress QA](docs/guide/qa.md)。
 
 更新历史命令：`updates` 查看 `.agent/history/updates.md`，`record` 按固定字段追加一条记录，`checkpoint` 检查本地 Git 工作区是否还有未提交改动，`push-check` 用 `git ls-remote` 核对远端 HEAD 和历史记录。它们不会自动提交或推送。
 
@@ -231,6 +220,5 @@ git push origin vX.Y.Z
 ## 边界
 
 - 不替代 Git、CI、测试框架或项目管理平台。
-- 不把聊天记录、临时错误或秘密写入长期记忆。
-- 不凭提交信息猜测核心组件；核心组件必须由项目显式配置。
+- 不把聊天记录、临时错误或秘密写进项目工件。
 - 不自动批准、不自动扩大范围、不覆盖用户已有资料。

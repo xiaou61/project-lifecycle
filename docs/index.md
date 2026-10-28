@@ -21,7 +21,7 @@ features:
     details: 需求、批准、任务、测试和阻塞写入 .agent/，不用依赖旧聊天记录。
     link: /guide/full-workflow
   - title: 换个对话也能继续
-    details: 用 WORK-* 和恢复探针重新定位工作项，先处理 Git 归因，再继续当前阶段。
+    details: 用 WORK-* 和恢复探针重新定位工作项，先确认未提交改动的归属，再继续当前阶段。
     link: /guide/resume
   - title: 先把需求问透
     details: 需要详细调查时，按决策树逐轮确认关键选择，再生成 PRD 和任务计划。

@@ -4,15 +4,15 @@
 
 聊天适合推进当前动作，但会被上下文压缩、换对话和多人协作打断。项目工件保存的是可复查事实：批准状态、任务状态、测试证据、依赖和阻塞。
 
-`resume --json` 会额外返回当前 `requirements.md` 的 `goal`、`acceptance_criteria`、`constraints` 和 `goal_status`，以及 `state_evidence`、`document_budget` 作为压缩后恢复的最小任务包。它只是工件和已记录证据的结构化摘要：`documented_state` 不等于源码实时状态，`code_sync` 只有提交锚点通过才为 `verified`，否则要求重新核对。恢复时仍要读取 `read_paths` 中的原文并核对任务、Git 差异和测试。目标或验收缺失会提示警告，不会从聊天摘要或长期记忆臆造。
+`resume --json` 会额外返回当前 `requirements.md` 的 `goal`、`acceptance_criteria`、`constraints` 和 `goal_status`，以及 `state_evidence`、`document_budget` 作为压缩后恢复的最小任务包。它只是工件和已记录证据的结构化摘要：`documented_state` 不等于源码实时状态，`code_sync` 只有提交锚点通过才为 `verified`，否则要求重新核对。恢复时仍要读取 `read_paths` 中的原文并核对任务、Git 差异和测试。目标或验收缺失会提示警告，不会从聊天摘要臆造。
 
 ## 为什么“继续”不能自动批准
 
 “继续”“开始做”“执行 `WORK-*`”表达的是动作意图，不一定表示用户已经确认需求、方案或设计。把动作意图当批准会让 Agent 在范围未锁定时修改代码。
 
-## 为什么脏 Git 工作区要先归因
+## 为什么脏 Git 工作区不能直接继续
 
-未提交改动可能来自当前工作项，也可能来自用户正在进行的另一项工作。恢复时自动把所有改动归给当前工作项，会把未知事实变成错误前提；自动清理则有数据丢失风险。
+未提交改动可能来自当前工作项，也可能来自用户正在进行的另一项工作。恢复时自动把所有改动归给当前工作项，会把未知事实变成错误前提；自动清理则有数据丢失风险。因此恢复本身不被脏工作区阻塞，但改代码前只问一次要不要开独立 worktree，未知归属的改动保持原样。
 
 ## 为什么来源覆盖是可选的
 
@@ -24,7 +24,7 @@ Project Lifecycle 只需要项目内工件和一个只读 Python 检查器。运
 
 ## 三档模式和严格校验有什么区别
 
-`lite`、`managed`、`strict` 是工作风险路由：分别对应短路径、精简持久追踪和完整阶段。`project-lifecycle.ps1 status/resume` 只查询状态和恢复上下文；`validate` 检查工件、来源、证据和归因并保留警告；`validate --strict` 才把兼容性警告视为失败。严格模式主要增加记录和批准门槛，不自动增加测试数量。
+`lite`、`managed`、`strict` 是工作风险路由：分别对应短路径、精简持久追踪和完整阶段。`project-lifecycle.ps1 status/resume` 只查询状态和恢复上下文；`validate` 检查工件、来源、证据和归档引用并保留警告；`validate --strict` 才把兼容性警告视为失败。严格模式主要增加记录和批准门槛，不自动增加测试数量。
 
 ## `passed` 是不是业务验收通过
 
@@ -38,12 +38,6 @@ Project Lifecycle 只需要项目内工件和一个只读 Python 检查器。运
 
 - 教程站的[总索引](/reference/)说明这个 Skill 仓库各模块改哪里、到哪里验证。
 - 多仓库外层的 `.agent/PROJECT-INDEX.md` 只负责从一个工作区导航到真实项目。
-- 每个项目自己的 `.agent/INDEX.md` 按业务模块定位源码、测试、规格、工作项和 HTML 理解材料。
+- 每个项目自己的 `.agent/INDEX.md` 按业务模块定位源码、测试、规格和工作项。
 
 三者都只做导航，不保存阶段、批准、任务进度或测试结果。
-
-## 理解型 HTML 放在哪里
-
-`skills/project-lifecycle/` 是可复用的 Skill 本体，里面的 `references/html.md` 只规定 HTML 理解材料何时生成、如何保存和不能替代什么；它不保存某个项目的图。
-
-初始化目标项目时，Skill 会预建空的 `.agent/html/`。只有用户明确同意生成某份架构图、流程演示或状态解释后，Agent 才把实际 HTML 写入该项目的 `.agent/html/`，并登记到 `.agent/INDEX.md`。`docs/` 是正式 VitePress 教程，`output/` 是可交付产物，二者都不是项目理解材料的默认存放处。

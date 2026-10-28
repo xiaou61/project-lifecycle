@@ -17,7 +17,6 @@ COMMANDS = {
     "brief": ("project_status.py", ["--brief"]),
     "resume": ("project_status.py", ["--resume"]),
     "validate": ("project_validate.py", []),
-    "history": ("generate_core_history.py", []),
     "updates": ("update_history.py", ["--list"]),
     "record": ("update_history.py", ["--record"]),
     "approve": ("update_history.py", ["--approve"]),

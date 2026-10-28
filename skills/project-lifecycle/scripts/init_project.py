@@ -16,7 +16,6 @@ WORKSPACE_DIRS = (
     "rules",
     "references",
     "notes",
-    "html",
     "history",
     "scripts",
 )
@@ -32,18 +31,16 @@ WORKSPACE_README = """# .agent 项目工作区
 
 ```text
 .agent/
-  INDEX.md                  按模块定位代码、规格、变更和理解材料
-  memory.md                 跨任务仍有效的长期记忆
+  INDEX.md                  按模块定位代码、规格、变更和资料
   rules/always.md           用户确认后的项目常驻规范
   specs/                    多个工作项共享的当前事实
   changes/WORK-编号-中文名/  受管理需求的生命周期工件
   notes/ references/        决策理由与共享资料
-  html/                     用户同意后生成的项目理解型 HTML
-  history/                  更新历史与 Git 历史视图
+  history/                  更新历史
   scripts/                  项目内确定性辅助脚本（不放 Skill 状态脚本）
 ```
 
-`specs/` 保存当前共享事实，`changes/` 保存一次变更的依据、任务和验证；`history/updates.md` 追加每轮变更、决策、依据、验证和本地提交边界，`history/core-components.md` 是 Git 历史的生成视图；源代码与可执行测试仍在项目原有目录。`always.md` 只保存经用户确认且适用于多个任务的长期规则，单次约束写在对应 `requirements.md`。`html/` 只在用户明确同意后写入理解材料，空目录本身不表示已批准。
+`specs/` 保存当前共享事实，`changes/` 保存一次变更的依据、任务和验证；`history/updates.md` 追加每轮变更、决策、依据、验证和本地提交边界。源代码与可执行测试仍在项目原有目录。`always.md` 只保存经用户确认且适用于多个任务的长期规则，单次约束写在对应 `requirements.md`。
 
 
 直接用自然语言开始、确认、继续或查询状态即可。`WORK-*` 只用于跨对话定位，不代表阶段批准；恢复顺序、门槛、澄清、验证和完成语义统一见已安装 Skill 的 `references/workflow.md`。
@@ -66,9 +63,7 @@ status: active
 | 当前稳定规格 | `.agent/specs/` |
 | 需求与变更依据 | `.agent/changes/WORK-编号-中文名/` |
 | 决策说明与共享资料 | `.agent/notes/`、`.agent/references/` |
-| 长期记忆 | `.agent/memory.md` |
-| 项目理解型 HTML | `.agent/html/` |
-| 更新历史与 Git 历史视图 | `.agent/history/updates.md`、`.agent/history/core-components.md` |
+| 更新历史 | `.agent/history/updates.md` |
 
 ## 模块索引
 
@@ -78,12 +73,6 @@ status: active
 | --- | --- | --- | --- | --- |
 
 当前尚未登记项目模块。
-
-## HTML 理解材料
-
-将用于解释架构、流程、状态机、数据流或交互的独立 HTML 放在 `.agent/html/`，但必须先取得用户明确同意。初始化器只创建空目录；新增保留文件后，在这里补充名称、用途和相对路径；这类材料不替代源码、测试或批准工件。
-
-当前暂无 HTML 理解材料。
 
 ## 查看一次变更
 
@@ -131,21 +120,6 @@ AGENTS_TEMPLATE = """# 项目协作说明
 若未发现 `$project-lifecycle`，请先说明 Skill 未安装。
 """
 
-MEMORY_TEMPLATE = """# 项目长期记忆
-
-本文件只记录会影响后续多个任务、并且当前仍有使用价值的项目知识。它不是聊天记录、任务日志或待办清单。
-
-- 使用 `rg -n "^## MEM-" .agent/memory.md` 列出全部记忆。
-- 使用 `rg -n -i -C 6 "关键词|标签" .agent/memory.md` 查找相关记忆。
-- `active` 表示当前有效，`stale` 表示需要复核，`superseded` 表示已有替代条目。
-- 详细决策理由放入 `.agent/notes/`，共享资料放入 `.agent/references/`。
-
-## 记忆条目
-
-当前暂无长期记忆。
-"""
-
-
 def create_text_if_missing(path: Path, content: str) -> str:
     if path.exists():
         if not path.is_file():
@@ -181,7 +155,6 @@ def main() -> int:
             (
                 workspace / "README.md",
                 workspace / "INDEX.md",
-                workspace / "memory.md",
                 workspace / "rules" / "always.md",
                 workspace / "history" / "updates.md",
             ),
@@ -195,7 +168,6 @@ def main() -> int:
         agents_status = create_text_if_missing(agents_path, AGENTS_TEMPLATE)
         readme_status = create_text_if_missing(workspace / "README.md", WORKSPACE_README)
         index_status = create_text_if_missing(workspace / "INDEX.md", INDEX_TEMPLATE)
-        memory_status = create_text_if_missing(workspace / "memory.md", MEMORY_TEMPLATE)
         history_status = create_text_if_missing(
             workspace / "history" / "updates.md", UPDATE_HISTORY_TEMPLATE
         )
@@ -207,7 +179,6 @@ def main() -> int:
     print(f"{agents_status}：{agents_path}")
     print(f"{readme_status}：{workspace / 'README.md'}")
     print(f"{index_status}：{workspace / 'INDEX.md'}")
-    print(f"{memory_status}：{workspace / 'memory.md'}")
     print(f"{history_status}：{workspace / 'history' / 'updates.md'}")
     rules_path = workspace / "rules" / "always.md"
     if rules_path.is_file():

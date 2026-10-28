@@ -3,7 +3,7 @@ name: project-lifecycle
 description: 用户说“写需求”“把需求问透”“拆任务”“验收”“继续上次的活”“归档”“看项目状态”时使用；把需求、决策、任务和验证证据写入项目 `.agent/` 工件，支持需求访谈、PRD/任务拆解、审批签署、跨会话恢复和更新历史。适用于需要跨会话追踪、多人协作或有明显风险的开发工作；一次性问答、纯代码审查、边界清楚的单文件小修复不创建完整工作项。
 license: MIT
 metadata:
-  version: "0.0.4"
+  version: "0.0.5"
 ---
 
 # Project Lifecycle
@@ -14,26 +14,17 @@ metadata:
 
 命令入口：Windows 用 `scripts/project-lifecycle.ps1`，macOS/Linux 用 `scripts/project-lifecycle.sh`（或 `python3 scripts/project-lifecycle.py`）；三者共用 `project-lifecycle.py` 里的命令映射。下文用 `$lifecycle` 指代该入口，按当前宿主的 Skill 安装位置解析，例如 Codex 的 `$env:USERPROFILE\.codex\skills\`、ZCode 的 `$env:USERPROFILE\.agents\skills\`，不要把某个宿主的绝对路径写进项目规则。
 
-## 每轮顺序
-
-1. **确定项目**：多仓库先读外层 `PROJECT-INDEX.md`；再读目标项目的 `AGENTS.override.md`、`AGENTS.md`。
-2. **恢复规范**：读 `.agent/rules/always.md`。缺失、草案或冲突时先提草案；实现、部署、迁移、数据变更要等确认。
-3. **查状态**：默认用 `$lifecycle brief <项目> --json`。它只返回活动工作项、阻塞和下一步（约 3 KB）；要完整清单、签署历史或已归档项时用 `status`，要单工作项上下文用 `resume`。
-4. **定位依据**：按编号或中文名选中工作项，读它的 `requirements.md`，再按当前阶段读已批准的上游工件。
-5. **过门槛做一个动作**：核对规范、签署、硬依赖和关系影响，然后讨论、写工件、改代码、验证，或停在真实确认点。即将改源码前看 `resume` 给出的 `worktree.decision`：`active`/`proceed` 直接做，只有 `ask_user`（工作区有未提交改动）才问一次要不要开独立 worktree（判据见 `references/workflow.md` 的「开始实施前询问 Worktree」）。
-6. **同步事实**：按实际结果更新工件与任务状态，追加 `.agent/history/updates.md`；需要接力时输出状态块。
-
-任务计划批准后，可以按序连续执行到每个任务自己的验证为止，不必每完成一个任务就停下来汇报；范围变化、验证失败或遇到新决策点时再停。
+每轮动作、恢复顺序、阶段门槛、签署、关系、规则优先级、规格与决策说明、归档和更新历史统一维护在 `references/workflow.md`，本页不重复。查状态默认用 `$lifecycle brief <项目> --json`（约 3 KB）；要完整清单、签署历史或已归档项时用 `status`，要单工作项上下文用 `resume`。
 
 ## 三条不可让路的底线
 
 - **不代签**：`approved_by`、`approved_at`、`approver_role`、`accepted_by`、`accepted_at` 只能由 `$lifecycle approve` 写入，模型不得自行填写——那等于替用户签字。
-- **无证据不算通过**：没有新鲜跑过的命令输出，就不许声称完成；跳过的测试不等于通过；修缺陷要有"去掉修复会红"的反向验证。每条结论对应的命令与判据见 `references/testing.md` 的"完成前的硬门"。
+- **无证据不算通过**：没有新鲜跑过的命令输出，就不许声称完成；跳过的测试不等于通过；修缺陷要有“去掉修复会红”的反向验证。每条结论对应的命令与判据见 `references/testing.md` 的“完成前的硬门”。
 - **范围变了回最早工件**：目标、验收、公共行为、接口、数据、安全、部署或架构发生实质变化时，回到最早受影响的工件并使下游失效，不能只在任务层面消化。
 
 ## 写任务
 
-拆任务前读 `references/tasks.md` 的计划质量门，最常被跳过的三条：接口块要字面一致（相邻任务的函数名、参数、返回类型），评审焦点要把规格暗示的失败模式指到具体任务与测试名，步骤必须是"一个动作一个可检查结果"。
+拆任务前读 `references/tasks.md` 的计划质量门，最常被跳过的三条：接口块要字面一致（相邻任务的函数名、参数、返回类型），评审焦点要把规格暗示的失败模式指到具体任务与测试名，步骤必须是“一个动作一个可检查结果”。
 
 ## 风险路由
 
@@ -43,7 +34,7 @@ metadata:
 | 需要持久追踪的普通功能 | `managed` | `WORK-*` + `workflow: compact`，保留需求、任务和验证 | 按验收矩阵执行，不因模式自动增加测试 |
 | 新项目、跨模块、公共接口、数据、安全、迁移或架构 | `strict` | `WORK-*` + `workflow: full`，需求 -> 方案 -> 设计 -> 任务 -> 实现 -> 验证 | 最窄可信检查；严格校验是工件门槛，不等于更多测试 |
 
-模式只在开始时判断一次；风险上升时只能升级，不能用低模式绕过公共接口、数据、安全、迁移、部署或架构门槛。判断依据写进 `requirements.md` 的 `mode_reason`，不要写成"因为重要"。
+模式只在开始时判断一次；风险上升时只能升级，不能用低模式绕过公共接口、数据、安全、迁移、部署或架构门槛。判断依据写进 `requirements.md` 的 `mode_reason`，不要写成“因为重要”。
 
 旧工件没有 `mode` 时按 `workflow: compact -> managed`、`workflow: full -> strict` 兼容推导。`lite` 不要求创建 `requirements.md`；若已经存在工作项，显式模式必须补 `mode_reason`。
 
@@ -59,11 +50,9 @@ metadata:
 | “把 WORK-003 标成通过” | 没有新鲜测试输出时拒绝，按 `references/testing.md` 的硬门要证据 |
 | “这个需求变了，先不管旧方案” | 范围变了回最早受影响的工件，不能让下游悄悄失效 |
 
-自然语言到工件结果的完整映射、恢复顺序、澄清边界、阶段门槛、关系和完成语义只维护在 `references/workflow.md`；本页只列最常见的触发与不触发边界，各阶段写法按需读取对应参考文件。出现歧义、冲突或跨对话接力时再打开它，不必每轮通读。
-
 ## 用户入口
 
-`$lifecycle <init|status|brief|resume|validate|history|updates|record|approve|archive|checkpoint|push-check>`，自然语言表达即可，入口与动作的对应关系见 `references/workflow.md` 的"用户如何触发"。不要要求普通用户直接运行 Python 文件。
+`$lifecycle <init|status|brief|resume|validate|updates|record|approve|archive|checkpoint|push-check>`，自然语言表达即可，入口与动作的对应关系见 `references/workflow.md` 的“用户如何触发”。不要要求普通用户直接运行 Python 文件。
 
 三个不直观的点：`validate` 只有显式 `--strict` 才把兼容性警告视为失败；`approve` 是唯一能写签署字段的入口（`--artifact all` 一次签完已存在的阶段工件）；`archive` 只移动目录、不改内容。`compact`、`full` 和需求深挖是兼容字段或参考协议，不拆成会互相抢触发的重复 Skill。
 
@@ -71,9 +60,8 @@ metadata:
 
 `requirements.md`、`tasks.md`、`testing.md`、`workflow.md` 顶部都有「常见借口与反驳」表，进入该阶段前先扫一眼。
 
-- **协议**：`references/workflow.md` 是唯一的恢复、批准、漂移、依赖、验证和完成协议；出现歧义、冲突或跨对话接力时读。
-- **阶段工件**：`requirements.md`、`proposal.md`、`design.md`、`tasks.md`、`testing.md`。
-- **专项**：`requirements-interview.md`（需求深挖）、`relationships.md`（标识与关系）、`rules.md`（分层规范）、`specs.md`（稳定规格）、`memory.md`、`notes.md`（决策理由）、`core-history.md`、`update-history.md`（更新日志与推送边界）、`html.md`（理解型 HTML）。
+- **协议**：`references/workflow.md` 是唯一的恢复、批准、漂移、依赖、规则层级、规格和决策说明、验证、完成协议；出现歧义、冲突或跨对话接力时读。
+- **阶段工件**：`references/requirements.md`（含需求深挖）、`references/proposal.md`、`references/design.md`、`references/tasks.md`、`references/testing.md`、`references/update-history.md`（更新日志与推送边界）。
 - **示例**：`examples/managed-walkthrough.md`，首次执行或工件写法拿不准时读。
 - **实现**：底层 Python 脚本属于 Skill 内部实现，一律通过 `$lifecycle` 调用，不从目标项目 `.agent/scripts/` 查找。
 - **自检**：在 Skill 仓库根运行 `python -m unittest discover -s tests -p "test_*.py"`；至少 1 条测试，`Ran 0 tests` 不算通过。
