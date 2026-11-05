@@ -1,6 +1,6 @@
 ---
 name: project-lifecycle
-description: 用户说“写需求”“把需求问透”“拆任务”“验收”“继续上次的活”“归档”“看项目状态”时使用；把需求、决策、任务和验证证据写入项目 `.agent/` 工件，支持需求访谈、PRD/任务拆解、审批签署、跨会话恢复和更新历史。适用于需要跨会话追踪、多人协作或有明显风险的开发工作；一次性问答、纯代码审查、边界清楚的单文件小修复不创建完整工作项。
+description: 用户说“写需求”“把需求问透”“拆任务”“验收”“继续上次的活”“归档”“看项目状态”时使用；把需求、决策、任务和验证证据写入项目 `.agent/` 工件，支持需求访谈、PRD/任务拆解、审批签署和跨会话恢复。适用于需要跨会话追踪、多人协作或有明显风险的开发工作；一次性问答、纯代码审查、边界清楚的单文件小修复不创建完整工作项。
 license: MIT
 metadata:
   version: "0.0.5"
@@ -14,7 +14,7 @@ metadata:
 
 命令入口：Windows 用 `scripts/project-lifecycle.ps1`，macOS/Linux 用 `scripts/project-lifecycle.sh`（或 `python3 scripts/project-lifecycle.py`）；三者共用 `project-lifecycle.py` 里的命令映射。下文用 `$lifecycle` 指代该入口，按当前宿主的 Skill 安装位置解析，例如 Codex 的 `$env:USERPROFILE\.codex\skills\`、ZCode 的 `$env:USERPROFILE\.agents\skills\`，不要把某个宿主的绝对路径写进项目规则。
 
-每轮动作、恢复顺序、阶段门槛、签署、关系、规则优先级、规格与决策说明、归档和更新历史统一维护在 `references/workflow.md`，本页不重复。查状态默认用 `$lifecycle brief <项目> --json`（约 3 KB）；要完整清单、签署历史或已归档项时用 `status`，要单工作项上下文用 `resume`。
+每轮动作、恢复顺序、阶段门槛、签署、关系、规则优先级、规格与决策说明、归档统一维护在 `references/workflow.md`，本页不重复。查状态默认用 `$lifecycle brief <项目> --json`（约 3 KB）；要完整清单、签署历史或已归档项时用 `status`，要单工作项上下文用 `resume`。
 
 ## 三条不可让路的底线
 
@@ -30,7 +30,7 @@ metadata:
 
 | 工作 | 模式 | 必要记录 | 允许的验证 |
 | --- | --- | --- | --- |
-| 单文件、低风险、边界明确 | `lite` | 聊天与更新历史（若有项目历史），不创建完整 `WORK-*` | 能证明本次改动的最窄检查 |
+| 单文件、低风险、边界明确 | `lite` | 聊天，不创建完整 `WORK-*` | 能证明本次改动的最窄检查 |
 | 需要持久追踪的普通功能 | `managed` | `WORK-*` + `workflow: compact`，保留需求、任务和验证 | 按验收矩阵执行，不因模式自动增加测试 |
 | 新项目、跨模块、公共接口、数据、安全、迁移或架构 | `strict` | `WORK-*` + `workflow: full`，需求 -> 方案 -> 设计 -> 任务 -> 实现 -> 验证 | 最窄可信检查；严格校验是工件门槛，不等于更多测试 |
 
@@ -52,7 +52,7 @@ metadata:
 
 ## 用户入口
 
-`$lifecycle <init|status|brief|resume|validate|updates|record|approve|archive|checkpoint|push-check>`，自然语言表达即可，入口与动作的对应关系见 `references/workflow.md` 的“用户如何触发”。不要要求普通用户直接运行 Python 文件。
+`$lifecycle <init|status|brief|resume|validate|approve|archive>`，自然语言表达即可，入口与动作的对应关系见 `references/workflow.md` 的“用户如何触发”。不要要求普通用户直接运行 Python 文件。变更历史以 Git 提交为准，不维护按轮追加的项目历史文件。
 
 三个不直观的点：`validate` 只有显式 `--strict` 才把兼容性警告视为失败；`approve` 是唯一能写签署字段的入口（`--artifact all` 一次签完已存在的阶段工件）；`archive` 只移动目录、不改内容。`compact`、`full` 和需求深挖是兼容字段或参考协议，不拆成会互相抢触发的重复 Skill。
 
@@ -61,7 +61,7 @@ metadata:
 `requirements.md`、`tasks.md`、`testing.md`、`workflow.md` 顶部都有「常见借口与反驳」表，进入该阶段前先扫一眼。
 
 - **协议**：`references/workflow.md` 是唯一的恢复、批准、漂移、依赖、规则层级、规格和决策说明、验证、完成协议；出现歧义、冲突或跨对话接力时读。
-- **阶段工件**：`references/requirements.md`（含需求深挖）、`references/proposal.md`、`references/design.md`、`references/tasks.md`、`references/testing.md`、`references/update-history.md`（更新日志与推送边界）。
+- **阶段工件**：`references/requirements.md`（含需求深挖）、`references/proposal.md`、`references/design.md`、`references/tasks.md`、`references/testing.md`。
 - **示例**：`examples/managed-walkthrough.md`，首次执行或工件写法拿不准时读。
 - **实现**：底层 Python 脚本属于 Skill 内部实现，一律通过 `$lifecycle` 调用，不从目标项目 `.agent/scripts/` 查找。
 - **自检**：在 Skill 仓库根运行 `python -m unittest discover -s tests -p "test_*.py"`；至少 1 条测试，`Ran 0 tests` 不算通过。

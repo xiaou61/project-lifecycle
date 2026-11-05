@@ -16,7 +16,6 @@ WORKSPACE_DIRS = (
     "rules",
     "references",
     "notes",
-    "history",
     "scripts",
 )
 
@@ -36,11 +35,10 @@ WORKSPACE_README = """# .agent 项目工作区
   specs/                    多个工作项共享的当前事实
   changes/WORK-编号-中文名/  受管理需求的生命周期工件
   notes/ references/        决策理由与共享资料
-  history/                  更新历史
   scripts/                  项目内确定性辅助脚本（不放 Skill 状态脚本）
 ```
 
-`specs/` 保存当前共享事实，`changes/` 保存一次变更的依据、任务和验证；`history/updates.md` 追加每轮变更、决策、依据、验证和本地提交边界。源代码与可执行测试仍在项目原有目录。`always.md` 只保存经用户确认且适用于多个任务的长期规则，单次约束写在对应 `requirements.md`。
+`specs/` 保存当前共享事实，`changes/` 保存一次变更的依据、任务和验证；变更历史以 Git 提交信息为准。源代码与可执行测试仍在项目原有目录。`always.md` 只保存经用户确认且适用于多个任务的长期规则，单次约束写在对应 `requirements.md`。
 
 
 直接用自然语言开始、确认、继续或查询状态即可。`WORK-*` 只用于跨对话定位，不代表阶段批准；恢复顺序、门槛、澄清、验证和完成语义统一见已安装 Skill 的 `references/workflow.md`。
@@ -63,7 +61,6 @@ status: active
 | 当前稳定规格 | `.agent/specs/` |
 | 需求与变更依据 | `.agent/changes/WORK-编号-中文名/` |
 | 决策说明与共享资料 | `.agent/notes/`、`.agent/references/` |
-| 更新历史 | `.agent/history/updates.md` |
 
 ## 模块索引
 
@@ -86,23 +83,6 @@ status: active
 | 交付后项目应保持什么行为 | `.agent/specs/` |
 """
 
-UPDATE_HISTORY_TEMPLATE = """---
-artifact: update-history
-status: active
-schema_version: 1
----
-
-# 项目更新历史
-
-这里按时间顺序追加每轮实际变更、关键决策、依据、验证结果和 Git 边界。新记录标题精确到秒并带本地 numeric 时区；它是面向人阅读的项目时间线，不替代 `.agent/changes/` 工件或 Git 历史。
-
-记录格式见已安装 Skill 的 `references/update-history.md`。每条记录至少包含变更、决策、依据、验证、本地提交和远端推送字段；没有实际持久化改动的聊天不追加；不要删除或覆盖旧记录。
-
-## 记录
-
-当前暂无更新记录。
-"""
-
 AGENTS_TEMPLATE = """# 项目协作说明
 
 本项目使用已安装的 `project-lifecycle` Skill 管理需要持久追踪、多人协作或有明显风险的工作。
@@ -115,7 +95,7 @@ AGENTS_TEMPLATE = """# 项目协作说明
 - 只有受管理需求创建 `WORK-*`；阶段批准、澄清、漂移、验证和完成语义统一遵循 Skill 的 `references/workflow.md`。
 - 未完成硬依赖阻断实现和验收；重大范围、接口、数据、安全、部署或架构变化回到最早受影响工件。
 - 规则未确认前不得进行实现、部署、迁移或数据变更；验证结果必须据实记录。
-- 每次实际修改后追加 `.agent/history/updates.md`，记录变更、决策、依据、验证和本地提交边界；远端 `push` 必须得到用户明确授权。
+- 变更历史以 Git 提交信息为准；远端 `push` 必须得到用户明确授权。
 
 若未发现 `$project-lifecycle`，请先说明 Skill 未安装。
 """
@@ -156,7 +136,6 @@ def main() -> int:
                 workspace / "README.md",
                 workspace / "INDEX.md",
                 workspace / "rules" / "always.md",
-                workspace / "history" / "updates.md",
             ),
             "文件",
         )
@@ -168,9 +147,6 @@ def main() -> int:
         agents_status = create_text_if_missing(agents_path, AGENTS_TEMPLATE)
         readme_status = create_text_if_missing(workspace / "README.md", WORKSPACE_README)
         index_status = create_text_if_missing(workspace / "INDEX.md", INDEX_TEMPLATE)
-        history_status = create_text_if_missing(
-            workspace / "history" / "updates.md", UPDATE_HISTORY_TEMPLATE
-        )
     except (OSError, RuntimeError) as error:
         print(f"初始化失败：{error}", file=sys.stderr)
         return 2
@@ -179,7 +155,6 @@ def main() -> int:
     print(f"{agents_status}：{agents_path}")
     print(f"{readme_status}：{workspace / 'README.md'}")
     print(f"{index_status}：{workspace / 'INDEX.md'}")
-    print(f"{history_status}：{workspace / 'history' / 'updates.md'}")
     rules_path = workspace / "rules" / "always.md"
     if rules_path.is_file():
         print(f"保留：{rules_path}")

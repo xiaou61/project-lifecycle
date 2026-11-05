@@ -26,7 +26,7 @@ SEVERE_WARNING_MARKERS = (
     "没有任何一个能被解析",
 )
 ARCHIVE_DATE_PREFIX = re.compile(r"^\d{4}-\d{2}-\d{2}-(.+)$")
-# 归档前的历史记录不回改：updates.md 是追加式时间线，改写它会伪造当时的事实。
+# 归档前的追加式历史目录不回改，改写它会伪造当时的事实。
 ARCHIVE_LINK_EXEMPT_DIRS = ("history",)
 
 

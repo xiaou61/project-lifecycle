@@ -636,7 +636,7 @@ def verification_anchor(work_dir: Path, git: dict[str, object]) -> dict[str, obj
     if not head:
         result["reason"] = "当前无法读取 HEAD，不能核对验证锚点。"
         return result
-    # 未提交改动按路径判断：并发的 .agent/ 工件写入（签署、更新历史、审查报告）
+    # 未提交改动按路径判断：并发的 .agent/ 工件写入（签署、审查报告）
     # 不代表源码变了，不该把全部历史工作项打成 stale。
     entries = git.get("entries") or []
     dirty_sources = [
@@ -1538,7 +1538,7 @@ def workspace_attribution_status(work_dir: Path, git: dict[str, object]) -> dict
     就过期，在有并发写入时几乎立刻失效。实测收益远小于维护成本。
 
     停用后：未提交改动仍由 Git 自己记录；"只提交当前工作项的文件、不碰用户已有与
-    未知归属的改动"这条纪律不变（见 references/update-history.md）。旧项目里已有的
+    未知归属的改动"这条纪律不变（见下文说明）。旧项目里已有的
     `workspace.md` 不再被校验，也不再阻止恢复。
 
     保留函数与返回结构，使 status / resume 的调用点无需改动；无条件返回 not_required。
