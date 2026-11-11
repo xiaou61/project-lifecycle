@@ -70,6 +70,13 @@ def validate_artifact_sections(item: dict[str, object], warnings: list[dict[str,
         if missing_decisions:
             warnings.append(issue(work_id, "requirements.md 缺少决策分层章节：" + "、".join(missing_decisions) + "。"))
 
+    design = work_dir / "design.md"
+    if design.is_file() and item["artifacts"].get("design") == "approved":
+        if not heading_present(design.read_text(encoding="utf-8-sig"), "变更清单"):
+            warnings.append(
+                issue(work_id, "design.md 已批准但缺少“## 变更清单”章节：审批者看不出这次增删改了什么、被删的由谁取代。")
+            )
+
     for artifact_name, status in item["artifacts"].items():
         if status == "unknown":
             errors.append(issue(work_id, f"{artifact_name} 工件存在但 frontmatter status 无法识别。"))
