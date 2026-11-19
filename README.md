@@ -1,5 +1,9 @@
 # Project Lifecycle Skill
 
+![CI](https://github.com/xiaou61/project-lifecycle/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 面向 Codex、ZCode 等 Agent 宿主的项目开发 Skill（Windows、macOS、Linux 均可用）。它把需要持久追踪的需求、决策、任务和验证证据保存到目标项目的 `.agent/`，让跨会话恢复有事实依据，同时按工作风险缩短流程。Skill 仓库自身的维护记录见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 Skill 运行时入口是 `skills/project-lifecycle/SKILL.md`。详细协议按需从 `skills/project-lifecycle/references/` 读取；根目录 README 只做使用说明，不是运行时状态源。仓库的模块地图见 [VitePress 总索引](docs/reference/index.md)。
@@ -103,7 +107,7 @@ $lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecyc
 & $lifecycle init "F:\我的项目"
 ```
 
-初始化器是幂等的：缺少时创建资料目录、入口模板和更新历史文件，保留已有 `AGENTS.md`、`.agent/`、源代码、测试和 Git 历史。它不会安装 Skill、猜测项目规则、移动旧目录、修改产品文件或创建空白工作项。
+初始化器是幂等的：缺少时创建资料目录和入口模板，保留已有 `AGENTS.md`、`.agent/`、源代码、测试和 Git 历史。它不会安装 Skill、猜测项目规则、移动旧目录、修改产品文件或创建空白工作项。
 
 首次初始化后，Agent 先检查仓库并提出项目常驻规则草案；用户确认后才创建 `.agent/rules/always.md`。规则未确认前允许讨论和只读检查，但不能实现、部署、迁移或变更数据。
 
@@ -185,20 +189,33 @@ npm run pack                                                 # 打包 Windows ex
 
 exe 内置一份 Skill 脚本副本，目标机器需要 Python 3.9+；详见 [desktop/README.md](desktop/README.md)。
 
+## 文档
+
+- 模块地图与维护者检查清单：[docs/reference/index.md](docs/reference/index.md)
+- `status --json` 字段契约（`schema_version = "2"`）：[docs/reference/status-schema.md](docs/reference/status-schema.md)
+- 命令参考：[docs/reference/commands.md](docs/reference/commands.md)
+- 全流程教程与 QA：[docs/guide/full-workflow.md](docs/guide/full-workflow.md)、[docs/guide/qa.md](docs/guide/qa.md)
+- 设计决策记录：[wiki/](wiki/README.md)
+- 维护变更历史：[CHANGELOG.md](CHANGELOG.md)
+
 ## 开发与发布
 
-维护者提交前至少运行：
+维护者提交前至少运行（本地需 `pip install ruff mypy`）：
 
 ```powershell
-python -m unittest discover -s tests -p "test_*.py" -v
+python -m unittest discover -s tests -p "test_*.py" -v        # 当前 81 条
+python -m ruff check skills/project-lifecycle/scripts tests   # 静态检查 E4/E7/E9/F/W
+python -m mypy skills/project-lifecycle/scripts/project_status.py   # 核心引擎类型
 python -m compileall -q skills/project-lifecycle/scripts
 python -X utf8 skills/project-lifecycle/scripts/project_validate.py "F:\我的项目" --strict
 git diff --check
 ```
 
+CI（`.github/workflows/ci.yml`）在 Python 3.9/3.11/3.13 上跑测试，另有 `lint`（ruff + mypy）、`docs`（VitePress 构建）、`desktop`（tsc 编译）三个 job。
+
 用户任务默认不增加通用冒烟测试；只按验收矩阵执行最窄可信检查。冒烟测试只有在用户、项目常驻规则或已批准测试计划明确要求时才运行，并记录到测试计划和验证报告。
 
-当前发布基线为 `v0.0.2`（`v0.0.1` 为首个发布基线）。后续版本按兼容性使用 `PATCH`、`MINOR`、`MAJOR`；在 `v1.0.0` 前使用 `v0.MINOR.PATCH`。不兼容的 `.agent/` 结构、状态语义或初始化行为必须在 GitHub Release 中说明迁移和回滚方式。
+最新发布 tag 为 `v0.0.3`（`v0.0.1` 为首个发布基线）。后续版本按兼容性使用 `PATCH`、`MINOR`、`MAJOR`；在 `v1.0.0` 前使用 `v0.MINOR.PATCH`。不兼容的 `.agent/` 结构、状态语义或初始化行为必须在 GitHub Release 中说明迁移和回滚方式。
 
 最小发布流程：
 
@@ -208,7 +225,7 @@ git push origin main
 git push origin vX.Y.Z
 ```
 
-后续正常发布顺序是：在 `main` 上完成测试和变更记录，创建不可移动的版本 tag，依次推送 `main` 和 tag，再在 GitHub 创建对应 Release。`v0.0.1` 和 `v0.0.2` 均已发布，不重复覆盖或移动。
+后续正常发布顺序是：在 `main` 上完成测试和变更记录，创建不可移动的版本 tag，依次推送 `main` 和 tag，再在 GitHub 创建对应 Release。`v0.0.1`、`v0.0.2`、`v0.0.3` 均已发布，不重复覆盖或移动。
 
 公开 tag 不移动、不覆盖。升级前先阅读 Release 说明；初始化器不是迁移器，存在不兼容结构时在独立分支手工迁移并重新验证。
 
@@ -217,3 +234,7 @@ git push origin vX.Y.Z
 - 不替代 Git、CI、测试框架或项目管理平台。
 - 不把聊天记录、临时错误或秘密写进项目工件。
 - 不自动批准、不自动扩大范围、不覆盖用户已有资料。
+
+## 许可证
+
+[MIT](LICENSE) © 2026 project-lifecycle 贡献者。
