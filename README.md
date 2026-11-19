@@ -71,7 +71,9 @@ skills/project-lifecycle/
   scripts/project-lifecycle.sh     面向用户的统一命令入口（macOS/Linux）
   scripts/project-lifecycle.py     命令映射与转发，上面两个入口共用
   scripts/init_project.py          幂等初始化器
-  scripts/project_status.py        只读状态汇总器
+  scripts/project_status.py        只读状态汇总器（编排与渲染）
+  scripts/status_schema.py         常量：schema_version、阶段/状态标签、追踪与任务正则
+  scripts/status_parsing.py        文本/任务解析：frontmatter、任务状态、Markdown 表格
   scripts/project_validate.py      工件校验器（可选严格模式）
 ```
 

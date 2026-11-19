@@ -2,6 +2,16 @@
 
 本文件记录 `project-lifecycle` Skill 仓库本身的维护变更；目标项目的逐轮记录以 Git 提交为准，不再维护 `.agent/history/updates.md`。Git 提交是可回滚事实源。
 
+## 2026-11-19（P2）· project_status.py 物理拆分（schema / parsing 分层），入口契约不变
+
+- 类型：refactor（不兼容：无；公开名字与 CLI/子进程契约不变，行为不变）
+- 变更：把 2276 行的 `scripts/project_status.py` 按低耦合层拆出两个同目录模块——`scripts/status_schema.py`（常量单一事实源：`ARTIFACTS`、`PHASE_LABELS`/`STATE_LABELS`、`WORK_ID_PATTERN`、`WORKFLOW_MODES`/`LIFECYCLE_MODES`/`MODE_LABELS`、`STATUS_SCHEMA_VERSION`、`TRACE_*`、`DOCUMENT_LIMITS`）与 `scripts/status_parsing.py`（纯文本/任务解析：`read_text`、`frontmatter_fields`、`parse_id_list`、`artifact_status`/`report_status`/`approval_status`、任务编号与状态解析 `parse_task_states`/`task_counts`、`markdown_section`/`markdown_table_rows`/`table_column`、四个 `TASK_*` 正则）；`project_status.py` 用显式 import 重新导出这些名字并加 `__all__`，仍保留 `inspect_project`、`render_*`、Git/`resume` 编排与 `main()`，行数 2276 → 1997。
+- 决策：**拆分保入口契约，而不是改成包**——`import project_status` 的公共名字与 `python project_status.py` 的子进程调用（desktop 按文件名 spawn）都保持原样；为避免 spec/import 两种加载方式下同级模块解析失败，入口首个可执行语句用 `sys.path.insert(0, 脚本目录)` 引导（`# noqa: E402`），mypy 用 `mypy_path` 固定搜索路径。**只拆无副作用的叶层**（常量 + 纯解析），把耦合重的状态推导/渲染留在同一文件，避免制造跨文件状态共享；更深一层（artifact 分析 vs 编排）留作后续可选增量。**保留 `__all__`**：显式重导出并声明，既满足 ruff 的 F401，也把「哪些是公开契约」写清楚。
+- 依据：`skills/project-lifecycle/scripts/{status_schema,status_parsing,project_status}.py`、`mypy.ini`、`README.md`、`docs/reference/index.md`。
+- 验证：`python -X utf8 -m unittest discover -s tests -p "test_*.py"` → **81 条全部通过**；`python -m ruff check skills/project-lifecycle/scripts tests` 全绿；`python -m mypy skills/project-lifecycle/scripts/project_status.py` → `Success: no issues found`；`python -m compileall -q skills/project-lifecycle/scripts` 通过；`python skills/project-lifecycle/scripts/project_status.py --help` 正常；`git diff --check` 无空白错误。
+- 本地提交：见本轮提交。
+- 远端推送：见本轮推送。
+
 ## 2026-11-19（P1）· 静态检查门禁（ruff + mypy）、status JSON 契约测试、文档死链检查、核心引擎类型收口
 
 - 类型：feature + refactor（不兼容：无，行为不变；新增测试与 CI 门禁）

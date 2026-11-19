@@ -22,7 +22,8 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 | 模块 | 主要位置 | 负责什么 | 改完检查 |
 | --- | --- | --- | --- |
 | 初始化器 | `skills/project-lifecycle/scripts/init_project.py` | 幂等创建目标项目的 `.agent/` 和入口模板 | 单元测试 |
-| 状态汇总与恢复 | `skills/project-lifecycle/scripts/project_status.py` | 推导阶段、依赖、Git 状态和 `--resume` JSON | 单元测试 + JSON 解析 |
+| 状态汇总与恢复 | `skills/project-lifecycle/scripts/project_status.py` | 编排：推导阶段、依赖、Git 状态、渲染和 `--resume` JSON | 单元测试 + JSON 解析 |
+| 状态常量与解析层 | `skills/project-lifecycle/scripts/status_schema.py`、`status_parsing.py` | 常量单一事实源（schema/标签/正则/预算）+ frontmatter、任务与 Markdown 解析 | 单元测试 |
 | 校验器 | `skills/project-lifecycle/scripts/project_validate.py` | 普通校验和可选 `--strict` 的结构、来源、证据、归档引用检查 | `--strict` |
 | 用户命令适配器 | `skills/project-lifecycle/scripts/project-lifecycle.py`（`.ps1`/`.sh` 转发） | 用 `init/status/brief/resume/validate/approve/archive` 隐藏底层 Python 实现 | 入口自检 |
 | 签署与归档命令 | `skills/project-lifecycle/scripts/artifacts.py` | 盖章签署、归档已完成工作项 | 命令行为检查 |
