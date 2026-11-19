@@ -1,0 +1,12 @@
+# ruff 静态检查配置（CI 与本地共用）
+# 只启用稳定、低噪音的规则集：pycodestyle 错误（E4/E7/E9）、pyflakes（F）、警告（W）。
+# 目标版本与命令适配器声明的 Python 3.9 下限一致。
+target-version = "py39"
+line-length = 120
+
+[lint]
+select = ["E4", "E7", "E9", "F", "W"]
+
+[lint.per-file-ignores]
+# 测试模块先 sys.path.insert 再 import 被测脚本，E402 是这种引导写法的必然结果。
+"tests/*" = ["E402"]

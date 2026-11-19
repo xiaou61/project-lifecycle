@@ -2,6 +2,16 @@
 
 本文件记录 `project-lifecycle` Skill 仓库本身的维护变更；目标项目的逐轮记录以 Git 提交为准，不再维护 `.agent/history/updates.md`。Git 提交是可回滚事实源。
 
+## 2026-11-19（P1）· 静态检查门禁（ruff + mypy）、status JSON 契约测试、文档死链检查、核心引擎类型收口
+
+- 类型：feature + refactor（不兼容：无，行为不变；新增测试与 CI 门禁）
+- 变更：①**新增 ruff 静态检查**（根 `ruff.toml`，`select = E4/E7/E9/F/W`），修掉 8 处测试告警（未用 `json` 导入、3 处未用局部变量），测试目录 `E402` 因 `sys.path.insert` 引导写法按文件豁免；`python -m ruff check skills/project-lifecycle/scripts tests` 全绿。②**新增 mypy 门禁**（根 `mypy.ini`，`ignore_missing_imports`），先对核心引擎 `scripts/project_status.py` 做类型收口：把 55 处 `dict[str, object]` 收窄为 `dict[str, Any]`，并修掉类型检查暴露的 3 类真实问题——`phase_result` 的 `tasks: dict[str, int]` 注解与实参（含 `warnings` 列表）不符；`git_status` 里 `except OSError as error:` 之后又给 `error` 赋值（Py3 会删除 except 变量）；`source_coverage_status` / `testing_evidence_status` 用 `None in {...}` / `any(v is None ...)` 判空后仍直接用 `int | None` 下标，改为逐项 `is None` 提前返回以实现类型收窄。③**status JSON 契约测试**（`tests/test_status_contract.py`）：固化 `schema_version="2"` 的顶层字段集合与 work-item 字段集合，新增/改名/删字段会立刻变红，防止桌面查看器（D-007 直接消费该 JSON）静默读到缺失字段；配套 `docs/reference/status-schema.md` 记录每个字段含义与变更流程。④**文档死链检查**（`tests/test_docs_links.py`）：扫描 README 与 `docs/**/*.md` 的站内链接，按 VitePress clean URL 规则（原路径 / +`.md` / +`/index.md` / +`.html`）解析，外链与纯锚点跳过。⑤**CI** 新增独立 `lint` job（Py 3.11，装 ruff+mypy，跑 ruff 全量 + mypy 核心引擎），与既有的三版本 `test` 矩阵、`docs`、`desktop` job 并列。
+- 决策：**只把 mypy 门禁压到 `project_status.py`**——它是被桌面与下游直接消费的公共契约，风险最高、最值得先守；`artifacts.py`/`project_validate.py` 仍是 `dict[str, object]` 风格（分别约 160/190 条），整体收口是一次独立、test-guarded 的 typing 任务，不塞进本轮以免把「加个检查」做成大重构。**93KB 物理拆分暂缓**：把 2251 行拆成包会冲击 `import project_status` + `python project_status.py` 的既有契约（desktop 子进程按文件名调用），需单独一轮并全程用 81 条测试守护，本轮先用 `dict[str, Any]` + 类型检查把可维护性提升到位。**类型检查暴露的是真问题不是噪音**：`except as error` 的删除语义与 `dict[str, int]` 错注解都是潜在运行时/理解坑，借 mypy 修正比单纯加门禁更有价值。
+- 依据：`ruff.toml`、`mypy.ini`、`.github/workflows/ci.yml`、`skills/project-lifecycle/scripts/project_status.py`、`tests/{test_status_contract,test_docs_links,test_project_status}.py`、`docs/reference/{status-schema.md,index.md}`。
+- 验证：`python -m ruff check skills/project-lifecycle/scripts tests` 全绿；`python -m mypy skills/project-lifecycle/scripts/project_status.py` → `Success: no issues found`；`python -X utf8 -m unittest discover -s tests -p "test_*.py"` 共 **81 条全部通过**（新增 `test_status_contract` 1 条、`test_docs_links` 1 条）；`python -m compileall -q skills/project-lifecycle/scripts` 通过；`git diff --check` 无空白错误。
+- 本地提交：见本轮提交。
+- 远端推送：见本轮推送。
+
 ## 2026-11-19 · 收尾：清除 update_history 残留、修复红色测试、补文档命令一致性测试
 
 - 类型：fix + refactor（不兼容：测试与文档，不涉及目标项目结构）

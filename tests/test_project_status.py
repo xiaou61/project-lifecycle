@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
-import json
 import subprocess
 import sys
 import tempfile
@@ -216,7 +215,7 @@ class ProjectStatusTests(unittest.TestCase):
         self.assertEqual(item["state"], "awaiting_approval")
 
     def test_pending_tasks_mean_implementation(self) -> None:
-        work = self.approve_through_tasks(
+        self.approve_through_tasks(
             "### TASK-001 | pending | 实现登录\n\n### TASK-002 | done | 建立模型"
         )
 
@@ -537,8 +536,8 @@ class ProjectStatusTests(unittest.TestCase):
         self.assertEqual(item["state"], "in_progress")
 
     def test_lifecycle_mode_compatibility_defaults_from_workflow(self) -> None:
-        compact = self.managed_work("WORK-004", "兼容受管理", workflow="compact")
-        full = self.managed_work("WORK-005", "兼容严格", workflow="full")
+        self.managed_work("WORK-004", "兼容受管理", workflow="compact")
+        self.managed_work("WORK-005", "兼容严格", workflow="full")
 
         items = {
             item["work_id"]: item

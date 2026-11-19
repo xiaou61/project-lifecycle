@@ -10,6 +10,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 
 ARTIFACTS = ("requirements", "proposal", "design", "tasks")
@@ -127,7 +128,7 @@ def report_status(path: Path) -> str:
     return match.group(1).lower() if match else "unknown"
 
 
-def approval_status(work_dir: Path, artifacts: dict[str, str]) -> dict[str, object]:
+def approval_status(work_dir: Path, artifacts: dict[str, str]) -> dict[str, Any]:
     """已批准工件必须带签署人和时间戳。
 
     签署只由 `project-lifecycle.ps1 approve` 盖章，模型不得自行写入
@@ -292,8 +293,8 @@ def parse_task_states(text: str) -> tuple[list[tuple[str, str | None]], set[str]
     return list(tasks.items()), formats
 
 
-def task_counts(path: Path) -> dict[str, object]:
-    counts: dict[str, object] = {
+def task_counts(path: Path) -> dict[str, Any]:
+    counts: dict[str, Any] = {
         "pending": 0,
         "in_progress": 0,
         "done": 0,
@@ -359,9 +360,9 @@ def table_column(headers: list[str], *names: str) -> int | None:
     return None
 
 
-def source_coverage_status(requirements_path: Path) -> dict[str, object]:
+def source_coverage_status(requirements_path: Path) -> dict[str, Any]:
     """Validate the optional source-to-requirement coverage table."""
-    result: dict[str, object] = {
+    result: dict[str, Any] = {
         "required": False,
         "status": "not_required",
         "level": "none",
@@ -403,7 +404,13 @@ def source_coverage_status(requirements_path: Path) -> dict[str, object]:
     requirement_column = table_column(headers, "REQ", "需求")
     acceptance_column = table_column(headers, "AC", "验收")
     status_column = table_column(headers, "状态", "status")
-    if None in {source_column, anchor_column, requirement_column, acceptance_column, status_column}:
+    if (
+        source_column is None
+        or anchor_column is None
+        or requirement_column is None
+        or acceptance_column is None
+        or status_column is None
+    ):
         result["status"] = "invalid"
         result["warnings"].append("来源覆盖表格必须包含来源、锚点、REQ、AC、状态列。")
         return result
@@ -433,7 +440,11 @@ def source_coverage_status(requirements_path: Path) -> dict[str, object]:
             and coverage_state in {"verified", "已验证", "complete", "completed"}
         )
         if mapped and rich:
-            mapped = all(cells[index].strip() for index in rich_columns.values())
+            mapped = all(
+                cells[index].strip()
+                for index in rich_columns.values()
+                if index is not None
+            )
         if mapped:
             result["mapped"] += 1
         else:
@@ -455,9 +466,9 @@ def source_coverage_status(requirements_path: Path) -> dict[str, object]:
 def testing_evidence_status(
     report_path: Path,
     expected_acceptance_ids: set[str] | None = None,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """Validate the optional executable evidence matrix in testing/report.md."""
-    result: dict[str, object] = {
+    result: dict[str, Any] = {
         "required": False,
         "status": "not_required",
         "path": str(report_path),
@@ -496,7 +507,18 @@ def testing_evidence_status(
         "result": table_column(headers, "结果", "result", "状态"),
         "evidence": table_column(headers, "证据", "evidence", "evidence_path"),
     }
-    if any(value is None for value in columns.values()):
+    check_column = columns["check"]
+    command_column = columns["command"]
+    exit_column = columns["exit_code"]
+    result_column = columns["result"]
+    evidence_column = columns["evidence"]
+    if (
+        check_column is None
+        or command_column is None
+        or exit_column is None
+        or result_column is None
+        or evidence_column is None
+    ):
         result["status"] = "invalid"
         result["warnings"].append("结构化验证证据必须包含检查项、命令、退出码、结果和证据列。")
         return result
@@ -506,11 +528,11 @@ def testing_evidence_status(
     missing_fields: list[str] = []
     for index, row in enumerate(rows[1:], 1):
         cells = row + [""] * (len(headers) - len(row))
-        check = cells[columns["check"]].strip()
-        command = cells[columns["command"]].strip()
-        exit_code = cells[columns["exit_code"]].strip().casefold()
-        outcome = cells[columns["result"]].strip().casefold()
-        evidence = cells[columns["evidence"]].strip()
+        check = cells[check_column].strip()
+        command = cells[command_column].strip()
+        exit_code = cells[exit_column].strip().casefold()
+        outcome = cells[result_column].strip().casefold()
+        evidence = cells[evidence_column].strip()
         passed = bool(
             check
             and command
@@ -564,7 +586,7 @@ def testing_evidence_status(
     return result
 
 
-def document_budget_status(work_dir: Path) -> dict[str, object]:
+def document_budget_status(work_dir: Path) -> dict[str, Any]:
     """Measure primary work-item Markdown without reading evidence logs into context."""
     paths = [
         work_dir / "requirements.md",
@@ -575,7 +597,7 @@ def document_budget_status(work_dir: Path) -> dict[str, object]:
         work_dir / "testing" / "report.md",
         work_dir / "workspace.md",
     ]
-    files: list[dict[str, object]] = []
+    files: list[dict[str, Any]] = []
     for path in paths:
         if not path.is_file():
             continue
@@ -613,13 +635,13 @@ def document_budget_status(work_dir: Path) -> dict[str, object]:
     }
 
 
-def verification_anchor(work_dir: Path, git: dict[str, object]) -> dict[str, object]:
+def verification_anchor(work_dir: Path, git: dict[str, Any]) -> dict[str, Any]:
     """Check whether a report still covers the current code snapshot."""
     report_path = work_dir / "testing" / "report.md"
     fields = file_fields(report_path)
     verified_commit = fields.get("verified_commit", "").strip().lower()
     verified_at = fields.get("verified_at", "").strip()
-    result: dict[str, object] = {
+    result: dict[str, Any] = {
         "status": "unknown",
         "report": str(report_path),
         "verified_commit": verified_commit or None,
@@ -697,7 +719,7 @@ def verification_anchor(work_dir: Path, git: dict[str, object]) -> dict[str, obj
     return result
 
 
-def work_identity(work_dir: Path) -> dict[str, object]:
+def work_identity(work_dir: Path) -> dict[str, Any]:
     identity_fields: dict[str, str] = {}
     for artifact in ARTIFACTS:
         identity_fields = file_fields(work_dir / f"{artifact}.md")
@@ -758,8 +780,8 @@ def markdown_list_lines(section: str) -> list[str]:
     ]
 
 
-def resume_requirements(requirements_path: Path) -> dict[str, object]:
-    result: dict[str, object] = {
+def resume_requirements(requirements_path: Path) -> dict[str, Any]:
+    result: dict[str, Any] = {
         "goal": "",
         "acceptance_criteria": [],
         "constraints": [],
@@ -795,7 +817,7 @@ def resume_requirements(requirements_path: Path) -> dict[str, object]:
     return result
 
 
-def state_evidence(item: dict[str, object], git: dict[str, object]) -> dict[str, object]:
+def state_evidence(item: dict[str, Any], git: dict[str, Any]) -> dict[str, Any]:
     """Describe what the status projection proves, without claiming live code completion."""
     test_status = str(item.get("test_evidence", {}).get("status", "missing"))
     recorded_tests = test_status == "complete"
@@ -894,9 +916,9 @@ def trace_definitions(text: str) -> list[dict[str, str]]:
 
 def traceability_status(
     work_dir: Path,
-    test_evidence: dict[str, object],
-    source_coverage: dict[str, object],
-) -> dict[str, object]:
+    test_evidence: dict[str, Any],
+    source_coverage: dict[str, Any],
+) -> dict[str, Any]:
     """需求、验收标准和任务之间的可推导链接。
 
     只读取工件里真实写下的引用（`- 对应：`、`- 依赖：`），不按编号顺序推测
@@ -909,7 +931,7 @@ def traceability_status(
         for definition in trace_definitions(read_text(requirements_path)):
             definitions[definition["id"]] = definition
 
-    tasks: list[dict[str, object]] = []
+    tasks: list[dict[str, Any]] = []
     tasks_path = work_dir / "tasks.md"
     if tasks_path.is_file():
         text = read_text(tasks_path)
@@ -969,7 +991,7 @@ def plan_hygiene(
     work_dir: Path,
     mode: str,
     artifacts: dict[str, str],
-    tasks: dict[str, object],
+    tasks: dict[str, Any],
 ) -> list[str]:
     """计划质量提示：strict 工作项的 tasks.md 应有“评审焦点”。
 
@@ -994,16 +1016,16 @@ def plan_hygiene(
 
 
 def phase_result(
-    identity: dict[str, object],
+    identity: dict[str, Any],
     work_dir: Path,
     archived: bool,
     phase: str,
     state: str,
     next_action: str,
     artifacts: dict[str, str],
-    tasks: dict[str, int],
+    tasks: dict[str, Any],
     warnings: list[str],
-) -> dict[str, object]:
+) -> dict[str, Any]:
     source_coverage = source_coverage_status(work_dir / "requirements.md")
     test_evidence = testing_evidence_status(
         work_dir / "testing" / "report.md",
@@ -1012,7 +1034,7 @@ def phase_result(
     document_budget = document_budget_status(work_dir)
     approval = approval_status(work_dir, artifacts)
     traceability = traceability_status(work_dir, test_evidence, source_coverage)
-    result: dict[str, object] = {
+    result: dict[str, Any] = {
         **identity,
         "slug": work_dir.name,
         "directory": work_dir.name,
@@ -1036,7 +1058,10 @@ def phase_result(
             *test_evidence["warnings"],
         ],
         # 只影响可读性的整理项（文档体积、任务格式），不阻断恢复也不表示事实缺失。
-        "hygiene": [*document_budget["warnings"], *tasks.get("warnings", [])],
+        "hygiene": [
+            *list(document_budget["warnings"]),
+            *list(tasks.get("warnings", [])),
+        ],
         # 计划质量建议：只在实现还没收口时提示，不改变阶段判断。
         "advice": plan_hygiene(work_dir, str(identity.get("mode", "")), artifacts, tasks),
     }
@@ -1077,7 +1102,7 @@ def phase_result(
     return result
 
 
-def inspect_work(work_dir: Path, archived: bool = False) -> dict[str, object]:
+def inspect_work(work_dir: Path, archived: bool = False) -> dict[str, Any]:
     identity = work_identity(work_dir)
     artifacts = {name: artifact_status(work_dir / f"{name}.md") for name in ARTIFACTS}
     artifacts["test_plan"] = "present" if (work_dir / "testing" / "plan.md").is_file() else "missing"
@@ -1240,7 +1265,7 @@ def inspect_work(work_dir: Path, archived: bool = False) -> dict[str, object]:
     )
 
 
-def relation_summary(item: dict[str, object]) -> dict[str, object]:
+def relation_summary(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "work_id": item["work_id"],
         "name": item["name"],
@@ -1252,7 +1277,7 @@ def relation_summary(item: dict[str, object]) -> dict[str, object]:
     }
 
 
-def missing_relation(work_id: str) -> dict[str, object]:
+def missing_relation(work_id: str) -> dict[str, Any]:
     return {
         "work_id": work_id,
         "name": None,
@@ -1264,7 +1289,7 @@ def missing_relation(work_id: str) -> dict[str, object]:
     }
 
 
-def dependency_cycles(items: list[dict[str, object]], index: dict[str, list[dict[str, object]]]) -> list[list[str]]:
+def dependency_cycles(items: list[dict[str, Any]], index: dict[str, list[dict[str, Any]]]) -> list[list[str]]:
     graph: dict[str, list[str]] = {}
     for item in items:
         work_id = str(item["work_id"])
@@ -1301,8 +1326,8 @@ def dependency_cycles(items: list[dict[str, object]], index: dict[str, list[dict
     return cycles
 
 
-def resolve_relations(items: list[dict[str, object]]) -> None:
-    index: dict[str, list[dict[str, object]]] = {}
+def resolve_relations(items: list[dict[str, Any]]) -> None:
+    index: dict[str, list[dict[str, Any]]] = {}
     for item in items:
         index.setdefault(str(item["work_id"]), []).append(item)
 
@@ -1374,7 +1399,7 @@ def resolve_relations(items: list[dict[str, object]]) -> None:
                     relation.update(relation_summary(targets[0]))
 
 
-def apply_rules_gate(items: list[dict[str, object]], rules: dict[str, object]) -> None:
+def apply_rules_gate(items: list[dict[str, Any]], rules: dict[str, Any]) -> None:
     """Block mutations before rules are confirmed; keep read-only verification visible."""
     if rules.get("ready") and rules.get("configured"):
         return
@@ -1415,9 +1440,9 @@ def locate_project(start: Path) -> Path:
     return resolved
 
 
-def git_status(project_root: Path) -> dict[str, object]:
+def git_status(project_root: Path) -> dict[str, Any]:
     """Return a small, read-only Git workspace overview."""
-    result: dict[str, object] = {
+    result: dict[str, Any] = {
         "status": "unknown",
         "branch": None,
         "head": None,
@@ -1449,13 +1474,13 @@ def git_status(project_root: Path) -> dict[str, object]:
             errors="replace",
             check=False,
         )
-    except OSError as error:
-        result["warning"] = f"无法读取 Git 工作区：{error}。"
+    except OSError as exc:
+        result["warning"] = f"无法读取 Git 工作区：{exc}。"
         return result
 
     if completed.returncode != 0:
-        error = (completed.stderr or "").strip()
-        if "not a git repository" in error.casefold():
+        stderr_text = (completed.stderr or "").strip()
+        if "not a git repository" in stderr_text.casefold():
             result.update(
                 status="not_a_repository",
                 attribution="not_applicable",
@@ -1463,7 +1488,7 @@ def git_status(project_root: Path) -> dict[str, object]:
                 warning=None,
             )
         else:
-            result["warning"] = f"Git 状态读取失败：{error or f'退出码 {completed.returncode}'}。"
+            result["warning"] = f"Git 状态读取失败：{stderr_text or f'退出码 {completed.returncode}'}。"
         return result
 
     lines = completed.stdout.splitlines()
@@ -1529,7 +1554,7 @@ def normalize_git_path(value: str) -> str:
     return value
 
 
-def workspace_attribution_status(work_dir: Path, git: dict[str, object]) -> dict[str, object]:
+def workspace_attribution_status(work_dir: Path, git: dict[str, Any]) -> dict[str, Any]:
     """
     工作区归因机制已按用户要求停用（2026-10-10）。
 
@@ -1554,7 +1579,7 @@ def workspace_attribution_status(work_dir: Path, git: dict[str, object]) -> dict
     }
 
 
-def resume_read_paths(project_root: Path, item: dict[str, object]) -> list[str]:
+def resume_read_paths(project_root: Path, item: dict[str, Any]) -> list[str]:
     work_dir = Path(str(item["path"]))
     paths = [
         str(project_root / ".agent" / "rules" / "always.md"),
@@ -1578,7 +1603,7 @@ def resume_read_paths(project_root: Path, item: dict[str, object]) -> list[str]:
     return list(dict.fromkeys(paths))
 
 
-def unavailable_resume(reason: str, *, blockers: list[str] | None = None) -> dict[str, object]:
+def unavailable_resume(reason: str, *, blockers: list[str] | None = None) -> dict[str, Any]:
     return {
         "mode": "out_of_scope",
         "reason": reason,
@@ -1593,12 +1618,12 @@ def unavailable_resume(reason: str, *, blockers: list[str] | None = None) -> dic
 
 def resume_context(
     project_root: Path,
-    active_items: list[dict[str, object]],
-    selected_items: list[dict[str, object]],
+    active_items: list[dict[str, Any]],
+    selected_items: list[dict[str, Any]],
     query: str | None,
-    git: dict[str, object],
-) -> dict[str, object]:
-    candidate: dict[str, object] | None = None
+    git: dict[str, Any],
+) -> dict[str, Any]:
+    candidate: dict[str, Any] | None = None
     if query:
         if not selected_items:
             return unavailable_resume(f"未找到可恢复的工作项：{query}。")
@@ -1724,9 +1749,9 @@ def work_directories(changes: Path) -> tuple[list[Path], list[Path]]:
     return active, archived
 
 
-def project_rules_status(workspace: Path) -> dict[str, object]:
+def project_rules_status(workspace: Path) -> dict[str, Any]:
     path = workspace / "rules" / "always.md"
-    result: dict[str, object] = {
+    result: dict[str, Any] = {
         "path": str(path),
         "present": path.is_file(),
         "status": "missing",
@@ -1783,7 +1808,7 @@ def project_rules_status(workspace: Path) -> dict[str, object]:
     return result
 
 
-def next_work_id(items: list[dict[str, object]]) -> str:
+def next_work_id(items: list[dict[str, Any]]) -> str:
     numbers = []
     for item in items:
         match = re.fullmatch(r"WORK-(\d+)", str(item["work_id"]), re.IGNORECASE)
@@ -1793,10 +1818,10 @@ def next_work_id(items: list[dict[str, object]]) -> str:
     return f"WORK-{number:03d}"
 
 
-def select_work(items: list[dict[str, object]], query: str) -> dict[str, object]:
+def select_work(items: list[dict[str, Any]], query: str) -> dict[str, Any]:
     normalized = query.strip().casefold()
 
-    def values(item: dict[str, object]) -> tuple[str, ...]:
+    def values(item: dict[str, Any]) -> tuple[str, ...]:
         return tuple(str(item[field]).casefold() for field in ("work_id", "name", "directory"))
 
     exact = [item for item in items if normalized in values(item)]
@@ -1816,12 +1841,12 @@ def inspect_project(
     start: Path,
     work: str | None = None,
     include_archive: bool = False,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     if not start.exists():
         raise RuntimeError(f"目标路径不存在：{start}")
     project_root = locate_project(start)
     workspace = project_root / ".agent"
-    result: dict[str, object] = {
+    result: dict[str, Any] = {
         "schema_version": STATUS_SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "project_root": str(project_root),
@@ -1942,14 +1967,14 @@ def inspect_project(
     return result
 
 
-def relation_label(relation: dict[str, object]) -> str:
+def relation_label(relation: dict[str, Any]) -> str:
     if relation["missing"]:
         return f"{relation['work_id']}（未找到）"
     state = STATE_LABELS.get(str(relation["state"]), str(relation["state"]))
     return f"{relation['work_id']} {relation['name']}（{relation['phase_label']}，{state}）"
 
 
-def git_status_label(git: dict[str, object]) -> str:
+def git_status_label(git: dict[str, Any]) -> str:
     labels = {
         "clean": "干净",
         "dirty": "有未提交改动",
@@ -1959,7 +1984,7 @@ def git_status_label(git: dict[str, object]) -> str:
     return labels.get(str(git["status"]), str(git["status"]))
 
 
-def render_resume(status: dict[str, object]) -> str:
+def render_resume(status: dict[str, Any]) -> str:
     resume = status["resume"]
     lines = [
         f"项目：{status['project_root']}",
@@ -2009,7 +2034,7 @@ def render_resume(status: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def brief_projection(status: dict[str, object]) -> dict[str, object]:
+def brief_projection(status: dict[str, Any]) -> dict[str, Any]:
     """每轮默认视图：只保留活动工作项和下一步，避免 200KB 全量 JSON 淹没上下文。"""
     items = status.get("work_items") or []
     active = [
@@ -2018,7 +2043,7 @@ def brief_projection(status: dict[str, object]) -> dict[str, object]:
         if not (item["phase"] == "completed" and item["state"] == "complete")
     ]
 
-    def compact(item: dict[str, object]) -> dict[str, object]:
+    def compact(item: dict[str, Any]) -> dict[str, Any]:
         tasks = item.get("tasks") or {}
         return {
             "work_id": item["work_id"],
@@ -2039,7 +2064,7 @@ def brief_projection(status: dict[str, object]) -> dict[str, object]:
 
     resume = status.get("resume") or {}
     selected = resume.get("work_item") or {}
-    result: dict[str, object] = {
+    result: dict[str, Any] = {
         "schema_version": status["schema_version"],
         "generated_at": status["generated_at"],
         "project_root": status["project_root"],
@@ -2077,7 +2102,7 @@ def brief_projection(status: dict[str, object]) -> dict[str, object]:
     return result
 
 
-def render_brief(status: dict[str, object]) -> str:
+def render_brief(status: dict[str, Any]) -> str:
     brief = brief_projection(status)
     rules = brief["rules"]
     git = brief["git"]
@@ -2106,7 +2131,7 @@ def render_brief(status: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def render_text(status: dict[str, object]) -> str:
+def render_text(status: dict[str, Any]) -> str:
     if status.get("scope") == "workspace":
         return "\n".join(
             [

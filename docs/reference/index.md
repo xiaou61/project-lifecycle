@@ -43,6 +43,7 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 | 任务拆分规则 | `skills/project-lifecycle/references/tasks.md` | 纵向切片、真实阻塞关系和 expand-contract 重构 | [全流程教程](/guide/full-workflow) |
 | 命令参考 | `docs/reference/commands.md` | 可复制的初始化、状态、恢复和校验命令 | [命令参考](/reference/commands) |
 | 边界与常见问题 | `docs/reference/boundaries.md` | 为什么这样设计，以及不负责什么 | [边界与常见问题](/reference/boundaries) |
+| status JSON 契约 | `docs/reference/status-schema.md` | `status --json` 的顶层与 work-item 字段契约（桌面查看器按 D-007 依赖它） | [status JSON 契约](/reference/status-schema) |
 | 设计决策记录 | `wiki/` | Skill 自身的“当初为什么这么设计”、被否掉的备选和改动影响 | [设计 wiki](https://github.com/xiaou61/project-lifecycle/tree/main/wiki) |
 
 ### 可视化与构建
@@ -80,6 +81,8 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 ```powershell
 python -m unittest discover -s tests -p "test_*.py" -v
 python -m compileall -q skills/project-lifecycle/scripts
+python -m ruff check skills/project-lifecycle/scripts tests
+python -m mypy skills/project-lifecycle/scripts/project_status.py
 python -X utf8 "<Skill 发现目录>\.system\skill-creator\scripts\quick_validate.py" "skills/project-lifecycle"
 npm run docs:build
 git diff --check
