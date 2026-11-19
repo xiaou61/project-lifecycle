@@ -1,6 +1,16 @@
 # 更新历史
 
-本文件记录 `project-lifecycle` Skill 仓库本身的维护变更；目标项目的逐轮记录写在各自的 `.agent/history/updates.md`。Git 提交仍是可回滚事实源。
+本文件记录 `project-lifecycle` Skill 仓库本身的维护变更；目标项目的逐轮记录以 Git 提交为准，不再维护 `.agent/history/updates.md`。Git 提交是可回滚事实源。
+
+## 2026-11-19 · 收尾：清除 update_history 残留、修复红色测试、补文档命令一致性测试
+
+- 类型：fix + refactor（不兼容：测试与文档，不涉及目标项目结构）
+- 变更：完成 2026-10-28（`9fa5e3a`）删除按轮更新历史（`update_history.py` / `.agent/history/updates.md`）的收尾。此前删除只做了脚本与文档主干，`tests/`、`desktop/`、README、VitePress 文档、示例仍引用已删模块——`python -m unittest discover -s tests` 只能收集 14 条、2 个模块 import 失败（一次「Ran 0/14 tests 通过」的假通过）。本次：①测试改用 `artifacts.py`（`load_artifacts_module`，移除 `load_update_module`/`UPDATE_SCRIPT`），删掉 3 条针对已删命令的用例，新增 `test_init_does_not_create_history`，断言 init 不再创建 `.agent/history`；②`desktop/src/main.ts` 的「历史」页签改读 `git log`（`load-history` IPC），删除 history 工件分类与 `updates.md` 回退，`index.html`/`renderer.ts`/`types.d.ts` 文案「历史」→「提交」，`desktop/README.md` 同步；③README、`docs/reference/commands.md`、`docs/guide/qa.md`、`docs/guide/full-workflow.md`、`docs/guide/getting-started.md`、`docs/guide/resume.md`、`docs/reference/index.md`、`docs/architecture.md`、`examples/managed-walkthrough.md` 去掉 `updates`/`record`/`checkpoint`/`push-check` 命令与 `update-history.md` 引用，改用 `git commit` / `git status --porcelain`；④`tests/test_skill_packaging.py` 新增 `DocumentedCommandsTest`：扫描 README、docs、skill 参考与示例里所有 `$lifecycle <cmd>` 调用，断言命令都存在于 `COMMANDS`（CHANGELOG/wiki 有意保留旧命令名以如实记录当时的决策，故不扫描）。
+- 决策：**文档命令漂移必须由测试兜住**——旧命令能留在十来份文档里，是因为「命令映射→脚本存在」有测试、「文档里的调用名」没有；加一条正则扫描，把这类残留固化成红色，顺带抓出并修掉了 `docs/guide/resume.md` 里遗留的 `$lifecycle checkpoint` 示例。**历史不改写**——`wiki/D-006/D-007/D-009` 与 `CHANGELOG.md` 旧条目如实记录当时围绕 `updates.md` 的决策，保留原文，仅在本条说明其已被取代。**`desktop/release/` 打包产物不动**（git 未跟踪，重新打包即可）。
+- 依据：`skills/project-lifecycle/scripts/{project-lifecycle,project_status,artifacts}.py`、`tests/{test_project_status,test_lifecycle_actions,test_skill_packaging}.py`、`desktop/src/{main,renderer}.ts`、`desktop/src/types.d.ts`、`README.md`、`docs/**`、`skills/project-lifecycle/examples/managed-walkthrough.md`。
+- 验证：`python -X utf8 -m unittest discover -s tests -p "test_*.py"` 共 **79 条全部通过**（此前只有 14 条可收集、2 个模块 import 失败）；`tests/test_skill_packaging.py` 6 条通过（含新增 `test_documented_commands_are_known`）；`python -m compileall` 通过。
+- 本地提交：见本轮提交。
+- 远端推送：见本轮推送。
 
 ## 2026-10-28 · 精简 Skill：删长期记忆、HTML 材料与核心历史，合并 5 个参考文件
 

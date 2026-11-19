@@ -107,7 +107,7 @@ git worktree add "..\我的项目-WORK-003" -b "work/WORK-003"
 在新目录的对话中只执行 `WORK-003`，其他对话使用各自的 `WORK-*` 和 Worktree。完成后先在各自目录验证，再由一个整合对话查看 `git diff`、运行 `project-lifecycle.ps1 validate` 和回归测试，最后合并分支。若只能共用一个目录，约定同一时刻只有一个对话可以写入；其他对话只读或等待，并在切换前运行：
 
 ```powershell
-& $lifecycle checkpoint "F:\我的项目" --json
+git -C "F:\我的项目" status --porcelain
 ```
 
-看到 `dirty`、`unclassified` 或多个活动工作项时，不要让新对话直接改代码；先指定 `--work WORK-xxx`，或请用户确认未知改动归属。这样能防止错误接力，但不能替代 Git 分支合并和人工冲突处理。
+看到大量未提交改动、无法归类的新文件或多个活动工作项时，不要让新对话直接改代码；先指定 `--work WORK-xxx`，或请用户确认未知改动归属。这样能防止错误接力，但不能替代 Git 分支合并和人工冲突处理。

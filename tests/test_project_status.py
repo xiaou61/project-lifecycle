@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = ROOT / "skills" / "project-lifecycle"
 STATUS_SCRIPT = SKILL_ROOT / "scripts" / "project_status.py"
 INIT_SCRIPT = SKILL_ROOT / "scripts" / "init_project.py"
-UPDATE_SCRIPT = SKILL_ROOT / "scripts" / "update_history.py"
+ARTIFACTS_SCRIPT = SKILL_ROOT / "scripts" / "artifacts.py"
 LIFECYCLE_ENTRY = SKILL_ROOT / "scripts" / "project-lifecycle.py"
 
 
@@ -42,17 +42,17 @@ project_status = load_status_module()
 project_validate = load_validate_module()
 
 
-def load_update_module():
-    spec = importlib.util.spec_from_file_location("update_history", UPDATE_SCRIPT)
+def load_artifacts_module():
+    spec = importlib.util.spec_from_file_location("artifacts", ARTIFACTS_SCRIPT)
     if spec is None or spec.loader is None:
-        raise RuntimeError("无法加载 update_history.py")
+        raise RuntimeError("无法加载 artifacts.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules["project_status"] = project_status
     spec.loader.exec_module(module)
     return module
 
 
-update_history = load_update_module()
+artifacts = load_artifacts_module()
 
 
 def artifact(
@@ -793,7 +793,7 @@ class ProjectStatusTests(unittest.TestCase):
 
 
 class InitializationTests(unittest.TestCase):
-    def test_update_history_record_and_list(self) -> None:
+    def test_init_does_not_create_history(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             project = Path(temp)
             init = subprocess.run(
@@ -804,125 +804,7 @@ class InitializationTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(init.returncode, 0, init.stderr)
-            record = subprocess.run(
-                [
-                    sys.executable,
-                    "-X",
-                    "utf8",
-                    str(UPDATE_SCRIPT),
-                    str(project),
-                    "--record",
-                    "--work",
-                    "WORK-001",
-                    "--title",
-                    "记录一次变更",
-                    "--change",
-                    "修改实现",
-                    "--decision",
-                    "复用现有入口",
-                    "--basis",
-                    ".agent/changes/WORK-001/tasks.md",
-                    "--verification",
-                    "单元测试通过",
-                ],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                check=False,
-            )
-            self.assertEqual(record.returncode, 0, record.stderr)
-            history = (project / ".agent" / "history" / "updates.md").read_text(encoding="utf-8")
-            self.assertRegex(
-                history,
-                r"## 20\d{2}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{4} · WORK-001 · 记录一次变更",
-            )
-            self.assertIn("WORK-001 · 记录一次变更", history)
-            self.assertIn("本地提交：待用户授权/未提交", history)
-            listed = subprocess.run(
-                [sys.executable, "-X", "utf8", str(UPDATE_SCRIPT), str(project), "--list", "--json"],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                check=False,
-            )
-            self.assertEqual(listed.returncode, 0, listed.stderr)
-            self.assertEqual(len(json.loads(listed.stdout)["entries"]), 1)
-
-    def test_history_list_keeps_legacy_date_entries_with_second_precision_entries(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            project = Path(temp)
-            subprocess.run(
-                [sys.executable, "-X", "utf8", str(INIT_SCRIPT), str(project)],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                check=True,
-            )
-            history = project / ".agent" / "history" / "updates.md"
-            history.write_text(
-                history.read_text(encoding="utf-8").replace(
-                    "当前暂无更新记录。",
-                    "## 2026-09-08 · maintenance · 旧记录\n\n- 类型：maintenance\n"
-                    "\n## 2026-09-09 14:32:07 +0800 · maintenance · 新记录\n\n- 类型：maintenance\n",
-                ),
-                encoding="utf-8",
-            )
-            listed = subprocess.run(
-                [sys.executable, "-X", "utf8", str(UPDATE_SCRIPT), str(project), "--list", "--json"],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                check=False,
-            )
-            self.assertEqual(listed.returncode, 0, listed.stderr)
-            entries = json.loads(listed.stdout)["entries"]
-            self.assertEqual(len(entries), 2)
-            self.assertTrue(entries[0].startswith("## 2026-09-08 ·"))
-            self.assertTrue(entries[1].startswith("## 2026-09-09 14:32:07 +0800 ·"))
-
-    def test_push_check_detects_missing_history_and_can_record_remote_commit(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            project = Path(temp)
-            remote = project.parent / f"remote-{project.name}.git"
-            subprocess.run(
-                [sys.executable, "-X", "utf8", str(INIT_SCRIPT), str(project)],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                check=True,
-            )
-            def git(*args: str) -> subprocess.CompletedProcess[str]:
-                return subprocess.run(
-                    ["git", "-C", str(project), *args],
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    check=True,
-                )
-
-            subprocess.run(["git", "init", "--bare", str(remote)], capture_output=True, check=True)
-            git("init", "-b", "main")
-            git("config", "user.name", "Test")
-            git("config", "user.email", "test@example.com")
-            git("add", ".")
-            git("commit", "-m", "base")
-            git("remote", "add", "origin", str(remote))
-            git("push", "-u", "origin", "main")
-
-            before = update_history.push_status(project)
-            self.assertEqual(before["status"], "up_to_date")
-            self.assertEqual(before["history_status"], "missing")
-            self.assertFalse(before["consistent"])
-
-            result = update_history.push_check(project, as_json=True, record=True, work="maintenance")
-            self.assertEqual(result, 0)
-            after = update_history.push_status(project)
-            self.assertEqual(after["history_status"], "recorded")
-            self.assertTrue(after["consistent"])
-            self.assertIn(
-                f"远端 HEAD={after['remote_commit']}",
-                (project / ".agent" / "history" / "updates.md").read_text(encoding="utf-8"),
-            )
+            self.assertFalse((project / ".agent" / "history").exists())
 
     def test_existing_project_is_preserved_and_repeatable(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -959,7 +841,7 @@ class InitializationTests(unittest.TestCase):
             self.assertEqual(source.read_text(encoding="utf-8"), "VALUE = 1\n")
             self.assertFalse((project / ".agent" / "memory.md").exists())
             self.assertFalse((project / ".agent" / "html").exists())
-            self.assertTrue((project / ".agent" / "history" / "updates.md").is_file())
+            self.assertFalse((project / ".agent" / "history").exists())
             self.assertEqual(index.read_text(encoding="utf-8"), "# 用户维护的项目索引\n")
             self.assertEqual(rules.read_text(encoding="utf-8"), "# 用户自定义项目规范\n\n## MUST\n\n- 保留此规则\n")
             # .agent/scripts/ 是留给目标项目自己的辅助脚本；Skill 的脚本不得复制进去，
@@ -991,9 +873,6 @@ class InitializationTests(unittest.TestCase):
             self.assertIn(".agent/specs/", project_index)
             self.assertIn("project-lifecycle.ps1 status", project_index)
             self.assertNotIn(".agent/scripts/project_status.py", project_index)
-            update_history = project / ".agent" / "history" / "updates.md"
-            self.assertIn("artifact: update-history", update_history.read_text(encoding="utf-8"))
-            self.assertIn("本地提交", update_history.read_text(encoding="utf-8"))
             status = project_status.inspect_project(project)
             self.assertFalse((project / ".agent" / "rules" / "always.md").exists())
             self.assertFalse(status["rules"]["ready"])
@@ -1014,11 +893,6 @@ class ApprovalSigningTests(unittest.TestCase):
             "---\nartifact: project_rules\nstatus: active\nconfigured: true\n---\n\n"
             "# 项目常驻规范\n\n## MUST：所有任务\n\n- 运行测试\n",
             encoding="utf-8",
-        )
-        history = self.project / ".agent" / "history" / "updates.md"
-        history.parent.mkdir(parents=True, exist_ok=True)
-        history.write_text(
-            "---\nartifact: update-history\nstatus: active\n---\n\n## 记录\n", encoding="utf-8"
         )
         self.work = self.project / ".agent" / "changes" / "WORK-001-登录超时"
         artifact(
@@ -1044,8 +918,8 @@ class ApprovalSigningTests(unittest.TestCase):
         values.update(overrides)
         return argparse.Namespace(**values)
 
-    def test_approve_stamps_signer_and_appends_history(self) -> None:
-        self.assertEqual(0, update_history.approve(self.approve_args(), self.project))
+    def test_approve_stamps_signer(self) -> None:
+        self.assertEqual(0, artifacts.approve(self.approve_args(), self.project))
         fields = project_status.frontmatter_fields(
             (self.work / "requirements.md").read_text(encoding="utf-8-sig")
         )
@@ -1053,22 +927,19 @@ class ApprovalSigningTests(unittest.TestCase):
         self.assertEqual("张三", fields["approved_by"])
         self.assertEqual("产品", fields["approver_role"])
         self.assertTrue(project_status.APPROVED_AT_PATTERN.match(fields["approved_at"]))
-        entry = (self.project / ".agent" / "history" / "updates.md").read_text(encoding="utf-8")
-        self.assertIn("签署 .agent/changes/WORK-001-登录超时/requirements.md", entry)
-        self.assertIn("审批人 张三（产品）", entry)
-        self.assertIn(fields["approved_at"], entry)
+        self.assertFalse((self.project / ".agent" / "history").exists())
 
     def test_approve_records_business_acceptance_only_for_passed_report(self) -> None:
         report = self.work / "testing" / "report.md"
         artifact(report, "test-report", "partial", work="登录超时", work_id="WORK-001")
         with self.assertRaises(RuntimeError):
-            update_history.approve(self.approve_args(artifact="test-report", by="李四"), self.project)
+            artifacts.approve(self.approve_args(artifact="test-report", by="李四"), self.project)
         report.write_text(
             report.read_text(encoding="utf-8").replace("status: partial", "status: passed"),
             encoding="utf-8",
         )
         self.assertEqual(
-            0, update_history.approve(self.approve_args(artifact="test-report", by="李四"), self.project)
+            0, artifacts.approve(self.approve_args(artifact="test-report", by="李四"), self.project)
         )
         fields = project_status.frontmatter_fields(report.read_text(encoding="utf-8-sig"))
         self.assertEqual("passed", fields["status"])
@@ -1077,7 +948,7 @@ class ApprovalSigningTests(unittest.TestCase):
 
     def test_approve_unknown_work_item_is_rejected(self) -> None:
         with self.assertRaises(RuntimeError):
-            update_history.approve(self.approve_args(work="WORK-999"), self.project)
+            artifacts.approve(self.approve_args(work="WORK-999"), self.project)
 
     def test_unsigned_approval_is_a_compatibility_warning(self) -> None:
         item = project_status.inspect_project(self.project)["work_items"][0]
@@ -1089,7 +960,7 @@ class ApprovalSigningTests(unittest.TestCase):
         self.assertFalse(project_validate.validate_project(self.project, strict=True)["valid"])
 
     def test_signed_artifact_has_no_approval_warning(self) -> None:
-        update_history.approve(self.approve_args(), self.project)
+        artifacts.approve(self.approve_args(), self.project)
         item = project_status.inspect_project(self.project)["work_items"][0]
         self.assertEqual("complete", item["approval"]["status"])
         self.assertEqual("张三", item["approval"]["artifacts"]["requirements"]["approved_by"])
@@ -1120,11 +991,11 @@ class ApprovalSigningTests(unittest.TestCase):
                 "updated: 2026-08-19\r\n---\r\n\r\n# 需求\r\n"
             ).encode("utf-8")
         )
-        text, bom, newline = update_history.load_artifact(path)
-        stamped = update_history.stamp_frontmatter(
+        text, bom, newline = artifacts.load_artifact(path)
+        stamped = artifacts.stamp_frontmatter(
             text, {"status": "approved", "approved_by": "张三", "approver_role": ""}, newline
         )
-        update_history.save_artifact(path, stamped, bom)
+        artifacts.save_artifact(path, stamped, bom)
         raw = path.read_bytes()
         self.assertTrue(raw.startswith(b"\xef\xbb\xbf"))
         self.assertNotIn(b"\n", raw.replace(b"\r\n", b""))

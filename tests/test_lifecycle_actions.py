@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""approve / archive 自检：批量签署只写一条历史；归档只动目录且拒绝未完成项。"""
+"""approve / archive 自检：批量签署逐个盖章、不写更新历史；归档只动目录且拒绝未完成项。
+
+变更历史以 Git 提交为准，Skill 不再维护按轮追加的 `.agent/history/updates.md`。
+"""
 
 from __future__ import annotations
 
@@ -14,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "skills" / "project-lifecycle" / "scripts"))
 
 import project_status
-import update_history
+import artifacts
 
 
 FRONTMATTER = """---
@@ -29,14 +32,10 @@ status: {status}
 
 
 def build_project(root: Path) -> Path:
-    """搭一个最小可用的 .agent：工作项四件工件 + 空更新历史。"""
+    """搭一个最小可用的 .agent：工作项四件工件 + 已确认的项目规则。"""
     subprocess.run(["git", "init", "-q"], cwd=root, check=True, capture_output=True)
     work_dir = root / ".agent" / "changes" / "WORK-001-示例功能"
     work_dir.mkdir(parents=True)
-    (root / ".agent" / "history").mkdir()
-    (root / ".agent" / "history" / "updates.md").write_text(
-        "# 更新历史\n\n当前暂无更新记录。\n", encoding="utf-8"
-    )
     (root / ".agent" / "rules").mkdir()
     (root / ".agent" / "rules" / "always.md").write_text(
         "---\nstatus: active\nconfigured: true\n---\n\n# 规范\n", encoding="utf-8"
@@ -48,25 +47,21 @@ def build_project(root: Path) -> Path:
     return work_dir
 
 
-def history_entries(root: Path) -> int:
-    path = root / ".agent" / "history" / "updates.md"
-    return path.read_text(encoding="utf-8").count("\n## 20")
-
-
 class ApproveAllTest(unittest.TestCase):
-    def test_single_history_entry_for_batch(self) -> None:
+    def test_approve_all_stamps_every_artifact_without_history(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             work_dir = build_project(root)
             args = argparse.Namespace(
                 work="WORK-001", artifact="all", by="张三", role="产品", json=False
             )
-            update_history.approve(args, root)
+            self.assertEqual(0, artifacts.approve(args, root))
             for artifact in ("requirements", "proposal", "design", "tasks"):
                 text = (work_dir / f"{artifact}.md").read_text(encoding="utf-8")
                 self.assertIn("approved_by: 张三", text)
                 self.assertIn("status: approved", text)
-            self.assertEqual(history_entries(root), 1)
+            # 不再生成按轮更新的历史文件
+            self.assertFalse((root / ".agent" / "history").exists())
 
     def test_single_artifact_keeps_other_statuses(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -75,7 +70,7 @@ class ApproveAllTest(unittest.TestCase):
             args = argparse.Namespace(
                 work="WORK-001", artifact="requirements", by="张三", role="", json=False
             )
-            update_history.approve(args, root)
+            artifacts.approve(args, root)
             self.assertIn(
                 "status: approved",
                 (work_dir / "requirements.md").read_text(encoding="utf-8"),
@@ -98,7 +93,7 @@ class ApproveAllTest(unittest.TestCase):
                 work="WORK-001", artifact="test-report", by="李四", role="", json=False
             )
             with self.assertRaises(RuntimeError):
-                update_history.approve(args, root)
+                artifacts.approve(args, root)
 
     def test_by_falls_back_to_project_approver(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -111,7 +106,7 @@ class ApproveAllTest(unittest.TestCase):
             args = argparse.Namespace(
                 work="WORK-001", artifact="requirements", by=None, role="", json=False
             )
-            update_history.approve(args, root)
+            artifacts.approve(args, root)
             self.assertIn(
                 "approved_by: 王五",
                 (work_dir / "requirements.md").read_text(encoding="utf-8"),
@@ -125,7 +120,7 @@ class ApproveAllTest(unittest.TestCase):
                 work="WORK-001", artifact="requirements", by=None, role="", json=False
             )
             with self.assertRaises(RuntimeError):
-                update_history.approve(args, root)
+                artifacts.approve(args, root)
 
 
 class ArchiveTest(unittest.TestCase):
@@ -134,7 +129,7 @@ class ArchiveTest(unittest.TestCase):
             root = Path(tmp)
             build_project(root)
             args = argparse.Namespace(work="WORK-001", json=False)
-            update_history.archive_completed(args, root)
+            artifacts.archive_completed(args, root)
             self.assertTrue((root / ".agent" / "changes" / "WORK-001-示例功能").is_dir())
             self.assertFalse((root / ".agent" / "changes" / "archive").exists())
 

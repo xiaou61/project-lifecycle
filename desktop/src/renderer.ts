@@ -1773,7 +1773,7 @@ function renderWorkspace(): void {
           "muted small",
           project.lastActivity
             ? `最后活动（${project.lastActivitySource === "git" ? "提交" : "记录"}）${formatDate(project.lastActivity)}`
-            : "没有提交记录，也没有更新历史",
+    : "没有提交记录",
         ),
       );
       card.appendChild(foot);
@@ -2294,16 +2294,16 @@ async function renderValidateTab(): Promise<void> {
 async function renderHistoryTab(): Promise<void> {
   const body = byId("history-body");
   clear(body);
-  body.appendChild(element("p", "muted", "正在读取更新历史…"));
+  body.appendChild(element("p", "muted", "正在读取提交历史…"));
   const result = await window.api.loadHistory(ui.root);
   clear(body);
   if (!result.ok || !result.data) {
-    body.appendChild(element("p", "issue error", result.error || "无法读取更新历史"));
+    body.appendChild(element("p", "issue error", result.error || "无法读取提交历史"));
     return;
   }
   ui.history = result.data;
   if (result.data.length === 0) {
-    body.appendChild(element("p", "muted", "当前没有更新记录。"));
+    body.appendChild(element("p", "muted", "当前没有提交记录。"));
     return;
   }
   for (const entry of result.data) {

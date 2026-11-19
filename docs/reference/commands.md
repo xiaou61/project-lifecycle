@@ -56,13 +56,9 @@ $lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecyc
 | `resume` | 输出可恢复上下文和接力提示 | 跨会话接力 |
 | `validate` | 检查工件、来源、证据和归档引用，保留兼容性警告 | 日常交接检查 |
 | `validate --strict` | 在上述检查基础上把警告视为失败 | 发布前质量门槛 |
-| `updates` | 查看 `.agent/history/updates.md` 的最近记录 | 每轮变化时间线 |
-| `record` | 按固定字段追加一条结构化更新记录 | 变更留痕 |
 | `approve` | 把用户确认盖章成带审批人和时间的签署记录 | 审批签署 |
-| `approve --artifact all` | 一次签完已存在的阶段工件，只写一条历史记录 | 整版确认 |
+| `approve --artifact all` | 一次签完已存在的阶段工件，逐个盖章 | 整版确认 |
 | `archive` | 把已完成工作项移进 `changes/archive/` | 完成收尾 |
-| `checkpoint` | 检查本地工作区是否还有未提交改动 | 本地提交检查点 |
-| `push-check` | 用 `git ls-remote` 核对远端提交和更新历史 | 推送后核验 |
 
 `brief` 是每轮恢复的默认入口：完整 `status` 在 16 个工作项的项目上约 225 KB，而 `brief` 只保留筛选后的活动项与真正阻塞。每项里 `warnings` 是真阻塞（上游未批准、依赖未完成、证据缺口），`hygiene` 是整理项（文档体积、任务状态格式），`advice` 是计划质量建议（如缺 `## 评审焦点`）——只有 `warnings` 会阻止自动恢复。
 
@@ -70,41 +66,31 @@ $lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecyc
 
 这借鉴了 Superpowers 的组合方式：每个动作有清晰边界，但仍由一个生命周期 Skill 统一处理事实、批准和漂移。用户侧风险模式是 `lite`、`managed`、`strict`；`compact`、`full` 是写入工件的兼容工作流字段，需求深挖写在 `requirements.md` 里，不是重复安装的 Skill。
 
-## 更新历史与提交边界
+## 变更历史与提交边界
 
-初始化后，目标项目会有 `.agent/history/updates.md`。每次实际修改后追加本轮的变更、决策、依据、验证和提交状态；新记录标题精确到秒并带本地时区，例如 `2026-09-09 14:32:07 +0800`。详细字段见 [更新历史规则](https://github.com/xiaou61/project-lifecycle/blob/main/skills/project-lifecycle/references/update-history.md)。
+变更历史以 Git 提交为准：每次实际修改后产出一个本地 commit，提交信息写清改了什么、涉及哪个 `WORK-*` 以及关键决策，Git 本身就是可回滚的事实源。Skill 不维护单独的按轮更新历史文件；需要人读的决策理由写进工作项工件（`proposal.md`、`design.md`）或 `.agent/notes/`。
 
-本地 commit 只是恢复和回滚检查点。切换工作项或完成沉淀前应先完成本地检查点；`git push`、远端分支、tag 和部署不会由 Skill 自动执行，必须由用户明确授权。
+本地 commit 只是恢复和回滚检查点。切换工作项或完成沉淀前先 `git status --porcelain` 确认工作区干净；`git push`、远端分支、tag 和部署不会由 Skill 自动执行，必须由用户明确授权。
 
 可组合命令示例：
 
 ```powershell
-# 查看最近 10 条更新
-& $lifecycle updates "F:\我的项目" --tail 10
+# 提交本轮修改（提交信息带工作项编号和改动摘要）
+git -C "F:\我的项目" add -A
+git -C "F:\我的项目" commit -m "feat: WORK-003 调整会话超时处理"
 
-# 追加一条结构化更新记录
-& $lifecycle record "F:\我的项目" --work WORK-003 --title "修复登录超时" --type implementation `
-  --change "调整会话超时处理" --decision "保留现有接口" --basis ".agent/changes/WORK-003-登录/design.md" `
-  --verification "pytest tests/test_login.py -q：通过"
-
-# 用户确认需求后盖章：写入审批人、角色和脚本时间戳，并追加一条决策记录
+# 用户确认需求后盖章：写入审批人、角色和脚本时间戳
 # --by 可省略，省略时取 .agent/rules/always.md 的 approver；都没有时报错而不是猜
 & $lifecycle approve "F:\我的项目" --work WORK-003 --artifact requirements --by "张三" --role "产品"
 
-# 用户一次确认整版：签完已存在的需求/方案/设计/任务，只写一条历史记录
+# 用户一次确认整版：签完已存在的需求/方案/设计/任务，逐个盖章
 & $lifecycle approve "F:\我的项目" --work WORK-003 --artifact all --by "张三" --role "产品"
 
 # 用户验收通过后登记业务验收（只接受 status: passed 的报告）
 & $lifecycle approve "F:\我的项目" --work WORK-003 --artifact test-report --by "李四"
 
-# 切换工作项前检查是否还有未提交改动；有改动时返回非零
-& $lifecycle checkpoint "F:\我的项目" --json
-
-# 推送后核对远端 HEAD 是否已同步，及 updates.md 是否记录
-& $lifecycle push-check "F:\我的项目" --json
-
-# 核验成功后追加本地远端记录（不会提交或再次推送）
-& $lifecycle push-check "F:\我的项目" --record-push --work WORK-003
+# 切换工作项前确认没有未提交改动
+git -C "F:\我的项目" status --porcelain
 ```
 
 ## 发布前检查
@@ -145,7 +131,7 @@ git push origin main
 git push origin v0.0.2
 ```
 
-版本号按兼容性递增；不兼容的 `.agent/` 结构、状态语义或初始化行为要在 Release 中写明迁移和回滚方式。创建 tag 前先完成测试、Skill 校验、更新历史和 `git diff --check`；公开 tag 不移动、不覆盖。
+版本号按兼容性递增；不兼容的 `.agent/` 结构、状态语义或初始化行为要在 Release 中写明迁移和回滚方式。创建 tag 前先完成测试、Skill 校验和 `git diff --check`；公开 tag 不移动、不覆盖。
 
 ## 稳定 JSON
 

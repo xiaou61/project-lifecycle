@@ -99,12 +99,10 @@ updated: 2026-10-21
 - 不开：直接在当前目录工作，同一时刻只允许一个写入对话
 ```
 
-用户同意再执行，并记录这次决定：
+用户同意再执行（这次决定可在 `requirements.md`、`design.md` 或 `.agent/notes/` 里记一句）：
 
 ```powershell
 git worktree add "..\示例项目-WORK-001" -b "work/WORK-001"
-& $lifecycle record "F:\示例项目" --work WORK-001 --type decision `
-  --decision "WORK-001 使用 worktree：..\示例项目-WORK-001，分支 work/WORK-001"
 ```
 
 开之前确认该工作项的 `.agent/changes/WORK-001-*/` 已经提交——worktree 只检出已提交内容。用户拒绝就留在当前目录，不要反复再问。
@@ -135,9 +133,8 @@ evidence: required
 ## 5. 收尾
 
 ```powershell
-& $lifecycle record "F:\示例项目" --work WORK-001 `
-  --change "新增订单 CSV 导出" `
-  --verification "pytest tests/test_export.py -q：通过"
+git -C "F:\示例项目" add -A
+git -C "F:\示例项目" commit -m "feat: WORK-001 新增订单 CSV 导出"
 & $lifecycle archive "F:\示例项目" --work WORK-001
 & $lifecycle validate "F:\示例项目"
 ```

@@ -4,7 +4,7 @@
 
 这里的 `skills/` 是可复用的 Skill 本体，`docs/` 是面向用户的正式教程，`output/` 是生成后的交付文件。初始化到其他项目后，该项目还会拥有自己的 `.agent/INDEX.md`。不要把它们混成一个事实源。
 
-Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiaou61/project-lifecycle/blob/main/CHANGELOG.md)；目标项目的逐轮历史见 `.agent/history/updates.md`。
+Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiaou61/project-lifecycle/blob/main/CHANGELOG.md)；目标项目的变更历史见其 Git 提交。
 
 ## 按模块查找
 
@@ -14,7 +14,7 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 | --- | --- | --- | --- |
 | 入口与风险路由 | `skills/project-lifecycle/SKILL.md` | `lite`、`managed`、`strict` 三档模式和不可绕过的底线 | 单元测试 + 严格校验 |
 | 全流程协议 | `skills/project-lifecycle/references/workflow.md` | 恢复顺序、审批门槛、漂移、依赖和完成语义 | `tests/test_project_status.py` |
-| 规则与边界 | `references/workflow.md` 的「规则层级与优先级」「稳定规格」「决策说明」、`update-history.md` | 规则优先级、关系、稳定事实、决策理由和更新记录边界 | 状态检查 + 严格校验 |
+| 规则与边界 | `references/workflow.md` 的「规则层级与优先级」「稳定规格」「决策说明」 | 规则优先级、关系、稳定事实和决策理由 | 状态检查 + 严格校验 |
 | 阶段工件规范 | `references/requirements.md`、`proposal.md`、`design.md`、`tasks.md`、`testing.md` | 需求（含深挖）、方案、设计、任务和验证报告怎么写 | 工件校验器 |
 
 ### 工具与质量
@@ -24,8 +24,8 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 | 初始化器 | `skills/project-lifecycle/scripts/init_project.py` | 幂等创建目标项目的 `.agent/` 和入口模板 | 单元测试 |
 | 状态汇总与恢复 | `skills/project-lifecycle/scripts/project_status.py` | 推导阶段、依赖、Git 状态和 `--resume` JSON | 单元测试 + JSON 解析 |
 | 校验器 | `skills/project-lifecycle/scripts/project_validate.py` | 普通校验和可选 `--strict` 的结构、来源、证据、归档引用检查 | `--strict` |
-| 用户命令适配器 | `skills/project-lifecycle/scripts/project-lifecycle.py`（`.ps1`/`.sh` 转发） | 用 `init/status/brief/resume/validate/updates/record/approve/archive/checkpoint/push-check` 隐藏底层 Python 实现 | 入口自检 |
-| 更新历史命令 | `skills/project-lifecycle/scripts/update_history.py` | 查看、追加更新记录、盖章签署、归档已完成工作项和检查本地提交检查点 | 命令行为检查 |
+| 用户命令适配器 | `skills/project-lifecycle/scripts/project-lifecycle.py`（`.ps1`/`.sh` 转发） | 用 `init/status/brief/resume/validate/approve/archive` 隐藏底层 Python 实现 | 入口自检 |
+| 签署与归档命令 | `skills/project-lifecycle/scripts/artifacts.py` | 盖章签署、归档已完成工作项 | 命令行为检查 |
 | 回归测试 | `tests/test_project_status.py`、`tests/test_task_parsing.py`、`tests/test_lifecycle_actions.py`、`tests/test_skill_packaging.py` | 固化生命周期与边界行为、任务解析的四种写法、批量签署与归档、文档路径与命令映射 | 维护者发布检查 |
 
 ### 面向用户的文档
@@ -37,7 +37,7 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 | 开始使用 | `docs/guide/getting-started.md` | 安装、初始化和第一次工作 | [开始使用](/guide/getting-started) |
 | 全流程 | `docs/guide/full-workflow.md` | 需求到完成的阶段说明 | [全流程教程](/guide/full-workflow) |
 | 恢复与接力 | `docs/guide/resume.md` | 跨会话恢复、多个工作项和 Git 状态 | [恢复与接力](/guide/resume) |
-| QA 问答 | `docs/guide/qa.md` | 31 个从安装到并发协作、验收和历史记录的实操问题 | [QA 问答](/guide/qa) |
+| QA 问答 | `docs/guide/qa.md` | 从安装到并发协作和验收的实操问题 | [QA 问答](/guide/qa) |
 | 需求与验收 | `docs/guide/requirements.md` | 事实、决定、来源覆盖和验收标准 | [需求、来源与验收](/guide/requirements) |
 | 需求深挖访谈 | `docs/guide/requirements-interview.md`、`skills/project-lifecycle/references/requirements.md` 的「需求深挖」 | 决策树、逐轮提问、停止条件和 PRD/Task 门槛 | [需求深挖访谈](/guide/requirements-interview) |
 | 任务拆分规则 | `skills/project-lifecycle/references/tasks.md` | 纵向切片、真实阻塞关系和 expand-contract 重构 | [全流程教程](/guide/full-workflow) |
@@ -49,7 +49,7 @@ Skill 仓库本身的更新和决策见 [`CHANGELOG.md`](https://github.com/xiao
 
 | 模块 | 主要位置 | 用途 | 约定 |
 | --- | --- | --- | --- |
-| 目标项目导航与历史 | `.agent/INDEX.md`、`.agent/history/updates.md` | 按业务模块定位代码、规格、工作项和每轮变更记录 | 更新记录追加维护，索引不复制阶段状态 |
+| 目标项目导航 | `.agent/INDEX.md` | 按业务模块定位代码、规格和工作项 | 索引不复制阶段状态 |
 | 正式教程源文件 | `docs/` | VitePress 页面和静态资源 | 用 `npm run docs:dev` 预览 |
 | 生成交付物 | `output/` | 可下载的 HTML、Draw.io 等最终产物 | 不把这里当运行时事实源 |
 | VitePress 配置 | `docs/.vitepress/config.mts` | 导航、侧栏、搜索和站点元信息 | `npm run docs:build` |

@@ -215,7 +215,7 @@ interface ProjectSummary {
   acceptanceGaps: number;
   rulesReady: boolean;
   gitStatus: string;
-  /** 最后一次活动：优先 Git 提交时间，其次 updates.md 的最后一条记录。 */
+  /** 最后一次活动：取 Git 提交时间；没有提交时为空。 */
   lastActivity: string;
   lastActivitySource: string;
 }

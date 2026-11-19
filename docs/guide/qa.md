@@ -144,10 +144,10 @@ git worktree add "..\我的项目-WORK-003" -b "work/WORK-003"
 采用人工写入排他：同一目录同一时刻只允许一个对话修改，其他对话只读或等待。切换前执行：
 
 ```powershell
-& $lifecycle checkpoint "F:\我的项目" --json
+git -C "F:\我的项目" status --porcelain
 ```
 
-若结果显示 `dirty`，先确认这些改动属于谁。看到未知改动时先让用户确认，不覆盖、不清理、不替别人提交。这个办法降低误操作概率，但仍不替代分支合并和冲突解决。
+若输出不为空，先确认这些改动属于谁。看到未知改动时先让用户确认，不覆盖、不清理、不替别人提交。这个办法降低误操作概率，但仍不替代分支合并和冲突解决。
 
 ### 16. 多个活动工作项时，Skill 会替我选哪个？
 
@@ -222,50 +222,15 @@ git worktree add "..\我的项目-WORK-003" -b "work/WORK-003"
 
 这样做会多一次确认，但能避免“旧 PRD + 新实现 + 旧测试”拼成看似完整、实际不可追溯的结果。
 
-## 历史、索引与理解材料
+## 索引与理解材料
 
-### 23. 每次修改怎么留下更新历史？
+### 23. 每次修改怎么留下变更历史？
 
-目标项目初始化后有 `.agent/history/updates.md`，每次实际改源码、测试、配置、Skill 规则、文档或工件都追加一条记录，至少写变更、决策、依据、验证、本地提交和远端推送边界。新记录标题精确到秒并带本地时区，例如 `2026-09-09 13:47:43 +0800`；旧的纯日期记录仍可正常读取。记录是追加式的，发现错误时追加更正，不覆盖旧事实。
+不维护单独的更新历史文件。变更历史以 Git 提交为准：每次实际修改后产出一个本地 commit，提交信息写清改了什么、涉及哪个 `WORK-*` 和关键决策；需要长期保留的决策理由写进工作项工件（`proposal.md`、`design.md`）或 `.agent/notes/`。Git 本身就是可回滚、可审计的事实源，比在 Markdown 里手工追加更可靠。
 
-查看最近记录：
+### 24. Skill 会自动提交或推送吗？
 
-```powershell
-& $lifecycle updates "F:\我的项目" --tail 10
-```
-
-### 24. `record` 会自动提交或推送吗？
-
-不会。它只追加结构化文本，不创建 Git commit，也不执行 `push`：
-
-```powershell
-& $lifecycle record "F:\我的项目" --work WORK-003 --title "修复登录超时" --type implementation `
-  --change "调整会话超时处理" --decision "保留现有接口" `
-  --basis ".agent/changes/WORK-003-用户登录/design.md" `
-  --verification "pytest tests/test_login.py -q：通过"
-```
-
-本地提交、远端分支、tag、部署都需要单独的用户授权；更新记录里必须如实写“待用户授权/未提交”或“未执行”。
-
-### 24.1 已经推送但忘了更新 `updates.md` 怎么办？
-
-推送后运行：
-
-```powershell
-& $lifecycle push-check "F:\我的项目" --json
-```
-
-它用 `git ls-remote` 读取真实远端提交。若远端已包含当前 `HEAD` 但历史缺记录，会返回非零并标记不一致；确认后运行 `--record-push` 追加本地核验记录。追加不会自动提交或再次推送，因此后续发布历史仍需单独授权。
-
-### 25. `checkpoint` 检查什么？
-
-它是切换工作项或交接前的只读检查，主要确认 Git 工作区是否还有未提交改动：
-
-```powershell
-& $lifecycle checkpoint "F:\我的项目" --json
-```
-
-返回非零表示工作区仍需处理，不表示代码一定错误。它不会替你提交或清理文件；再由用户决定是否创建本地 commit。
+不会。修改只落本地，是否 commit、`git push`、建远端分支/tag、部署都要用户单独明确授权。切换工作项或交接前，用 `git -C "F:\我的项目" status --porcelain` 确认工作区干净；有未提交改动先确认归属，不覆盖、不清理、不替别人提交。
 
 ### 26. 总索引、项目 `.agent/INDEX.md` 和 Git 历史有什么区别？
 
@@ -285,4 +250,4 @@ git worktree add "..\我的项目-WORK-003" -b "work/WORK-003"
 
 它不提供同一目录的并发锁、不自动合并分支、不运行数据库、不拦截所有 Agent 写入、不替代 CI/CD、线上监控或业务验收，也不会凭空补齐缺失的来源和测试证据。遇到这些需求时，使用 Git 分支/Worktree、项目现有测试和部署工具，并把外部结果记录回工作项。
 
-最短可靠组合是：先用 `status/resume` 恢复事实，按工作项隔离写入，完成后用测试和 `validate` 证明，再用 `updates/record/checkpoint` 留下可追溯记录。需要进一步了解阶段门槛，可阅读[全流程教程](/guide/full-workflow)和[边界与常见问题](/reference/boundaries)。
+最短可靠组合是：先用 `status/resume` 恢复事实，按工作项隔离写入，完成后用测试和 `validate` 证明，再用 Git 提交留下可追溯记录。需要进一步了解阶段门槛，可阅读[全流程教程](/guide/full-workflow)和[边界与常见问题](/reference/boundaries)。

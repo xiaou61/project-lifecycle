@@ -38,8 +38,7 @@ $lifecycle = "<已安装 Skill 目录>/project-lifecycle/scripts/project-lifecyc
 │  ├─ rules/always.md
 │  ├─ INDEX.md
 │  ├─ specs/
-│  ├─ changes/
-│  └─ history/updates.md
+│  └─ changes/
 └─ 你的源码和测试/
 ```
 

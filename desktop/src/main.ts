@@ -228,12 +228,6 @@ const RESOURCE_GROUPS: Array<{ key: string; label: string; hint: string; dirs: s
     dirs: ["references"],
   },
   {
-    key: "history",
-    label: "更新历史",
-    hint: "updates.md 是追加式时间线，不替代工作项工件或 Git 历史",
-    dirs: ["history"],
-  },
-  {
     key: "archive",
     label: "归档工作项",
     hint: "验证通过后归档的完整决策轨迹，保留原样供查阅",
@@ -432,13 +426,6 @@ async function lastActivityOf(root: string): Promise<{ value: string; source: st
   } catch {
     // 不是仓库或没有提交，继续回退
   }
-  const history = path.join(root, ".agent", "history", "updates.md");
-  if (existsSync(history)) {
-    const text = await readFile(history, { encoding: "utf8" }).catch(() => "");
-    const matches = text.match(/^##\s+(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{4})/gm);
-    const last = matches?.[matches.length - 1];
-    if (last) return { value: last.replace(/^##\s+/, ""), source: "updates" };
-  }
   return { value: "", source: "none" };
 }
 
@@ -595,15 +582,25 @@ function registerHandlers(): void {
 
   ipcMain.handle("load-history", async (_event, root: string) => {
     try {
-      const result = await runPython("update_history.py", [root, "--list", "--json", "--tail", "20"]);
-      const payload = parseJson<{ entries: string[] }>(result);
-      const entries = payload.entries
-        .map((raw) => {
-          const lines = raw.split(/\r?\n/);
-          const heading = (lines[0] ?? "").replace(/^##\s*/, "");
-          return { title: heading, body: lines.slice(1).join("\n").trim() };
-        })
-        .reverse();
+      const result = await run("git", [
+        "-C",
+        root,
+        "log",
+        "-n",
+        "20",
+        "--date=iso-strict",
+        "--pretty=format:%h%x09%ad%x09%s",
+      ]);
+      if (result.code !== 0) {
+        return { ok: false, data: null, error: result.stderr.trim() || "无法读取 Git 提交历史" };
+      }
+      const entries = result.stdout
+        .split(/\r?\n/)
+        .filter((line) => line.trim().length > 0)
+        .map((line) => {
+          const [hash = "", date = "", ...subject] = line.split("\t");
+          return { title: subject.join("\t") || hash, body: `${hash} · ${date}` };
+        });
       return { ok: true, data: entries, error: "" };
     } catch (error) {
       return { ok: false, data: null, error: (error as Error).message };

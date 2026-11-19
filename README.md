@@ -48,7 +48,6 @@ your-project/
       testing/plan.md
       testing/report.md
     notes/ references/              决策理由和共享资料
-    history/                        更新历史
     scripts/                        项目内确定性辅助脚本
   src/                              项目原有源代码
   tests/                            项目原有可执行测试
@@ -67,12 +66,10 @@ skills/project-lifecycle/
   references/design.md             组件、接口、数据流和失败行为（full）
   references/tasks.md              任务前置条件和执行拆分
   references/testing.md            验收矩阵、证据和剩余风险
-  references/update-history.md     更新日志字段、本地检查点和推送边界
   examples/managed-walkthrough.md  从需求到验证的最小完整走查
   scripts/project-lifecycle.ps1    面向用户的统一命令入口（Windows）
   scripts/project-lifecycle.sh     面向用户的统一命令入口（macOS/Linux）
   scripts/project-lifecycle.py     命令映射与转发，上面两个入口共用
-  scripts/update_history.py        更新历史与本地检查点命令实现
   scripts/init_project.py          幂等初始化器
   scripts/project_status.py        只读状态汇总器
   scripts/project_validate.py      工件校验器（可选严格模式）
@@ -157,28 +154,24 @@ Agent 会主动给受管理需求分配不复用的中文名称和 `WORK-*` 编�
 
 状态查询返回当前阶段、工件状态、任务计数、依赖、关联、阻塞原因和下一步。`resume` 额外输出唯一可恢复工作项、建议读取路径和可复制接力句；JSON 顶层有稳定的 `schema_version` 和 `generated_at`，`git` 概览会标出脏工作区和归因状态。需要检查重复 `REQ-*`/`AC-*`/`TASK-*`、正式来源引用、结构化测试证据和项目规则时，使用 `project-lifecycle.ps1 validate`。外层工作区只返回导航提示，不承载 `WORK-*` 状态。
 
-多个对话可以通过不同 `WORK-*` 接力，但 Skill 不提供同一工作树的文件锁或自动合并。并行写入时为每个工作项使用独立分支和 Git Worktree；不能使用 Worktree 时，同一目录同一时刻只允许一个写入对话，切换前先运行 `checkpoint`。详细问答见 [VitePress QA](docs/guide/qa.md)。
+多个对话可以通过不同 `WORK-*` 接力，但 Skill 不提供同一工作树的文件锁或自动合并。并行写入时为每个工作项使用独立分支和 Git Worktree；不能使用 Worktree 时，同一目录同一时刻只允许一个写入对话，切换前先用 `git status --porcelain` 确认工作区干净。详细问答见 [VitePress QA](docs/guide/qa.md)。
 
-更新历史命令：`updates` 查看 `.agent/history/updates.md`，`record` 按固定字段追加一条记录，`checkpoint` 检查本地 Git 工作区是否还有未提交改动，`push-check` 用 `git ls-remote` 核对远端 HEAD 和历史记录。它们不会自动提交或推送。
+变更历史以 Git 提交为准：每次实际修改后产出一个本地 commit，提交信息写清改动和涉及的 `WORK-*`；需要人读的决策理由写进工作项工件或 `.agent/notes/`。Skill 不维护单独的按轮更新历史文件。
 
-审批签署命令：`approve` 把用户确认盖章成带审批人和脚本时间戳的记录。它同时把工件 `status` 置为 `approved`、写入 `approved_by`/`approved_at`/`approver_role`（`--artifact test-report` 时写 `accepted_by`/`accepted_at`）并追加一条决策记录。签署字段只能由这个入口写入，Agent 不得自行填写；缺少签署时 `validate` 报告警告，`validate --strict` 视为失败。
+审批签署命令：`approve` 把用户确认盖章成带审批人和脚本时间戳的记录。它同时把工件 `status` 置为 `approved`、写入 `approved_by`/`approved_at`/`approver_role`（`--artifact test-report` 时写 `accepted_by`/`accepted_at`）。签署字段只能由这个入口写入，Agent 不得自行填写；缺少签署时 `validate` 报告警告，`validate --strict` 视为失败。
 
 ```powershell
-& $lifecycle updates "F:\我的项目" --tail 10
-& $lifecycle record "F:\我的项目" --work WORK-003 --title "修复登录超时" --type implementation `
-  --change "调整会话超时处理" --decision "保留现有接口" --basis ".agent/changes/WORK-003-登录/design.md" `
-  --verification "pytest tests/test_login.py -q：通过"
+git -C "F:\我的项目" add -A
+git -C "F:\我的项目" commit -m "feat: WORK-003 调整会话超时处理"
 & $lifecycle approve "F:\我的项目" --work WORK-003 --artifact requirements --by "张三" --role "产品"
 & $lifecycle approve "F:\我的项目" --work WORK-003 --artifact all --by "张三" --role "产品"
-& $lifecycle checkpoint "F:\我的项目" --json
-& $lifecycle push-check "F:\我的项目" --json
 ```
 
-每次实际修改后，Agent 还要在目标项目 `.agent/history/updates.md` 追加变更、决策、依据、验证和本地提交边界。切换独立工作项或完成沉淀前，先留下本地 commit 检查点；`git push`、远端分支、tag 和部署必须得到用户明确授权。
+切换独立工作项或完成沉淀前，先 `git status --porcelain` 确认工作区干净；`git push`、远端分支、tag 和部署必须得到用户明确授权。
 
 ## 工件查看器
 
-[`desktop/`](desktop/README.md) 是一个 Electron + TypeScript 的只读界面，两个视图：**工作区**（各项目的阻塞/待补签/证据缺口汇总，点卡片进入项目）与**项目**（五个页签：**总览**（七道阶段门槛条 + 需求追踪图（REQ/AC/TASK 三条带，悬停亮线、点击看关系、缺口标黄）+ 工作项依赖/关联图）、**阅读**（工件状态、审批签署、Git 日期与 Markdown 正文）、**校验**、**历史**、**数据**（原始 JSON，点字段跳转））。它不替代 `status` 命令，也不写任何工件——状态与追踪关系都由 `project_status.py` 推导，界面只是渲染那份 JSON。
+[`desktop/`](desktop/README.md) 是一个 Electron + TypeScript 的只读界面，两个视图：**工作区**（各项目的阻塞/待补签/证据缺口汇总，点卡片进入项目）与**项目**（五个页签：**总览**（七道阶段门槛条 + 需求追踪图（REQ/AC/TASK 三条带，悬停亮线、点击看关系、缺口标黄）+ 工作项依赖/关联图）、**阅读**（工件状态、审批签署、Git 日期与 Markdown 正文）、**校验**、**提交**、**数据**（原始 JSON，点字段跳转））。它不替代 `status` 命令，也不写任何工件——状态与追踪关系都由 `project_status.py` 推导，界面只是渲染那份 JSON。
 
 ```powershell
 cd desktop
